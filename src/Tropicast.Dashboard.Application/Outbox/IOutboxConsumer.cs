@@ -5,10 +5,12 @@ public sealed record OutboxEnvelope(Guid Id, string Type, string Payload, DateTi
 
 /// <summary>
 /// Receives domain events from the outbox (provisioning #8, RadioBrowser #13). Delivery is at least once:
-/// handlers must be idempotent. A throw retries the message later with backoff.
+/// handlers must be idempotent. A throw retries the message later with backoff. Messages whose type no consumer
+/// handles stay stored until one does, so a consumer added later receives earlier events too.
 /// </summary>
 public interface IOutboxConsumer
 {
-    bool Accepts(string eventType);
+    /// <summary>Event type names this consumer handles, e.g. <c>StationCreated</c>.</summary>
+    IReadOnlyCollection<string> EventTypes { get; }
     Task HandleAsync(OutboxEnvelope message, CancellationToken cancellationToken);
 }

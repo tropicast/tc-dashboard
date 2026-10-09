@@ -15,7 +15,7 @@ builder.Services.AddExceptionHandler(options =>
 // Enums travel by name ("Owner"), as they are stored; numbers are rejected, so undefined values never get in.
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
-builder.Services.AddOpenApi(options => options.AddExamples());
+builder.Services.AddOpenApi(options => options.AddExamples().AddConcurrencyHeaders());
 builder.Services.AddHealthChecks();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

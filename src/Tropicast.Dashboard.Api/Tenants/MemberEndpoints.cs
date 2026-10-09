@@ -38,6 +38,9 @@ internal static class MemberEndpoints
     private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> RemoveAsync(Guid userId, TenantAccess access,
         AppDbContext db, CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        // Locks the tenant row: two concurrent removals cannot both see a second Owner and leave none.
+        await db.Tenants.FromSql($"SELECT *, xmin FROM tenants WHERE id = {access.TenantId} FOR UPDATE").SingleAsync(cancellationToken);
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.UserId == userId, cancellationToken);
         if (membership is null)
         {
@@ -57,6 +60,7 @@ internal static class MemberEndpoints
         }
         db.Memberships.Remove(membership);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return TypedResults.NoContent();
     }
 }

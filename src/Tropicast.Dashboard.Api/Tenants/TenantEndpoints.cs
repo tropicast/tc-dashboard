@@ -40,11 +40,11 @@ internal static class TenantEndpoints
     internal static void MapTenants(this IEndpointRouteBuilder app)
     {
         var tenants = app.MapGroup("/api/v1/tenants").WithTags("Tenants").AddEndpointFilter<CommandValidation>();
-        tenants.MapPost("", CreateAsync).RequireAuthorization()
+        tenants.MapPost("", CreateAsync).RequireAuthorization().WithETag()
             .WithSummary("Creates a tenant on the Free plan; the caller becomes its Owner.");
-        tenants.MapGet("/current", GetAsync).RequireAuthorization(TenantPolicies.Member)
+        tenants.MapGet("/current", GetAsync).RequireAuthorization(TenantPolicies.Member).WithETag()
             .WithSummary("The current tenant (X-Tenant-Id), its plan and usage.");
-        tenants.MapPatch("/current", UpdateAsync).RequireAuthorization(TenantPolicies.Admin)
+        tenants.MapPatch("/current", UpdateAsync).RequireAuthorization(TenantPolicies.Admin).WithIfMatch().WithETag()
             .WithSummary("Renames the current tenant. Needs If-Match.");
     }
 

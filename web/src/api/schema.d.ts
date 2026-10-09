@@ -737,6 +737,10 @@ export interface paths {
                 /** @description Created */
                 201: {
                     headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        /** @description Address of the created resource. */
+                        Location?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -780,6 +784,8 @@ export interface paths {
                 /** @description OK */
                 200: {
                     headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -797,7 +803,10 @@ export interface paths {
         patch: {
             parameters: {
                 query?: never;
-                header?: never;
+                header: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match": string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -810,6 +819,8 @@ export interface paths {
                 /** @description OK */
                 200: {
                     headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -966,6 +977,10 @@ export interface paths {
                 /** @description Created */
                 201: {
                     headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        /** @description Address of the created resource. */
+                        Location?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -1011,6 +1026,8 @@ export interface paths {
                 /** @description OK */
                 200: {
                     headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -1032,7 +1049,10 @@ export interface paths {
         delete: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match"?: string;
+                };
                 path: {
                     id: string;
                 };
@@ -1062,7 +1082,10 @@ export interface paths {
         patch: {
             parameters: {
                 query?: never;
-                header?: never;
+                header: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match": string;
+                };
                 path: {
                     id: string;
                 };
@@ -1077,6 +1100,8 @@ export interface paths {
                 /** @description OK */
                 200: {
                     headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -1458,8 +1483,8 @@ export interface components {
          *     }
          */
         UpdateTenantCommand: {
-            name: null | string;
-            slug: null | string;
+            name?: null | string;
+            slug?: null | string;
         };
         /** @description API version information. */
         VersionInfo: {

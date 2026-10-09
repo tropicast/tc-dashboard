@@ -488,6 +488,21 @@
         "responses": {
           "201": {
             "description": "Created",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "Address of the created resource.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -518,6 +533,14 @@
         "responses": {
           "200": {
             "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -533,6 +556,17 @@
           "Tenants"
         ],
         "summary": "Renames the current tenant. Needs If-Match.",
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The ETag from your last read. Missing: 428; stale: 412.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -546,6 +580,14 @@
         "responses": {
           "200": {
             "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -692,6 +734,21 @@
         "responses": {
           "201": {
             "description": "Created",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "Address of the created resource.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -733,6 +790,14 @@
         "responses": {
           "200": {
             "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -760,6 +825,15 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The ETag from your last read. Missing: 428; stale: 412.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -775,6 +849,14 @@
         "responses": {
           "200": {
             "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -811,6 +893,14 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The ETag from your last read. Missing: 428; stale: 412.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1692,10 +1782,6 @@
           {
             "name": "Radio Mada Media"
           }
-        ],
-        "required": [
-          "name",
-          "slug"
         ],
         "type": "object",
         "properties": {

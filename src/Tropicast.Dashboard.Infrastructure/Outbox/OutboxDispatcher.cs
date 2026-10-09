@@ -18,7 +18,8 @@ public sealed class OutboxOptions
 
 /// <summary>
 /// Delivers outbox messages to every <see cref="IOutboxConsumer"/> that handles their type. Rows are claimed with
-/// <c>FOR UPDATE SKIP LOCKED</c>, so several API instances can run it. A message is done when all its consumers succeed.
+/// <c>FOR UPDATE SKIP LOCKED</c>, so several API instances can run it. A message is done when all its consumers succeed;
+/// types no consumer handles are left pending (not claimed), so they wait without being polled.
 /// </summary>
 internal sealed partial class OutboxDispatcher(IServiceScopeFactory scopes, IOptions<OutboxOptions> options, TimeProvider time,
     ILogger<OutboxDispatcher> logger) : BackgroundService
@@ -53,12 +54,18 @@ internal sealed partial class OutboxDispatcher(IServiceScopeFactory scopes, IOpt
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var consumers = scope.ServiceProvider.GetServices<IOutboxConsumer>().ToList();
+        var types = consumers.SelectMany(c => c.EventTypes).Distinct().ToArray();
+        if (types.Length == 0)
+        {
+            // Nothing consumes events yet: keep them for when a consumer is registered.
+            return 0;
+        }
         var now = time.GetUtcNow();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var batch = await db.OutboxMessages
             .FromSql($"""
                 SELECT *, xmin FROM outbox_messages
-                WHERE processed_at IS NULL AND (next_attempt_at IS NULL OR next_attempt_at <= {now})
+                WHERE processed_at IS NULL AND type = ANY({types}) AND (next_attempt_at IS NULL OR next_attempt_at <= {now})
                 ORDER BY occurred_at
                 LIMIT {options.Value.BatchSize}
                 FOR UPDATE SKIP LOCKED
@@ -69,7 +76,7 @@ internal sealed partial class OutboxDispatcher(IServiceScopeFactory scopes, IOpt
             var envelope = new OutboxEnvelope(message.Id, message.Type, message.Payload, message.OccurredAt);
             try
             {
-                foreach (var consumer in consumers.Where(c => c.Accepts(message.Type)))
+                foreach (var consumer in consumers.Where(c => c.EventTypes.Contains(message.Type)))
                 {
                     await consumer.HandleAsync(envelope, cancellationToken);
                 }

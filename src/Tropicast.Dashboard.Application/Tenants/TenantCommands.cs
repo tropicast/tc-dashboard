@@ -9,7 +9,7 @@ namespace Tropicast.Dashboard.Application.Tenants;
 public sealed record CreateTenantCommand(string Name, string Slug);
 
 /// <summary>Changes the tenant's name or slug; omitted fields keep their value.</summary>
-public sealed record UpdateTenantCommand(string? Name, string? Slug);
+public sealed record UpdateTenantCommand(string? Name = null, string? Slug = null);
 
 internal sealed class CreateTenantValidator : AbstractValidator<CreateTenantCommand>
 {

@@ -81,3 +81,27 @@ public sealed class TenantTests(DashboardFactory factory) : IClassFixture<Dashbo
         (await dj.SendAsync(HttpMethod.Get, "/api/v1/tenants/current")).Status(HttpStatusCode.Forbidden);
     }
 }
+
+public sealed class LastOwnerTests(DashboardFactory factory) : IClassFixture<DashboardFactory>
+{
+    [Fact]
+    public async Task Two_owners_removing_each_other_at_once_leave_one_owner()
+    {
+        var first = new Browser(factory);
+        var firstId = await first.SignUpAndLoginAsync(Browser.Unique("first"));
+        var tenantId = await first.CreateTenantAsync();
+        var second = new Browser(factory) { TenantId = tenantId };
+        var secondId = await second.SignUpAndLoginAsync(Browser.Unique("second"));
+        await Browser.AddMemberAsync(factory, tenantId, secondId, MembershipRole.Owner);
+
+        var results = await Task.WhenAll(
+            first.SendAsync(HttpMethod.Delete, $"/api/v1/tenants/current/members/{secondId}"),
+            second.SendAsync(HttpMethod.Delete, $"/api/v1/tenants/current/members/{firstId}"));
+        Assert.Single(results, r => r.StatusCode == HttpStatusCode.NoContent);
+
+        var survivor = results[0].StatusCode == HttpStatusCode.NoContent ? first : second;
+        var members = await (await survivor.SendAsync(HttpMethod.Get, "/api/v1/tenants/current/members"))
+            .Content.ReadFromJsonAsync<List<MemberResponse>>(Browser.Json, TestContext.Current.CancellationToken);
+        Assert.Equal(MembershipRole.Owner, Assert.Single(members!).Role);
+    }
+}

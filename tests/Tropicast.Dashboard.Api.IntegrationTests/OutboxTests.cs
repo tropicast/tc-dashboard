@@ -54,12 +54,26 @@ public sealed class OutboxTests(PostgresContainer postgres) : IAsyncLifetime
         Assert.Equal("StationCreated", Assert.Single(_consumer.Received).Type);
     }
 
+    [Fact]
+    public async Task Without_consumers_messages_stay_pending_for_later()
+    {
+        var owner = new Browser(_factory);
+        await owner.SignUpAndLoginAsync(Browser.Unique("owner"));
+        await owner.CreateTenantAsync();
+        await owner.SendAsync(HttpMethod.Post, "/api/v1/stations", new { name = "Radio", slug = "pending" });
+
+        Assert.Equal(0, await _factory.Services.GetRequiredService<OutboxDispatcher>().DispatchBatchAsync(Token));
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.All(await db.OutboxMessages.ToListAsync(Token), m => Assert.Null(m.ProcessedAt));
+    }
+
     private sealed class RecordingConsumer : IOutboxConsumer
     {
         public List<OutboxEnvelope> Received { get; } = [];
         public bool FailNext { get; set; }
 
-        public bool Accepts(string eventType) => eventType == "StationCreated";
+        public IReadOnlyCollection<string> EventTypes { get; } = ["StationCreated"];
 
         public Task HandleAsync(OutboxEnvelope message, CancellationToken cancellationToken)
         {

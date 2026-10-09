@@ -45,13 +45,13 @@ internal static class StationEndpoints
         var stations = app.MapGroup("/api/v1/stations").WithTags("Stations").AddEndpointFilter<CommandValidation>();
         stations.MapGet("", ListAsync).RequireAuthorization(TenantPolicies.Member)
             .WithSummary("Stations of the current tenant, newest first.");
-        stations.MapPost("", CreateAsync).RequireAuthorization(TenantPolicies.Admin)
+        stations.MapPost("", CreateAsync).RequireAuthorization(TenantPolicies.Admin).WithETag()
             .WithSummary("Creates a station within the plan's station limit and assigns it a stream.");
-        stations.MapGet("/{id:guid}", GetAsync).RequireAuthorization(TenantPolicies.Member)
+        stations.MapGet("/{id:guid}", GetAsync).RequireAuthorization(TenantPolicies.Member).WithETag()
             .WithSummary("One station; the ETag header is needed to change it.");
-        stations.MapPatch("/{id:guid}", UpdateAsync).RequireAuthorization(TenantPolicies.Admin)
+        stations.MapPatch("/{id:guid}", UpdateAsync).RequireAuthorization(TenantPolicies.Admin).WithIfMatch().WithETag()
             .WithSummary("Changes station settings. Needs If-Match.");
-        stations.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization(TenantPolicies.Admin)
+        stations.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization(TenantPolicies.Admin).WithIfMatch(required: false)
             .WithSummary("Deletes the station; its history is kept and its public ID is never reused.");
     }
 
