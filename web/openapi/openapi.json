@@ -479,6 +479,7 @@
         "type": "object",
         "properties": {
           "token": {
+            "maxLength": 256,
             "type": "string"
           }
         }
@@ -551,6 +552,7 @@
         "type": "object",
         "properties": {
           "email": {
+            "maxLength": 256,
             "type": "string"
           }
         }
@@ -635,10 +637,20 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string"
+            "maxLength": 256,
+            "type": "string",
+            "description": "Address to invite; the invitee accepts after signing in with it."
           },
           "role": {
-            "$ref": "#/components/schemas/MembershipRole"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Required: there is no default role.",
+                "$ref": "#/components/schemas/MembershipRole"
+              }
+            ]
           }
         }
       },
@@ -650,6 +662,7 @@
         "type": "object",
         "properties": {
           "email": {
+            "maxLength": 256,
             "type": "string"
           },
           "password": {
@@ -718,6 +731,7 @@
         "type": "object",
         "properties": {
           "refreshToken": {
+            "maxLength": 256,
             "type": "string"
           }
         }
@@ -730,6 +744,7 @@
         "type": "object",
         "properties": {
           "email": {
+            "maxLength": 256,
             "type": "string"
           },
           "password": {
@@ -746,6 +761,7 @@
         "type": "object",
         "properties": {
           "email": {
+            "maxLength": 256,
             "type": "string"
           },
           "code": {
@@ -765,12 +781,14 @@
         "type": "object",
         "properties": {
           "email": {
+            "maxLength": 256,
             "type": "string"
           },
           "password": {
             "type": "string"
           },
           "deviceName": {
+            "maxLength": 64,
             "type": "string"
           }
         }

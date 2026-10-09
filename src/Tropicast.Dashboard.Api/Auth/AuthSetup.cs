@@ -38,9 +38,9 @@ internal static class AuthSetup
 
         services.AddIdentityCore<AppUser>(options =>
             {
-                // Length over composition rules (NIST SP 800-63B).
+                // Length is the only rule (NIST SP 800-63B): no composition or distinct-character requirements.
                 options.Password.RequiredLength = 12;
-                options.Password.RequiredUniqueChars = 4;
+                options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireDigit = false;
                 options.Password.RequireLowercase = false;
                 options.Password.RequireUppercase = false;
@@ -63,8 +63,7 @@ internal static class AuthSetup
             })
             // The desktop app sends a bearer token; the SPA relies on its cookie.
             .AddPolicyScheme(SessionOrBearer, null, options => options.ForwardDefaultSelector = context =>
-                context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.Ordinal)
-                    ? IdentityConstants.BearerScheme : IdentityConstants.ApplicationScheme)
+                IsBearer(context.Request) ? IdentityConstants.BearerScheme : IdentityConstants.ApplicationScheme)
             .AddBearerToken(IdentityConstants.BearerScheme, options => options.BearerTokenExpiration = TimeSpan.FromMinutes(15))
             .AddIdentityCookies();
 
@@ -116,6 +115,7 @@ internal static class AuthSetup
     /// <summary>Authentication, tenant resolution, antiforgery for cookie sessions, rate limits and authorization, in order.</summary>
     internal static WebApplication UseDashboardAuth(this WebApplication app)
     {
+        app.Use(NormalizeBearerScheme);
         app.UseAuthentication();
         app.UseMiddleware<TenantAccessMiddleware>();
         app.Use(ValidateAntiforgeryForSessionsAsync);
@@ -132,6 +132,7 @@ internal static class AuthSetup
     {
         var method = context.Request.Method;
         if (context.Request.Path.StartsWithSegments("/api") && context.Request.Cookies.ContainsKey(SessionCookie)
+            && !IsBearer(context.Request)
             && !(HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method) || HttpMethods.IsTrace(method)))
         {
             try
@@ -148,6 +149,24 @@ internal static class AuthSetup
         }
         await next(context);
     }
+
+    /// <summary>
+    /// Scheme names are case-insensitive (RFC 9110), but the bearer handler only reads "Bearer ": rewrite "bearer ",
+    /// "BEARER " and the like before authentication.
+    /// </summary>
+    private static Task NormalizeBearerScheme(HttpContext context, RequestDelegate next)
+    {
+        var header = context.Request.Headers.Authorization.ToString();
+        if (IsBearer(context.Request) && !header.StartsWith("Bearer ", StringComparison.Ordinal))
+        {
+            context.Request.Headers.Authorization = "Bearer " + header["Bearer ".Length..];
+        }
+        return next(context);
+    }
+
+    /// <summary>Authentication scheme names are case-insensitive (RFC 9110).</summary>
+    private static bool IsBearer(HttpRequest request)
+        => request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
 
     private static Task SetStatus(HttpResponse response, int status)
     {

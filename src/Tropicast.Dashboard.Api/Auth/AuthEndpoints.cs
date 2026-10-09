@@ -5,21 +5,22 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Tropicast.Dashboard.Application.Email;
-using Tropicast.Dashboard.Application.Security;
 using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Auth;
 
-internal sealed record RegisterRequest(string Email, string Password);
-internal sealed record ConfirmEmailRequest(Guid UserId, string Code);
-internal sealed record EmailRequest(string Email);
-internal sealed record LoginRequest(string Email, string Password);
-internal sealed record ResetPasswordRequest(string Email, string Code, string NewPassword);
-internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
-internal sealed record TokenRequest(string Email, string Password, string DeviceName);
-internal sealed record RefreshRequest(string RefreshToken);
+internal sealed record RegisterRequest([property: Required, EmailAddress, MaxLength(256)] string Email, [property: Required] string Password);
+internal sealed record ConfirmEmailRequest([property: Required] Guid UserId, [property: Required] string Code);
+internal sealed record EmailRequest([property: Required, MaxLength(256)] string Email);
+internal sealed record LoginRequest([property: Required, MaxLength(256)] string Email, [property: Required] string Password);
+internal sealed record ResetPasswordRequest([property: Required, MaxLength(256)] string Email, [property: Required] string Code,
+    [property: Required] string NewPassword);
+internal sealed record ChangePasswordRequest([property: Required] string CurrentPassword, [property: Required] string NewPassword);
+internal sealed record TokenRequest([property: Required, MaxLength(256)] string Email, [property: Required] string Password,
+    [property: Required, MaxLength(64)] string DeviceName);
+internal sealed record RefreshRequest([property: Required, MaxLength(256)] string RefreshToken);
 internal sealed record MembershipResponse(Guid TenantId, string TenantName, string TenantSlug, MembershipRole Role);
 internal sealed record MeResponse(Guid Id, string Email, IReadOnlyList<MembershipResponse> Memberships);
 internal sealed record DeviceResponse(Guid Id, string DeviceName, DateTimeOffset CreatedAt, DateTimeOffset LastUsedAt, bool Current);
@@ -30,12 +31,14 @@ internal sealed record DeviceResponse(Guid Id, string DeviceName, DateTimeOffset
 /// </summary>
 internal static class AuthEndpoints
 {
-    private const string SignInFailed = "Email or password is incorrect, or the email address is not confirmed yet.";
-    private static readonly EmailAddressAttribute EmailFormat = new();
+    /// <summary>One answer for every failure (unknown email, wrong password, unconfirmed, locked), so none reveals an account.</summary>
+    private const string SignInFailed =
+        "Email or password is incorrect, the email address is not confirmed yet, or too many attempts failed. "
+        + "Try again in 15 minutes or reset your password.";
 
     internal static void MapAuth(this IEndpointRouteBuilder app)
     {
-        var auth = app.MapGroup("/api/v1/auth").WithTags("Auth");
+        var auth = app.MapGroup("/api/v1/auth").WithTags("Auth").AddEndpointFilter<RequestValidation>();
         auth.MapGet("/antiforgery", GetAntiforgeryToken)
             .WithSummary("Sets the XSRF-TOKEN cookie; echo its value in X-XSRF-TOKEN on unsafe requests made with the session cookie.");
 
@@ -71,10 +74,6 @@ internal static class AuthEndpoints
     private static async Task<Results<Accepted, ValidationProblem>> RegisterAsync(RegisterRequest request,
         UserManager<AppUser> users, IEmailSender email, IOptions<AppOptions> app, TimeProvider time, CancellationToken cancellationToken)
     {
-        if (!EmailFormat.IsValid(request.Email) || request.Email.Length > 256)
-        {
-            return Invalid("email", "Enter a valid email address.");
-        }
         var existing = await users.FindByEmailAsync(request.Email);
         if (existing is not null)
         {
@@ -228,16 +227,18 @@ internal static class AuthEndpoints
     {
         var refused = TypedResults.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in again on this device.");
         var now = time.GetUtcNow();
-        var hash = Secrets.Hash(request.RefreshToken ?? "");
-        var session = await db.DeviceSessions.SingleOrDefaultAsync(s => s.RefreshTokenHash == hash, cancellationToken);
+        var session = DeviceSession.TryGetSessionId(request.RefreshToken, out var sessionId)
+            ? await db.DeviceSessions.SingleOrDefaultAsync(s => s.Id == sessionId, cancellationToken)
+            : null;
         if (session is null)
         {
-            // A rotated-out token presented again means it was copied: end that device's session.
-            if (await db.DeviceSessions.FirstOrDefaultAsync(s => s.PreviousRefreshTokenHash == hash, cancellationToken) is { } reused)
-            {
-                reused.Revoke(now);
-                await db.SaveChangesAsync(cancellationToken);
-            }
+            return refused;
+        }
+        if (!session.IsCurrent(request.RefreshToken))
+        {
+            // A token of this session that is no longer current was copied: end the session for every holder.
+            session.Revoke(now);
+            await db.SaveChangesAsync(cancellationToken);
             return refused;
         }
         var user = await users.FindByIdAsync(session.UserId.ToString());
@@ -260,8 +261,9 @@ internal static class AuthEndpoints
     private static async Task<NoContent> RevokeTokenAsync(RefreshRequest request, AppDbContext db, TimeProvider time,
         CancellationToken cancellationToken)
     {
-        var hash = Secrets.Hash(request.RefreshToken ?? "");
-        if (await db.DeviceSessions.SingleOrDefaultAsync(s => s.RefreshTokenHash == hash, cancellationToken) is { } session)
+        if (DeviceSession.TryGetSessionId(request.RefreshToken, out var sessionId)
+            && await db.DeviceSessions.SingleOrDefaultAsync(s => s.Id == sessionId, cancellationToken) is { } session
+            && session.IsCurrent(request.RefreshToken))
         {
             session.Revoke(time.GetUtcNow());
             await db.SaveChangesAsync(cancellationToken);
@@ -305,9 +307,9 @@ internal static class AuthEndpoints
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static ProblemHttpResult SignInProblem(SignInResult result) => TypedResults.Problem(
-        statusCode: StatusCodes.Status401Unauthorized,
-        title: result.IsLockedOut ? "Too many failed attempts. Try again in 15 minutes or reset your password." : SignInFailed);
+    /// <summary>Lockout still applies server-side; the answer stays the same.</summary>
+    private static ProblemHttpResult SignInProblem(SignInResult _) => TypedResults.Problem(
+        statusCode: StatusCodes.Status401Unauthorized, title: SignInFailed);
 
     private static ValidationProblem Invalid(string field, string message)
         => TypedResults.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });

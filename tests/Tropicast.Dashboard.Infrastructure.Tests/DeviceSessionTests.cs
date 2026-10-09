@@ -1,4 +1,3 @@
-using Tropicast.Dashboard.Application.Security;
 using Tropicast.Dashboard.Infrastructure.Identity;
 
 namespace Tropicast.Dashboard.Infrastructure.Tests;
@@ -12,14 +11,16 @@ public sealed class DeviceSessionTests
     {
         var (session, first) = DeviceSession.Start(Guid.NewGuid(), " Studio PC ", Now);
         Assert.Equal("Studio PC", session.DeviceName);
-        Assert.True(Secrets.Matches(first, session.RefreshTokenHash));
-        Assert.DoesNotContain(first, session.RefreshTokenHash, StringComparison.Ordinal);
+        Assert.True(session.IsCurrent(first));
+        Assert.True(DeviceSession.TryGetSessionId(first, out var id) && id == session.Id);
+        Assert.DoesNotContain(first.Split('.')[1], session.RefreshTokenHash, StringComparison.Ordinal);
 
         var second = session.Rotate(Now.AddDays(1));
-        Assert.NotEqual(first, second);
-        Assert.True(Secrets.Matches(second, session.RefreshTokenHash));
-        Assert.True(Secrets.Matches(first, session.PreviousRefreshTokenHash!));
-        Assert.Equal(Now.AddDays(1) + DeviceSession.Lifetime, session.ExpiresAt);
+        var third = session.Rotate(Now.AddDays(2));
+        Assert.True(session.IsCurrent(third));
+        Assert.False(session.IsCurrent(second));
+        Assert.False(session.IsCurrent(first));
+        Assert.Equal(Now.AddDays(2) + DeviceSession.Lifetime, session.ExpiresAt);
     }
 
     [Fact]
@@ -31,4 +32,15 @@ public sealed class DeviceSessionTests
         session.Revoke(Now);
         Assert.False(session.IsActive(Now));
     }
+}
+
+public sealed class RefreshTokenFormatTests
+{
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("no-dot")]
+    [InlineData(".secret")]
+    [InlineData("not-a-guid.secret")]
+    public void Malformed_tokens_name_no_session(string? token) => Assert.False(DeviceSession.TryGetSessionId(token, out _));
 }

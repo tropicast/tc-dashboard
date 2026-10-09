@@ -47,7 +47,6 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     user_id = table.Column<Guid>(type: "uuid", nullable: false),
                     device_name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     refresh_token_hash = table.Column<string>(type: "character(64)", fixedLength: true, maxLength: 64, nullable: false),
-                    previous_refresh_token_hash = table.Column<string>(type: "character(64)", fixedLength: true, maxLength: 64, nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     last_used_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -160,17 +159,6 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                 });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_device_sessions_previous_refresh_token_hash",
-                table: "device_sessions",
-                column: "previous_refresh_token_hash");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_device_sessions_refresh_token_hash",
-                table: "device_sessions",
-                column: "refresh_token_hash",
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_device_sessions_user_id",

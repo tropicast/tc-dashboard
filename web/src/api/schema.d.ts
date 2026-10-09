@@ -760,8 +760,9 @@ export interface components {
             expiresAt: string;
         };
         InviteRequest: {
+            /** @description Address to invite; the invitee accepts after signing in with it. */
             email: string;
-            role: components["schemas"]["MembershipRole"];
+            role: null | components["schemas"]["MembershipRole"];
         };
         LoginRequest: {
             email: string;

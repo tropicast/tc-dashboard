@@ -3,8 +3,9 @@ using Tropicast.Dashboard.Application.Security;
 namespace Tropicast.Dashboard.Infrastructure.Identity;
 
 /// <summary>
-/// A signed-in desktop device. Holds the hash of its current refresh token; each refresh rotates it, and presenting
-/// the previous token again (a stolen copy) revokes the session.
+/// A signed-in desktop device. Refresh tokens are <c>{session id}.{secret}</c>; only the hash of the current secret is
+/// stored. Each refresh rotates the secret, and any other token of the session (one rotated out, however long ago,
+/// i.e. a copy) revokes the session.
 /// </summary>
 public sealed class DeviceSession
 {
@@ -18,7 +19,6 @@ public sealed class DeviceSession
     public Guid UserId { get; private set; }
     public string DeviceName { get; private set; } = null!;
     public string RefreshTokenHash { get; private set; } = null!;
-    public string? PreviousRefreshTokenHash { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset LastUsedAt { get; private set; }
     public DateTimeOffset ExpiresAt { get; private set; }
@@ -29,29 +29,41 @@ public sealed class DeviceSession
     /// <summary>Starts a session and returns it with the refresh token to hand to the device (shown once).</summary>
     public static (DeviceSession Session, string RefreshToken) Start(Guid userId, string deviceName, DateTimeOffset now)
     {
-        var token = Secrets.New();
         var name = deviceName.Trim();
-        return (new DeviceSession
+        var session = new DeviceSession
         {
             Id = Guid.CreateVersion7(now),
             UserId = userId,
             DeviceName = name.Length is > 0 and <= 64 ? name : throw new ArgumentException("1-64 characters.", nameof(deviceName)),
-            RefreshTokenHash = Secrets.Hash(token),
             CreatedAt = now,
-            LastUsedAt = now,
-            ExpiresAt = now + Lifetime,
-        }, token);
+        };
+        return (session, session.Rotate(now));
     }
 
-    /// <summary>Replaces the refresh token; the old one stops working. Sliding expiry.</summary>
+    /// <summary>The session a refresh token claims to belong to; it still has to match <see cref="IsCurrent"/>.</summary>
+    public static bool TryGetSessionId(string? refreshToken, out Guid sessionId)
+    {
+        sessionId = Guid.Empty;
+        var dot = refreshToken?.IndexOf('.', StringComparison.Ordinal) ?? -1;
+        return dot > 0 && Guid.TryParseExact(refreshToken![..dot], "N", out sessionId);
+    }
+
+    /// <summary>Whether this is the session's current refresh token (constant-time).</summary>
+    public bool IsCurrent(string refreshToken)
+    {
+        ArgumentNullException.ThrowIfNull(refreshToken);
+        return TryGetSessionId(refreshToken, out var id) && id == Id
+            && Secrets.Matches(refreshToken[(refreshToken.IndexOf('.', StringComparison.Ordinal) + 1)..], RefreshTokenHash);
+    }
+
+    /// <summary>Replaces the refresh token; every earlier one stops working. Sliding expiry.</summary>
     public string Rotate(DateTimeOffset now)
     {
-        var token = Secrets.New();
-        PreviousRefreshTokenHash = RefreshTokenHash;
-        RefreshTokenHash = Secrets.Hash(token);
+        var secret = Secrets.New();
+        RefreshTokenHash = Secrets.Hash(secret);
         LastUsedAt = now;
         ExpiresAt = now + Lifetime;
-        return token;
+        return $"{Id:N}.{secret}";
     }
 
     public void Revoke(DateTimeOffset now) => RevokedAt ??= now;

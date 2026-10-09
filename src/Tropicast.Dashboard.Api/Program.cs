@@ -10,8 +10,9 @@ builder.Services.AddProblemDetails();
 // Malformed request bodies are the client's fault: 400, not 500.
 builder.Services.AddExceptionHandler(options =>
     options.StatusCodeSelector = exception => exception is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError);
-// Enums travel by name ("Owner"), as they are stored.
-builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+// Enums travel by name ("Owner"), as they are stored; numbers are rejected, so undefined values never get in.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 builder.Services.AddApplication();

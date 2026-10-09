@@ -12,7 +12,7 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261009204106_AddIdentity")]
+    [Migration("20261009210051_AddIdentity")]
     partial class AddIdentity
     {
         /// <inheritdoc />
@@ -860,12 +860,6 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_used_at");
 
-                    b.Property<string>("PreviousRefreshTokenHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character(64)")
-                        .HasColumnName("previous_refresh_token_hash")
-                        .IsFixedLength();
-
                     b.Property<string>("RefreshTokenHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -889,13 +883,6 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_device_sessions");
-
-                    b.HasIndex("PreviousRefreshTokenHash")
-                        .HasDatabaseName("ix_device_sessions_previous_refresh_token_hash");
-
-                    b.HasIndex("RefreshTokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("ix_device_sessions_refresh_token_hash");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_device_sessions_user_id");

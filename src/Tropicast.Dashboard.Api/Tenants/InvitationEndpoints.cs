@@ -12,23 +12,25 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Tenants;
 
-internal sealed record InviteRequest(string Email, MembershipRole Role);
+/// <param name="Email">Address to invite; the invitee accepts after signing in with it.</param>
+/// <param name="Role">Required: there is no default role.</param>
+internal sealed record InviteRequest([property: Required, EmailAddress, MaxLength(256)] string Email, [property: Required] MembershipRole? Role);
 internal sealed record InvitationResponse(Guid Id, string Email, MembershipRole Role, DateTimeOffset ExpiresAt);
-internal sealed record AcceptInvitationRequest(string Token);
+internal sealed record AcceptInvitationRequest([property: Required, MaxLength(256)] string Token);
 
 /// <summary>Invite people to the current tenant by email; they accept after signing in with that address.</summary>
 internal static class InvitationEndpoints
 {
-    private static readonly EmailAddressAttribute EmailFormat = new();
-
     internal static void MapInvitations(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/v1/tenants/current/invitations", InviteAsync)
             .WithTags("Members")
+            .AddEndpointFilter<RequestValidation>()
             .RequireAuthorization(TenantPolicies.Admin)
             .WithSummary("Invites someone by email. Only an Owner can invite another Owner.");
         app.MapPost("/api/v1/invitations/accept", AcceptAsync)
             .WithTags("Members")
+            .AddEndpointFilter<RequestValidation>()
             .RequireAuthorization()
             .WithSummary("Joins the tenant with the token from the invitation email.");
     }
@@ -37,21 +39,18 @@ internal static class InvitationEndpoints
         InviteRequest request, HttpContext context, TenantAccess access, UserManager<AppUser> users, AppDbContext db,
         IEmailSender email, IOptions<AppOptions> app, TimeProvider time, CancellationToken cancellationToken)
     {
-        if (!EmailFormat.IsValid(request.Email) || request.Email.Length > 256)
-        {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["email"] = ["Enter a valid email address."] });
-        }
-        if (request.Role == MembershipRole.Owner && access.Role != MembershipRole.Owner)
+        var role = request.Role!.Value;
+        if (role == MembershipRole.Owner && access.Role != MembershipRole.Owner)
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Only an Owner can invite another Owner.");
         }
         var tenant = await db.Tenants.SingleAsync(cancellationToken);
         var token = Secrets.New();
-        var invitation = Invitation.Create(tenant.Id, request.Email, request.Role, Secrets.Hash(token),
+        var invitation = Invitation.Create(tenant.Id, request.Email, role, Secrets.Hash(token),
             Guid.Parse(users.GetUserId(context.User)!), time.GetUtcNow());
         db.Invitations.Add(invitation);
         await db.SaveChangesAsync(cancellationToken);
-        await email.SendAsync(AuthEmails.Invitation(invitation.Email, app.Value.PublicBaseUrl, tenant.Name, request.Role.ToString(), token),
+        await email.SendAsync(AuthEmails.Invitation(invitation.Email, app.Value.PublicBaseUrl, tenant.Name, role.ToString(), token),
             cancellationToken);
         return TypedResults.Created($"/api/v1/tenants/current/invitations/{invitation.Id}",
             new InvitationResponse(invitation.Id, invitation.Email, invitation.Role, invitation.ExpiresAt));

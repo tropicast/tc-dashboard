@@ -139,10 +139,8 @@ internal sealed class DeviceSessionConfiguration : IEntityTypeConfiguration<Devi
     {
         builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         builder.Property(e => e.DeviceName).HasMaxLength(64);
+        // Looked up by the session ID inside the token, then compared: no index on the hash.
         builder.Property(e => e.RefreshTokenHash).HasMaxLength(64).IsFixedLength();
-        builder.Property(e => e.PreviousRefreshTokenHash).HasMaxLength(64).IsFixedLength();
-        builder.HasIndex(e => e.RefreshTokenHash).IsUnique();
-        builder.HasIndex(e => e.PreviousRefreshTokenHash);
         builder.HasIndex(e => e.UserId);
     }
 }

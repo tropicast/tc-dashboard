@@ -95,9 +95,10 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
         {
             (await browser.LoginAsync(email, "a wrong password for sure")).Status(HttpStatusCode.Unauthorized);
         }
+        // Locked: even the right password fails, with the same answer as an unknown account.
         var locked = await browser.LoginAsync(email);
         locked.Status(HttpStatusCode.Unauthorized);
-        Assert.Contains("Too many failed attempts", await Title(locked), StringComparison.Ordinal);
+        Assert.Equal(await Title(await browser.LoginAsync(Browser.Unique("nobody"))), await Title(locked));
     }
 
     [Fact]
@@ -136,10 +137,13 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
         var first = await TokenAsync(desktop, email, "Laptop");
         var second = await RefreshAsync(desktop, first.RefreshToken);
 
+        var third = await RefreshAsync(desktop, second.RefreshToken);
+
+        // A token two rotations old is presented again: it was copied.
         (await desktop.PostAsJsonAsync("/api/v1/auth/token/refresh", new { refreshToken = first.RefreshToken }, Token))
             .Status(HttpStatusCode.Unauthorized);
-        // The legitimate holder of the newer token is signed out too: the session is compromised.
-        (await desktop.PostAsJsonAsync("/api/v1/auth/token/refresh", new { refreshToken = second.RefreshToken }, Token))
+        // The legitimate holder of the current token is signed out too: the session is compromised.
+        (await desktop.PostAsJsonAsync("/api/v1/auth/token/refresh", new { refreshToken = third.RefreshToken }, Token))
             .Status(HttpStatusCode.Unauthorized);
     }
 
@@ -275,6 +279,68 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
         await Browser.AddMemberAsync(factory, tenantId, await admin.SignUpAndLoginAsync(Browser.Unique("admin")), MembershipRole.Admin);
         (await admin.SendAsync(HttpMethod.Post, "/api/v1/tenants/current/invitations",
             new { email = Browser.Unique("boss"), role = "Owner" })).Status(HttpStatusCode.Forbidden);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/auth/register")]
+    [InlineData("/api/v1/auth/login")]
+    [InlineData("/api/v1/auth/reset-password")]
+    [InlineData("/api/v1/auth/token")]
+    [InlineData("/api/v1/auth/token/refresh")]
+    [InlineData("/api/v1/auth/confirm-email")]
+    public async Task Missing_fields_are_a_400_validation_problem(string path)
+    {
+        var browser = new Browser(factory);
+        var response = await browser.Http.PostAsJsonAsync(path, new { }, Token);
+        response.Status(HttpStatusCode.BadRequest);
+        Assert.Contains("errors", await response.Content.ReadAsStringAsync(Token), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("{\"email\":\"a@example.test\"}")]
+    [InlineData("{\"email\":\"a@example.test\",\"role\":0}")]
+    [InlineData("{\"email\":\"a@example.test\",\"role\":\"Superuser\"}")]
+    [InlineData("{\"email\":\"not-an-email\",\"role\":\"Admin\"}")]
+    public async Task An_invitation_needs_a_valid_email_and_an_explicit_known_role(string body)
+    {
+        var owner = new Browser(factory);
+        owner.TenantId = await Browser.CreateTenantAsync(factory, await owner.SignUpAndLoginAsync(Browser.Unique("owner")), MembershipRole.Owner);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/tenants/current/invitations")
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add("X-XSRF-TOKEN", owner.AntiforgeryToken);
+        request.Headers.Add("X-Tenant-Id", owner.TenantId.ToString());
+        (await owner.Http.SendAsync(request, Token)).Status(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Length_is_the_only_password_rule()
+    {
+        var browser = new Browser(factory);
+        (await browser.Http.PostAsJsonAsync("/api/v1/auth/register",
+            new { email = Browser.Unique("repeat"), password = new string('a', 12) }, Token)).Status(HttpStatusCode.Accepted);
+    }
+
+    [Fact]
+    public async Task Bearer_requests_need_no_antiforgery_even_with_a_session_cookie_and_any_scheme_case()
+    {
+        var browser = new Browser(factory);
+        var email = Browser.Unique("both");
+        await browser.SignUpAndLoginAsync(email);
+        var tokens = await TokenAsync(factory.CreateClient(), email, "Studio PC");
+        foreach (var scheme in new[] { "Bearer", "bearer", "BEARER" })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/change-password")
+            {
+                Content = JsonContent.Create(new { currentPassword = "wrong one here", newPassword = "irrelevant passphrase" }),
+            };
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(scheme, tokens.AccessToken);
+            // Reaches the handler (wrong current password: 400 validation), not the antiforgery check or a 401.
+            var response = await browser.Http.SendAsync(request, Token);
+            response.Status(HttpStatusCode.BadRequest);
+            Assert.DoesNotContain("antiforgery", await response.Content.ReadAsStringAsync(Token), StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private async Task<bool> AllowedAsync(Guid userId, Guid tenantId, string policy)
