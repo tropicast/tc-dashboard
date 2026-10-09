@@ -12,7 +12,7 @@ internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<A
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
             ?? "Host=localhost;Database=tropicast;Username=tropicast";
         var options = new DbContextOptionsBuilder<AppDbContext>();
-        PersistenceSetup.Configure(options, connectionString);
+        PersistenceSetup.ConfigureStandalone(options, connectionString);
         return new AppDbContext(options.Options, new NoTenant());
     }
 

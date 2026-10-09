@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
+using Tropicast.Dashboard.Infrastructure.Identity;
 
 namespace Tropicast.Dashboard.Infrastructure.Persistence;
 
@@ -23,7 +24,7 @@ internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Members
     public void Configure(EntityTypeBuilder<Membership> builder)
     {
         builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
-        // user_id references the identity users table (added with authentication, #4).
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(e => new { e.TenantId, e.UserId }).IsUnique();
         builder.HasIndex(e => e.UserId);
     }
@@ -116,5 +117,32 @@ internal sealed class StationStatsRollupConfiguration : IEntityTypeConfiguration
     {
         builder.HasKey(e => new { e.StationId, e.Interval, e.PeriodStart });
         builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
+{
+    public void Configure(EntityTypeBuilder<Invitation> builder)
+    {
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.InvitedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.Property(e => e.Email).HasMaxLength(256);
+        builder.Property(e => e.TokenHash).HasMaxLength(64).IsFixedLength();
+        builder.HasIndex(e => e.TokenHash).IsUnique();
+        builder.HasIndex(e => new { e.TenantId, e.Email });
+    }
+}
+
+internal sealed class DeviceSessionConfiguration : IEntityTypeConfiguration<DeviceSession>
+{
+    public void Configure(EntityTypeBuilder<DeviceSession> builder)
+    {
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.Property(e => e.DeviceName).HasMaxLength(64);
+        builder.Property(e => e.RefreshTokenHash).HasMaxLength(64).IsFixedLength();
+        builder.Property(e => e.PreviousRefreshTokenHash).HasMaxLength(64).IsFixedLength();
+        builder.HasIndex(e => e.RefreshTokenHash).IsUnique();
+        builder.HasIndex(e => e.PreviousRefreshTokenHash);
+        builder.HasIndex(e => e.UserId);
     }
 }

@@ -20,6 +20,10 @@ internal static partial class Text
         => SlugPattern().IsMatch(value) ? value
             : throw new ArgumentException("Use 3-64 lowercase letters, digits and single hyphens.", name);
 
+    internal static string Sha256Hex(string value, string name)
+        => value is { Length: 64 } && value.All(char.IsAsciiHexDigitLower) ? value
+            : throw new ArgumentException("Expected a lowercase hex SHA-256 hash.", name);
+
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){2,63}$")]
     private static partial Regex SlugPattern();
 }

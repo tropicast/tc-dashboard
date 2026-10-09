@@ -24,7 +24,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     public AppDbContext CreateContext(Guid? tenantId)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>();
-        PersistenceSetup.Configure(options, ConnectionString);
+        PersistenceSetup.ConfigureStandalone(options, ConnectionString);
         return new AppDbContext(options.Options, new CurrentTenant { TenantId = tenantId });
     }
 

@@ -5,6 +5,8 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <!-- Pinned with EF Core: Npgsql alone would resolve an older Relational. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
@@ -14,9 +16,11 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Tropicast.Dashboard.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Tropicast.Dashboard.Api.IntegrationTests" />
   </ItemGroup>
 </Project>
