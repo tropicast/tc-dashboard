@@ -286,10 +286,7 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
         context.Request.Headers[TenantAccess.Header] = tenantId.ToString();
         context.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
             [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId.ToString())], "Test"));
-        await new TenantAccessMiddleware(_ => Task.CompletedTask).InvokeAsync(context,
-            services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.AppUser>>(),
-            services.GetRequiredService<Infrastructure.Persistence.AppDbContext>(),
-            services.GetRequiredService<Infrastructure.CurrentTenant>(), services.GetRequiredService<TenantAccess>());
+        await new TenantAccessMiddleware(_ => Task.CompletedTask).InvokeAsync(context);
         var result = await services.GetRequiredService<IAuthorizationService>().AuthorizeAsync(context.User, policy);
         return result.Succeeded;
     }

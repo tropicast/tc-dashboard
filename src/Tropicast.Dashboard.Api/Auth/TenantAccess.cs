@@ -30,11 +30,13 @@ internal sealed class TenantAccess
 /// </summary>
 internal sealed class TenantAccessMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, UserManager<AppUser> users, AppDbContext db, CurrentTenant current, TenantAccess access)
+    public async Task InvokeAsync(HttpContext context)
     {
+        // Services are resolved only for signed-in API calls: /health and the SPA must not need the database.
         if (context.Request.Path.StartsWithSegments("/api") && context.User.Identity?.IsAuthenticated == true
-            && Guid.TryParse(users.GetUserId(context.User), out var userId))
+            && Guid.TryParse(context.RequestServices.GetRequiredService<UserManager<AppUser>>().GetUserId(context.User), out var userId))
         {
+            var db = context.RequestServices.GetRequiredService<AppDbContext>();
             var memberships = db.Memberships.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(m => m.UserId == userId);
             var requested = context.Request.Headers[TenantAccess.Header].ToString();
             var membership = Guid.TryParse(requested, out var tenantId)
@@ -42,8 +44,8 @@ internal sealed class TenantAccessMiddleware(RequestDelegate next)
                 : requested.Length == 0 && await memberships.Take(2).ToListAsync(context.RequestAborted) is [var only] ? only : null;
             if (membership is not null)
             {
-                access.Set(membership);
-                current.TenantId = membership.TenantId;
+                context.RequestServices.GetRequiredService<TenantAccess>().Set(membership);
+                context.RequestServices.GetRequiredService<CurrentTenant>().TenantId = membership.TenantId;
             }
         }
         await next(context);
