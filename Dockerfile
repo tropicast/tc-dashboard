@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # One image: the ASP.NET Core API serving the built React SPA from wwwroot.
 
 # Docker Hub images via Google's mirror: shared CI runners hit Docker Hub's anonymous pull limit.
