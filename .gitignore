@@ -1,0 +1,9 @@
+bin/
+obj/
+TestResults/
+*.user
+.vs/
+.idea/
+.env
+# Built by `npm run build` in web/.
+src/Tropicast.Dashboard.Api/wwwroot/
