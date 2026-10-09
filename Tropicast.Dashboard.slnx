@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tropicast.Dashboard.Api/Tropicast.Dashboard.Api.csproj" />
+    <Project Path="src/Tropicast.Dashboard.Application/Tropicast.Dashboard.Application.csproj" />
+    <Project Path="src/Tropicast.Dashboard.Domain/Tropicast.Dashboard.Domain.csproj" />
+    <Project Path="src/Tropicast.Dashboard.Infrastructure/Tropicast.Dashboard.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tropicast.Dashboard.Api.IntegrationTests/Tropicast.Dashboard.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Tropicast.Dashboard.Application.Tests/Tropicast.Dashboard.Application.Tests.csproj" />
+    <Project Path="tests/Tropicast.Dashboard.Architecture.Tests/Tropicast.Dashboard.Architecture.Tests.csproj" />
+    <Project Path="tests/Tropicast.Dashboard.Domain.Tests/Tropicast.Dashboard.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

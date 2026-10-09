@@ -1,0 +1,48 @@
+# Local development. `docker compose up` runs PostgreSQL and the API (which also
+# serves the built SPA on http://localhost:8080). Add `--profile dev` for the
+# Vite dev server with hot reload on http://localhost:5173, proxying /api to the API.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: tropicast
+      POSTGRES_USER: tropicast
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tropicast-dev}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tropicast -d tropicast"]
+      interval: 2s
+      retries: 30
+
+  api:
+    build: .
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: Host=db;Database=tropicast;Username=tropicast;Password=${POSTGRES_PASSWORD:-tropicast-dev}
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    profiles: [dev]
+    image: node:24-alpine
+    working_dir: /web
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      API_URL: http://api:8080
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./web:/web
+      - web-node-modules:/web/node_modules
+    depends_on:
+      - api
+
+volumes:
+  db-data:
+  web-node-modules:

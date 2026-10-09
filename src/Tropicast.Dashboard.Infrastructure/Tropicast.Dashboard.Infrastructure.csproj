@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Adapters for the Application ports: EF Core, Identity, email, HTTP clients, background services. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Tropicast.Dashboard.Application\Tropicast.Dashboard.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+</Project>

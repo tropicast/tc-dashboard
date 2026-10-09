@@ -1,0 +1,52 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Tropicast.Dashboard.Api | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/version": {
+      "get": {
+        "tags": [
+          "Tropicast.Dashboard.Api"
+        ],
+        "summary": "Version of the running API.",
+        "operationId": "GetVersion",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "VersionInfo": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Semantic version of the API build."
+          }
+        },
+        "description": "API version information."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Tropicast.Dashboard.Api"
+    }
+  ]
+}

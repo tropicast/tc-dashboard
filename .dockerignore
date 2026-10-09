@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/TestResults/
+src/Tropicast.Dashboard.Api/wwwroot/
+.git/
+.github/
+tests/

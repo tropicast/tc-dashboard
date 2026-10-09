@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Entities, value objects and domain errors. No framework references. -->
+</Project>
