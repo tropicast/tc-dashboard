@@ -24,6 +24,15 @@ jobs:
   dotnet:
     name: .NET build, test and API client
     runs-on: ubuntu-latest
+    # Empty database for the migration bundle check.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
       - uses: actions/checkout@v7
 
@@ -35,6 +44,37 @@ jobs:
       - run: dotnet build Tropicast.Dashboard.slnx -c Release
 
       - run: dotnet test Tropicast.Dashboard.slnx -c Release --no-build
+
+      - name: Fail when the model changed without a migration
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/Tropicast.Dashboard.Infrastructure --configuration Release --no-build
+
+      # Deploys run this self-contained bundle against the database; the API never migrates in production.
+      - name: Build the migration bundle
+        run: >
+          dotnet ef migrations bundle --project src/Tropicast.Dashboard.Infrastructure --configuration Release
+          --self-contained -r linux-x64 -o artifacts/efbundle --force
+
+      - name: The bundle migrates an empty database and is a no-op the second time
+        env:
+          CONNECTION: Host=localhost;Database=postgres;Username=postgres;Password=ci-only
+        run: |
+          artifacts/efbundle --connection "$CONNECTION"
+          artifacts/efbundle --connection "$CONNECTION" | tee second-run.txt
+          if grep -q "Applying migration" second-run.txt; then echo "::error::The second run applied migrations."; exit 1; fi
+          sql() { docker run --rm --network host -e PGPASSWORD=ci-only postgres:17-alpine psql -h localhost -U postgres -tAc "$1"; }
+          migrations=$(find src/Tropicast.Dashboard.Infrastructure/Persistence/Migrations -name "*.Designer.cs" | wc -l)
+          test "$(sql 'select count(*) from __ef_migrations_history')" -eq "$migrations"
+          test "$(sql 'select count(*) from plans')" -eq 4
+
+      - uses: actions/upload-artifact@v7
+        # Artifacts are a convenience: a full storage quota must not fail the build.
+        continue-on-error: true
+        with:
+          name: efbundle
+          path: artifacts/efbundle
+          retention-days: 7
 
       - uses: actions/setup-node@v7
         with:

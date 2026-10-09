@@ -7,3 +7,4 @@ TestResults/
 .env
 # Built by `npm run build` in web/.
 src/Tropicast.Dashboard.Api/wwwroot/
+artifacts/
