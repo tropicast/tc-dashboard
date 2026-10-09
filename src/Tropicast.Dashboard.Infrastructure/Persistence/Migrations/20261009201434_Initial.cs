@@ -23,7 +23,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     max_stations = table.Column<int>(type: "integer", nullable: false),
                     max_listeners = table.Column<int>(type: "integer", nullable: false),
                     max_bitrate_kbps = table.Column<int>(type: "integer", nullable: false),
-                    formats = table.Column<int>(type: "integer", maxLength: 32, nullable: false),
+                    formats = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     directory_listing = table.Column<bool>(type: "boolean", nullable: false),
                     embed = table.Column<bool>(type: "boolean", nullable: false),
                     analytics = table.Column<bool>(type: "boolean", nullable: false),
@@ -237,10 +237,10 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                 columns: new[] { "id", "analytics", "directory_listing", "embed", "formats", "max_bitrate_kbps", "max_listeners", "max_stations", "name", "sort_order" },
                 values: new object[,]
                 {
-                    { "free", true, false, false, 3, 64, 100, 1, "Free", 0 },
-                    { "growth", true, true, true, 3, 192, 5000, 3, "Growth", 2 },
-                    { "pro", true, true, true, 3, 320, 25000, 5, "Pro", 3 },
-                    { "starter", true, true, false, 3, 128, 500, 1, "Starter", 1 }
+                    { "free", true, false, false, "Mp3, Opus", 64, 100, 1, "Free", 0 },
+                    { "growth", true, true, true, "Mp3, Opus", 192, 5000, 3, "Growth", 2 },
+                    { "pro", true, true, true, "Mp3, Opus", 320, 25000, 5, "Pro", 3 },
+                    { "starter", true, true, false, "Mp3, Opus", 128, 500, 1, "Starter", 1 }
                 });
 
             migrationBuilder.CreateIndex(

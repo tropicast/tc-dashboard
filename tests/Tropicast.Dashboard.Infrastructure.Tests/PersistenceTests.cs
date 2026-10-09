@@ -43,6 +43,8 @@ public sealed class PersistenceTests(PostgresFixture db)
         Assert.False(await context.BroadcastCredentials.AnyAsync(c => c.StationId == stationB.Id, Token));
         Assert.False(await context.LiveSessions.AnyAsync(s => s.StationId == stationB.Id, Token));
         Assert.False(await context.Memberships.AnyAsync(m => m.TenantId == b.Id, Token));
+        Assert.Null(await context.Tenants.FirstOrDefaultAsync(t => t.Id == b.Id, Token));
+        Assert.Equal([a.Id], await context.Tenants.Select(t => t.Id).ToListAsync(Token));
     }
 
     [Fact]
@@ -51,6 +53,7 @@ public sealed class PersistenceTests(PostgresFixture db)
         await CreateTenantWithStationAsync();
         await using var context = db.CreateContext(null);
         Assert.False(await context.Stations.AnyAsync(Token));
+        Assert.False(await context.Tenants.AnyAsync(Token));
         Assert.True(await context.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter]).AnyAsync(Token));
     }
 

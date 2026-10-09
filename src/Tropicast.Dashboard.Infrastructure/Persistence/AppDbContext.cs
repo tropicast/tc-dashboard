@@ -33,6 +33,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
+        // A user's tenants are listed through memberships with IgnoreQueryFilters([TenantFilter]).
+        modelBuilder.Entity<Tenant>().HasQueryFilter(TenantFilter, e => e.Id == CurrentTenantId);
         modelBuilder.Entity<Membership>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Subscription>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Station>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
@@ -42,7 +44,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
         modelBuilder.Entity<BroadcastCredential>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
         modelBuilder.Entity<LiveSession>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
         modelBuilder.Entity<StationStatsRollup>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
-        // Tenants are looked up by membership, not filtered: a user can belong to several.
 
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {

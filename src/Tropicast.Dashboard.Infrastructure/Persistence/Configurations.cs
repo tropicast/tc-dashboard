@@ -35,7 +35,8 @@ internal sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
     {
         builder.Property(e => e.Id).HasMaxLength(32);
         builder.Property(e => e.Name).HasMaxLength(64);
-        builder.Property(e => e.Formats).HasConversion<int>();
+        // Stored by name like every enum ("Mp3, Opus"), so renumbering the flags never changes stored data.
+        builder.Property(e => e.Formats).HasMaxLength(64);
         builder.HasData(Plan.Catalogue);
     }
 }

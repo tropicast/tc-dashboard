@@ -12,7 +12,7 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261009200217_Initial")]
+    [Migration("20261009201434_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -44,9 +44,10 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("embed");
 
-                    b.Property<int>("Formats")
-                        .HasMaxLength(32)
-                        .HasColumnType("integer")
+                    b.Property<string>("Formats")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("formats");
 
                     b.Property<int>("MaxBitrateKbps")
@@ -89,7 +90,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             Analytics = true,
                             DirectoryListing = false,
                             Embed = false,
-                            Formats = 3,
+                            Formats = "Mp3, Opus",
                             MaxBitrateKbps = 64,
                             MaxListeners = 100,
                             MaxStations = 1,
@@ -102,7 +103,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             Analytics = true,
                             DirectoryListing = true,
                             Embed = false,
-                            Formats = 3,
+                            Formats = "Mp3, Opus",
                             MaxBitrateKbps = 128,
                             MaxListeners = 500,
                             MaxStations = 1,
@@ -115,7 +116,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             Analytics = true,
                             DirectoryListing = true,
                             Embed = true,
-                            Formats = 3,
+                            Formats = "Mp3, Opus",
                             MaxBitrateKbps = 192,
                             MaxListeners = 5000,
                             MaxStations = 3,
@@ -128,7 +129,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             Analytics = true,
                             DirectoryListing = true,
                             Embed = true,
-                            Formats = 3,
+                            Formats = "Mp3, Opus",
                             MaxBitrateKbps = 320,
                             MaxListeners = 25000,
                             MaxStations = 5,
