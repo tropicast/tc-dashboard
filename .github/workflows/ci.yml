@@ -39,12 +39,12 @@ jobs:
       - name: Fail when the model changed without a migration
         run: |
           dotnet tool restore
-          dotnet ef migrations has-pending-model-changes --project src/Tropicast.Dashboard.Infrastructure -c Release --no-build
+          dotnet ef migrations has-pending-model-changes --project src/Tropicast.Dashboard.Infrastructure --configuration Release --no-build
 
       # Deploys run this self-contained bundle against the database; the API never migrates in production.
       - name: Build the migration bundle
         run: >
-          dotnet ef migrations bundle --project src/Tropicast.Dashboard.Infrastructure -c Release
+          dotnet ef migrations bundle --project src/Tropicast.Dashboard.Infrastructure --configuration Release
           --self-contained -r linux-x64 -o artifacts/efbundle --force
 
       - uses: actions/upload-artifact@v7
