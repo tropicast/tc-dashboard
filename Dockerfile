@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # One image: the ASP.NET Core API serving the built React SPA from wwwroot.
 
-FROM node:24-alpine AS web
+# Docker Hub images via Google's mirror: shared CI runners hit Docker Hub's anonymous pull limit.
+FROM mirror.gcr.io/library/node:24-alpine AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci

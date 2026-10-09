@@ -16,7 +16,7 @@ namespace Tropicast.Dashboard.Api.IntegrationTests;
 /// <summary>One PostgreSQL 17 container per test run; each factory gets its own database.</summary>
 public sealed class PostgresContainer : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("mirror.gcr.io/library/postgres:17-alpine").Build();
     private int _databases;
 
     public async ValueTask InitializeAsync() => await _container.StartAsync();
