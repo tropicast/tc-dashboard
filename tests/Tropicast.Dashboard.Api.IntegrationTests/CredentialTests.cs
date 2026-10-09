@@ -117,4 +117,19 @@ public sealed class CredentialTests(DashboardFactory factory) : IClassFixture<Da
         (await stranger.SendAsync(HttpMethod.Delete, $"{url}/{issued.Credential.Id}")).Status(HttpStatusCode.NotFound);
         (await owner.SendAsync(HttpMethod.Post, url, new { deviceLabel = "" })).Status(HttpStatusCode.BadRequest);
     }
+
+    [Fact]
+    public async Task Concurrent_revokes_all_succeed_and_are_audited_once()
+    {
+        var (owner, station) = await StationAsync();
+        var issued = await IssueAsync(owner, station.Id, "Studio PC");
+        var url = $"/api/v1/stations/{station.Id}/credentials/{issued.Credential.Id}";
+        var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => owner.SendAsync(HttpMethod.Delete, url)));
+        Assert.All(results, r => r.Status(HttpStatusCode.NoContent));
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(await db.AuditEntries.IgnoreQueryFilters()
+            .Where(e => e.TargetId == issued.Credential.Id.ToString() && e.Action == "credential.revoked").ToListAsync(Token));
+    }
 }

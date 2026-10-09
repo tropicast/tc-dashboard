@@ -36,7 +36,8 @@ internal static class CredentialEndpoints
             .AddEndpointFilter<CommandValidation>()
             .RequireAuthorization(TenantPolicies.Admin);
         credentials.MapGet("", ListAsync).WithSummary("Credentials of the station's devices, active first. Secrets are never listed.");
-        credentials.MapPost("", CreateAsync).WithSummary("Issues a credential for one device and shows its secret once.");
+        credentials.MapPost("", CreateAsync).WithSummary("Issues a credential for one device and shows its secret once.")
+            .ProducesProblem(StatusCodes.Status409Conflict);
         credentials.MapDelete("/{credentialId:guid}", RevokeAsync).WithSummary("Revokes one device's credential.");
     }
 
@@ -84,23 +85,30 @@ internal static class CredentialEndpoints
             new IssuedCredentialResponse(ToResponse(credential), station.PublicId, secret));
     }
 
+    /// <summary>
+    /// Revokes with a conditional UPDATE, so concurrent revokes (or a concurrent last-used update) never fail:
+    /// whichever request changes the row writes the audit entry, and every caller gets 204.
+    /// </summary>
     private static async Task<Results<NoContent, NotFound>> RevokeAsync(Guid stationId, Guid credentialId, HttpContext context,
         TenantAccess access, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
-        var credential = await db.BroadcastCredentials
-            .SingleOrDefaultAsync(c => c.Id == credentialId && c.StationId == stationId && c.Station.DeletedAt == null, cancellationToken);
-        if (credential is null)
+        var credentials = db.BroadcastCredentials
+            .Where(c => c.Id == credentialId && c.StationId == stationId && c.Station.DeletedAt == null);
+        var label = await credentials.Select(c => c.DeviceLabel).SingleOrDefaultAsync(cancellationToken);
+        if (label is null)
         {
             return TypedResults.NotFound();
         }
-        if (credential.IsActive)
+        var now = time.GetUtcNow();
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var revoked = await credentials.Where(c => c.RevokedAt == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(c => c.RevokedAt, now), cancellationToken);
+        if (revoked == 1)
         {
-            var now = time.GetUtcNow();
-            credential.Revoke(now);
-            Audit.Record(db, access, context.User, "credential.revoked", nameof(BroadcastCredential), credential.Id.ToString(),
-                credential.DeviceLabel, now);
+            Audit.Record(db, access, context.User, "credential.revoked", nameof(BroadcastCredential), credentialId.ToString(), label, now);
             await db.SaveChangesAsync(cancellationToken);
         }
+        await transaction.CommitAsync(cancellationToken);
         return TypedResults.NoContent();
     }
 

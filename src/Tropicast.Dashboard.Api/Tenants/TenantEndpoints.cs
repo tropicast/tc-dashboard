@@ -41,10 +41,13 @@ internal static class TenantEndpoints
     {
         var tenants = app.MapGroup("/api/v1/tenants").WithTags("Tenants").AddEndpointFilter<CommandValidation>();
         tenants.MapPost("", CreateAsync).RequireAuthorization().WithETag()
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .WithSummary("Creates a tenant on the Free plan; the caller becomes its Owner.");
         tenants.MapGet("/current", GetAsync).RequireAuthorization(TenantPolicies.Member).WithETag()
             .WithSummary("The current tenant (X-Tenant-Id), its plan and usage.");
         tenants.MapPatch("/current", UpdateAsync).RequireAuthorization(TenantPolicies.Admin).WithIfMatch().WithETag()
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired)
             .WithSummary("Renames the current tenant. Needs If-Match.");
     }
 

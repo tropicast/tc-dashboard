@@ -27,11 +27,14 @@ internal static class InvitationEndpoints
             .WithTags("Members")
             .AddEndpointFilter<RequestValidation>()
             .RequireAuthorization(TenantPolicies.Admin)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
             .WithSummary("Invites someone by email. Only an Owner can invite another Owner.");
         app.MapPost("/api/v1/invitations/accept", AcceptAsync)
             .WithTags("Members")
             .AddEndpointFilter<RequestValidation>()
             .RequireAuthorization()
+            .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .WithSummary("Joins the tenant with the token from the invitation email.");
     }
 
