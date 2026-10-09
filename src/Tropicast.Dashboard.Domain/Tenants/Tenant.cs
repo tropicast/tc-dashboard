@@ -30,5 +30,11 @@ public sealed class Tenant
         CreatedAt = now,
     };
 
+    public void Rename(string name, string slug)
+    {
+        Name = Text.Required(name, 100, nameof(name));
+        Slug = Text.Slug(slug, nameof(slug));
+    }
+
     public void ChangePlan(string planId) => PlanId = Text.Required(planId, 32, nameof(planId));
 }

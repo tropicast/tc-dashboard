@@ -52,6 +52,8 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Default", _connectionString);
         builder.UseSetting("App:PublicBaseUrl", "https://app.test");
+        // Tests read outbox rows and drive the dispatcher themselves.
+        builder.UseSetting("Outbox:Enabled", "false");
         builder.UseSetting("RateLimits:Auth:PermitLimit", AuthPermitLimit.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(Logs));
         builder.ConfigureTestServices(services =>

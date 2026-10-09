@@ -711,6 +711,423 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates a tenant on the Free plan; the caller becomes its Owner. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateTenantCommand"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        /** @description Address of the created resource. */
+                        Location?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TenantResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current tenant (X-Tenant-Id), its plan and usage. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TenantResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Renames the current tenant. Needs If-Match. */
+        patch: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateTenantCommand"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TenantResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/tenants/current/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Members of the current tenant. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MemberResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/current/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Removes a member. Only an Owner removes an Owner; the last Owner stays. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stations of the current tenant, newest first. */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number | string;
+                    pageSize?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PagedListOfStationResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Creates a station within the plan's station limit and assigns it a stream. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateStationCommand"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        /** @description Address of the created resource. */
+                        Location?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StationResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One station; the ETag header is needed to change it. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StationResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Deletes the station; its history is kept and its public ID is never reused. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match"?: string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Changes station settings. Needs If-Match. */
+        patch: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateStationCommand"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StationResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -726,6 +1143,61 @@ export interface components {
             /** Format: uuid */
             userId: string;
             code: string;
+        };
+        /**
+         * @description Creates a station in the current tenant.
+         * @example {
+         *       "name": "Radio Mada",
+         *       "slug": "radio-mada",
+         *       "description": "News and salegy from Antananarivo",
+         *       "genre": "Talk",
+         *       "country": "MG",
+         *       "language": "mg",
+         *       "website": "https://radiomada.example",
+         *       "listInDirectory": true
+         *     }
+         */
+        CreateStationCommand: {
+            /** @description Display name, e.g. "Radio Mada". */
+            name: string;
+            /** @description URL name, unique in the tenant, e.g. "radio-mada". */
+            slug: string;
+            /** @description Shown on the public page and in directories. */
+            description?: null | string;
+            /** @description e.g. "Talk" or "Salegy". */
+            genre?: null | string;
+            /** @description ISO 3166-1 alpha-2, e.g. "MG". */
+            country?: null | string;
+            /** @description BCP 47 tag, e.g. "mg" or "fr". */
+            language?: null | string;
+            /**
+             * Format: uri
+             * @description HTTPS address of a square logo.
+             */
+            logoUrl?: null | string;
+            /**
+             * Format: uri
+             * @description The station's website.
+             */
+            website?: null | string;
+            /**
+             * @description List on RadioBrowser, if the plan includes it.
+             * @default false
+             */
+            listInDirectory: boolean;
+        };
+        /**
+         * @description Creates a tenant; the caller becomes its Owner.
+         * @example {
+         *       "name": "Radio Mada Group",
+         *       "slug": "radio-mada"
+         *     }
+         */
+        CreateTenantCommand: {
+            /** @description Display name, e.g. "Radio Mada Group". */
+            name: string;
+            /** @description URL name, unique across Tropicast, e.g. "radio-mada". */
+            slug: string;
         };
         DeviceResponse: {
             /** Format: uuid */
@@ -759,14 +1231,50 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
         };
+        /**
+         * @example {
+         *       "email": "dj@example.com",
+         *       "role": "Broadcaster"
+         *     }
+         */
         InviteRequest: {
             /** @description Address to invite; the invitee accepts after signing in with it. */
             email: string;
             role: null | components["schemas"]["MembershipRole"];
         };
+        /** @description Listener URLs of a station. Uri? ListenerUrls.Opus is null when the plan has no Opus. */
+        ListenerUrls: {
+            /**
+             * Format: uri
+             * @description MP3 stream, playable everywhere.
+             */
+            mp3: string;
+            /**
+             * Format: uri
+             * @description Ogg Opus stream: about half the mobile data of MP3.
+             */
+            opus: null | string;
+        };
         LoginRequest: {
             email: string;
             password: string;
+        };
+        /** @description A member of the current tenant. */
+        MemberResponse: {
+            /**
+             * Format: uuid
+             * @description The member's account ID.
+             */
+            userId: string;
+            /** @description The member's email address. */
+            email: string;
+            /** @description Owner, Admin or Broadcaster. */
+            role: components["schemas"]["MembershipRole"];
+            /**
+             * Format: date-time
+             * @description When the member joined.
+             */
+            joinedAt: string;
         };
         MembershipResponse: {
             /** Format: uuid */
@@ -783,6 +1291,56 @@ export interface components {
             email: string;
             memberships: components["schemas"]["MembershipResponse"][];
         };
+        /** @description One page of results. */
+        PagedListOfStationResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["StationResponse"][];
+            /**
+             * Format: int32
+             * @description 1-based page number.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description Items per page (1-100).
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description Items on all pages.
+             */
+            totalCount: number | string;
+        };
+        /** @description A plan's limits and features. */
+        PlanResponse: {
+            /** @description Plan ID, e.g. "starter". */
+            id: string;
+            /** @description Display name. */
+            name: string;
+            /**
+             * Format: int32
+             * @description Stations the tenant may have.
+             */
+            maxStations: number | string;
+            /**
+             * Format: int32
+             * @description Concurrent listeners per station.
+             */
+            maxListeners: number | string;
+            /**
+             * Format: int32
+             * @description Highest stream bitrate accepted.
+             */
+            maxBitrateKbps: number | string;
+            /** @description Stream formats: "mp3", "opus". */
+            formats: string[];
+            /** @description RadioBrowser listing allowed. */
+            directoryListing: boolean;
+            /** @description Embeddable player allowed. */
+            embed: boolean;
+            /** @description Listener statistics included. */
+            analytics: boolean;
+        };
         RefreshRequest: {
             refreshToken: string;
         };
@@ -795,6 +1353,90 @@ export interface components {
             code: string;
             newPassword: string;
         };
+        /**
+         * @description A station.
+         * @example {
+         *       "id": "01927f5e-6c1a-7b3e-9a52-3f1d2c4b5a69",
+         *       "publicId": "k3m9x2p7qa",
+         *       "name": "Radio Mada",
+         *       "slug": "radio-mada",
+         *       "description": "News and salegy from Antananarivo",
+         *       "genre": "Talk",
+         *       "country": "MG",
+         *       "language": "mg",
+         *       "logoUrl": null,
+         *       "website": "https://radiomada.example",
+         *       "listInDirectory": true,
+         *       "createdAt": "2026-10-09T12:00:00+00:00",
+         *       "listenerUrls": {
+         *         "mp3": "https://listen.tropicastradio.com/stations/k3m9x2p7qa/live.mp3",
+         *         "opus": "https://listen.tropicastradio.com/stations/k3m9x2p7qa/live.opus"
+         *       }
+         *     }
+         */
+        StationResponse: {
+            /**
+             * Format: uuid
+             * @description ID in the API.
+             */
+            id: string;
+            /** @description ID in listener URLs and Icecast mounts; never changes. */
+            publicId: string;
+            /** @description Display name. */
+            name: string;
+            /** @description URL name, unique in the tenant. */
+            slug: string;
+            /** @description Shown on the public page and in directories. */
+            description: string;
+            /** @description Music or programme genre. */
+            genre: string;
+            /** @description ISO 3166-1 alpha-2 code. */
+            country: null | string;
+            /** @description BCP 47 language tag. */
+            language: null | string;
+            /**
+             * Format: uri
+             * @description Logo address.
+             */
+            logoUrl: null | string;
+            /**
+             * Format: uri
+             * @description The station's website.
+             */
+            website: null | string;
+            /** @description Listed on RadioBrowser (only when the plan includes it). */
+            listInDirectory: boolean;
+            /**
+             * Format: date-time
+             * @description When the station was created.
+             */
+            createdAt: string;
+            /** @description Where listeners play the station. */
+            listenerUrls: components["schemas"]["ListenerUrls"];
+        };
+        /** @description A tenant (customer account). */
+        TenantResponse: {
+            /**
+             * Format: uuid
+             * @description Tenant ID; send it as X-Tenant-Id to choose this tenant.
+             */
+            id: string;
+            /** @description Display name. */
+            name: string;
+            /** @description URL name, unique across Tropicast. */
+            slug: string;
+            /** @description Active or Suspended. */
+            status: components["schemas"]["TenantStatus"];
+            /** @description Current plan. */
+            plan: components["schemas"]["PlanResponse"];
+            /**
+             * Format: int32
+             * @description Stations in use, out of Plan.MaxStations.
+             */
+            stationCount: number | string;
+        };
+        /** @enum {unknown} */
+        TenantStatus: "Active" | "Suspended";
         TokenRequest: {
             email: string;
             password: string;
@@ -813,6 +1455,36 @@ export interface components {
             expiresIn: number | string;
             /** @description One-time: each refresh returns a new one. Revoke it to sign the device out. */
             refreshToken: string;
+        };
+        /**
+         * @description Changes station settings; omitted (null) fields keep their value.
+         * @example {
+         *       "genre": "Salegy",
+         *       "description": "Music all night"
+         *     }
+         */
+        UpdateStationCommand: {
+            name?: null | string;
+            slug?: null | string;
+            description?: null | string;
+            genre?: null | string;
+            country?: null | string;
+            language?: null | string;
+            /** Format: uri */
+            logoUrl?: null | string;
+            /** Format: uri */
+            website?: null | string;
+            listInDirectory?: null | boolean;
+        };
+        /**
+         * @description Changes the tenant's name or slug; omitted fields keep their value.
+         * @example {
+         *       "name": "Radio Mada Media"
+         *     }
+         */
+        UpdateTenantCommand: {
+            name?: null | string;
+            slug?: null | string;
         };
         /** @description API version information. */
         VersionInfo: {

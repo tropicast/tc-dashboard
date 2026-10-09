@@ -48,9 +48,9 @@ public sealed class StationTests
     public void Directory_listing_needs_a_plan_that_includes_it()
     {
         var station = Station.Create(Guid.NewGuid(), "Radio", "radio", Now);
-        station.SetDirectoryListing(true, Plan.Free);
+        station.SetDirectoryListing(true, Plan.Free, Now);
         Assert.False(station.ListInDirectory);
-        station.SetDirectoryListing(true, Plan.Starter);
+        station.SetDirectoryListing(true, Plan.Starter, Now);
         Assert.True(station.ListInDirectory);
     }
 
@@ -72,5 +72,30 @@ public sealed class StationTests
         credential.Revoke(Now.AddMinutes(2));
         Assert.False(credential.IsActive);
         Assert.Equal(Now.AddMinutes(1), credential.RevokedAt);
+    }
+}
+
+public sealed class StationEventTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void Creating_changing_and_deleting_record_events_once_each()
+    {
+        var station = Station.Create(Guid.NewGuid(), "Radio", "radio", Now);
+        Assert.IsType<StationCreated>(Assert.Single(station.DomainEvents));
+        station.Rename("Radio 2", "radio-2", Now);
+        Assert.Single(station.DomainEvents);
+        station.ClearDomainEvents();
+
+        station.Rename("Radio 3", "radio-3", Now);
+        station.Describe("News", "Talk", "MG", "mg", null, null, Now);
+        Assert.IsType<StationChanged>(Assert.Single(station.DomainEvents));
+        station.ClearDomainEvents();
+
+        station.Delete(Now);
+        station.Delete(Now);
+        var deleted = Assert.IsType<StationDeleted>(Assert.Single(station.DomainEvents));
+        Assert.Equal((station.Id, station.PublicId), (deleted.StationId, deleted.PublicId));
     }
 }

@@ -17,13 +17,21 @@ internal static partial class Text
         => string.IsNullOrWhiteSpace(value) ? "" : Required(value, maxLength, name);
 
     internal static string Slug(string value, string name)
-        => SlugPattern().IsMatch(value) ? value
-            : throw new ArgumentException("Use 3-64 lowercase letters, digits and single hyphens.", name);
+        => Slugs.IsValid(value) ? value : throw new ArgumentException(Slugs.Rule, name);
 
     internal static string Sha256Hex(string value, string name)
         => value is { Length: 64 } && value.All(char.IsAsciiHexDigitLower) ? value
             : throw new ArgumentException("Expected a lowercase hex SHA-256 hash.", name);
 
+}
+
+/// <summary>URL slugs for tenants and stations.</summary>
+public static partial class Slugs
+{
+    public const string Rule = "Use 3-64 lowercase letters, digits and single hyphens, starting and ending with a letter or digit.";
+
+    public static bool IsValid(string? value) => value is not null && Pattern().IsMatch(value);
+
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){2,63}$")]
-    private static partial Regex SlugPattern();
+    private static partial Regex Pattern();
 }
