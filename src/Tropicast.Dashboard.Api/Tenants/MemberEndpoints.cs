@@ -21,6 +21,7 @@ internal static class MemberEndpoints
         var members = app.MapGroup("/api/v1/tenants/current/members").WithTags("Members");
         members.MapGet("", ListAsync).RequireAuthorization(TenantPolicies.Member).WithSummary("Members of the current tenant.");
         members.MapDelete("/{userId:guid}", RemoveAsync).RequireAuthorization(TenantPolicies.Admin)
+            .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
             .WithSummary("Removes a member. Only an Owner removes an Owner; the last Owner stays.");
     }
 

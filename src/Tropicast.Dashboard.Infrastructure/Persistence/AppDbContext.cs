@@ -7,6 +7,7 @@ using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Domain;
+using Tropicast.Dashboard.Domain.Audit;
 using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Outbox;
 
@@ -32,6 +33,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<Station> Stations => Set<Station>();
@@ -62,6 +64,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
         builder.Entity<Tenant>().HasQueryFilter(TenantFilter, e => e.Id == CurrentTenantId);
         builder.Entity<Membership>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
         builder.Entity<Invitation>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
+        builder.Entity<AuditEntry>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
         builder.Entity<Subscription>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
         builder.Entity<Station>().HasQueryFilter(TenantFilter, e => e.TenantId == CurrentTenantId);
         builder.Entity<Station>().HasQueryFilter(DeletedFilter, e => e.DeletedAt == null);

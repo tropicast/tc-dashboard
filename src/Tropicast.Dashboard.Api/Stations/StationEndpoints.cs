@@ -46,12 +46,16 @@ internal static class StationEndpoints
         stations.MapGet("", ListAsync).RequireAuthorization(TenantPolicies.Member)
             .WithSummary("Stations of the current tenant, newest first.");
         stations.MapPost("", CreateAsync).RequireAuthorization(TenantPolicies.Admin).WithETag()
+            .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
             .WithSummary("Creates a station within the plan's station limit and assigns it a stream.");
         stations.MapGet("/{id:guid}", GetAsync).RequireAuthorization(TenantPolicies.Member).WithETag()
             .WithSummary("One station; the ETag header is needed to change it.");
         stations.MapPatch("/{id:guid}", UpdateAsync).RequireAuthorization(TenantPolicies.Admin).WithIfMatch().WithETag()
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired)
             .WithSummary("Changes station settings. Needs If-Match.");
         stations.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization(TenantPolicies.Admin).WithIfMatch(required: false)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .WithSummary("Deletes the station; its history is kept and its public ID is never reused.");
     }
 

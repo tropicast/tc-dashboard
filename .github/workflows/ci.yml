@@ -24,6 +24,9 @@ jobs:
   dotnet:
     name: .NET build, test and API client
     runs-on: ubuntu-latest
+    env:
+      # Testcontainers' own images (Ryuk) from Google's Docker Hub mirror: Docker Hub fails on shared runners.
+      TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: mirror.gcr.io
     # Empty database for the migration bundle check.
     services:
       postgres:
