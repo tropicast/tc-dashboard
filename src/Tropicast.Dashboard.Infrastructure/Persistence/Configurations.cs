@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Tropicast.Dashboard.Domain.Audit;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
@@ -95,6 +96,8 @@ internal sealed class BroadcastCredentialConfiguration : IEntityTypeConfiguratio
     {
         builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => e.StationId);
+        // One active credential per device label; revoking frees the label.
+        builder.HasIndex(e => new { e.StationId, e.DeviceLabel }).IsUnique().HasFilter("revoked_at IS NULL");
         builder.Property(e => e.DeviceLabel).HasMaxLength(64);
         builder.Property(e => e.SecretHash).HasMaxLength(64).IsFixedLength();
         builder.Ignore(e => e.IsActive);
@@ -155,5 +158,18 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(e => e.LastError).HasMaxLength(256);
         // The dispatcher only reads unprocessed rows.
         builder.HasIndex(e => e.OccurredAt).HasFilter("processed_at IS NULL");
+    }
+}
+
+internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEntry>
+{
+    public void Configure(EntityTypeBuilder<AuditEntry> builder)
+    {
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
+        builder.Property(e => e.Action).HasMaxLength(64);
+        builder.Property(e => e.TargetType).HasMaxLength(64);
+        builder.Property(e => e.TargetId).HasMaxLength(64);
+        builder.Property(e => e.Summary).HasMaxLength(256);
+        builder.HasIndex(e => new { e.TenantId, e.OccurredAt });
     }
 }

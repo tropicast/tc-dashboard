@@ -143,8 +143,14 @@ is at `/scalar`.
 | `GET /stations/{id}` | Member | `ETag` |
 | `PATCH /stations/{id}` | Admin | Needs `If-Match` (428 without, 412 when stale) |
 | `DELETE /stations/{id}` | Admin | Soft delete; optional `If-Match` |
+| `GET /stations/{id}/credentials` | Admin | Per-device broadcast credentials, active first; never the secret |
+| `POST /stations/{id}/credentials` | Admin | Issues a 256-bit secret for one device; the only response that shows it (`Cache-Control: no-store`) |
+| `DELETE /stations/{id}/credentials/{credentialId}` | Admin | Revokes that device only; idempotent |
 
-Stations of other tenants answer 404. Listener URLs come from `Streaming`
+Stations of other tenants answer 404. Broadcast credentials are stored as
+SHA-256 hashes; the Icecast username is the station's public ID. Credential
+creation and revocation are recorded in `audit_entries` (actor, action,
+target; never secrets). Listener URLs come from `Streaming`
 settings (`Node`, `ListenerBaseUrl`). A station change is saved together with
 an `outbox_messages` row (`StationCreated`, `StationChanged`,
 `StationDeleted`). A background dispatcher hands these rows to the

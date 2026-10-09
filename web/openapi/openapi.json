@@ -913,6 +913,131 @@
           }
         }
       }
+    },
+    "/api/v1/stations/{stationId}/credentials": {
+      "get": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Credentials of the station's devices, active first. Secrets are never listed.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CredentialResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Issues a credential for one device and shows its secret once.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCredentialCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedCredentialResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{stationId}/credentials/{credentialId}": {
+      "delete": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Revokes one device's credential.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -959,6 +1084,24 @@
             "type": "string"
           }
         }
+      },
+      "CreateCredentialCommand": {
+        "examples": [
+          {
+            "deviceLabel": "Studio PC"
+          }
+        ],
+        "required": [
+          "deviceLabel"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceLabel": {
+            "type": "string",
+            "description": "Names the device, e.g. \"Studio PC\"; unique among the station's active credentials."
+          }
+        },
+        "description": "Issues a broadcast credential for one device of a station."
       },
       "CreateStationCommand": {
         "examples": [
@@ -1062,6 +1205,49 @@
           }
         },
         "description": "Creates a tenant; the caller becomes its Owner."
+      },
+      "CredentialResponse": {
+        "required": [
+          "id",
+          "deviceLabel",
+          "createdAt",
+          "lastUsedAt",
+          "revokedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Credential ID.",
+            "format": "uuid"
+          },
+          "deviceLabel": {
+            "type": "string",
+            "description": "The device it was issued for."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was issued.",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Last accepted connection from Icecast; null if never used.",
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was revoked; null while active.",
+            "format": "date-time"
+          }
+        },
+        "description": "A broadcast credential, without its secret."
       },
       "DeviceResponse": {
         "required": [
@@ -1207,6 +1393,29 @@
             ]
           }
         }
+      },
+      "IssuedCredentialResponse": {
+        "required": [
+          "credential",
+          "username",
+          "secret"
+        ],
+        "type": "object",
+        "properties": {
+          "credential": {
+            "description": "The stored credential.",
+            "$ref": "#/components/schemas/CredentialResponse"
+          },
+          "username": {
+            "type": "string",
+            "description": "Icecast source username: the station's public ID."
+          },
+          "secret": {
+            "type": "string",
+            "description": "Icecast source password. Store it in the device now; it cannot be shown again."
+          }
+        },
+        "description": "A new credential with its secret. This response is the only time the secret is shown."
       },
       "ListenerUrls": {
         "required": [
@@ -1830,6 +2039,9 @@
     },
     {
       "name": "Stations"
+    },
+    {
+      "name": "Credentials"
     }
   ]
 }

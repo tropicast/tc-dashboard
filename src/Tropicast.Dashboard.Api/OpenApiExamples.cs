@@ -19,6 +19,7 @@ internal static class OpenApiExamples
              "country":"MG","language":"mg","website":"https://radiomada.example","listInDirectory":true}
             """,
         [typeof(UpdateStationCommand)] = """{"genre":"Salegy","description":"Music all night"}""",
+        [typeof(CreateCredentialCommand)] = """{"deviceLabel":"Studio PC"}""",
         [typeof(InviteRequest)] = """{"email":"dj@example.com","role":"Broadcaster"}""",
         [typeof(StationResponse)] = """
             {"id":"01927f5e-6c1a-7b3e-9a52-3f1d2c4b5a69","publicId":"k3m9x2p7qa","name":"Radio Mada","slug":"radio-mada",

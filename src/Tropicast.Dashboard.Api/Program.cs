@@ -44,6 +44,7 @@ app.MapInvitations();
 app.MapTenants();
 app.MapMembers();
 app.MapStations();
+app.MapCredentials();
 
 // The React SPA is built into wwwroot; client-side routes fall back to index.html.
 app.UseDefaultFiles();
