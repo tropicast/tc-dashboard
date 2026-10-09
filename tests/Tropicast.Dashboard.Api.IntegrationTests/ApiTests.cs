@@ -1,12 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Tropicast.Dashboard.Api.IntegrationTests;
 
-public sealed class ApiTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public sealed class ApiTests(DashboardFactory factory) : IClassFixture<DashboardFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = factory.CreateBrowser();
 
     [Fact]
     public async Task Health_answers_200()
@@ -37,5 +36,14 @@ public sealed class ApiTests(WebApplicationFactory<Program> factory) : IClassFix
         var response = await _client.GetAsync("/openapi/v1.json", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("/api/v1/version", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_malformed_body_is_a_400_problem()
+    {
+        using var content = new StringContent("{not json", System.Text.Encoding.UTF8, "application/json");
+        var response = await _client.PostAsync("/api/v1/auth/login", content, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 }

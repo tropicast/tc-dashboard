@@ -9,7 +9,7 @@ namespace Tropicast.Dashboard.Infrastructure.Tests;
 /// <summary>One PostgreSQL 17 container per test run, migrated from an empty database.</summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("mirror.gcr.io/library/postgres:17-alpine").Build();
 
     public string ConnectionString => _container.GetConnectionString();
 
@@ -24,7 +24,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     public AppDbContext CreateContext(Guid? tenantId)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>();
-        PersistenceSetup.Configure(options, ConnectionString);
+        PersistenceSetup.ConfigureStandalone(options, ConnectionString);
         return new AppDbContext(options.Options, new CurrentTenant { TenantId = tenantId });
     }
 

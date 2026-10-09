@@ -27,7 +27,7 @@ jobs:
     # Empty database for the migration bundle check.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: mirror.gcr.io/library/postgres:17-alpine
         env:
           POSTGRES_PASSWORD: ci-only
         ports: ["5432:5432"]
@@ -63,7 +63,7 @@ jobs:
           artifacts/efbundle --connection "$CONNECTION"
           artifacts/efbundle --connection "$CONNECTION" | tee second-run.txt
           if grep -q "Applying migration" second-run.txt; then echo "::error::The second run applied migrations."; exit 1; fi
-          sql() { docker run --rm --network host -e PGPASSWORD=ci-only postgres:17-alpine psql -h localhost -U postgres -tAc "$1"; }
+          sql() { docker run --rm --network host -e PGPASSWORD=ci-only mirror.gcr.io/library/postgres:17-alpine psql -h localhost -U postgres -tAc "$1"; }
           migrations=$(find src/Tropicast.Dashboard.Infrastructure/Persistence/Migrations -name "*.Designer.cs" | wc -l)
           test "$(sql 'select count(*) from __ef_migrations_history')" -eq "$migrations"
           test "$(sql 'select count(*) from plans')" -eq 4

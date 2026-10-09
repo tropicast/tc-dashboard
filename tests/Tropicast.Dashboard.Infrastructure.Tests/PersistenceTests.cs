@@ -3,6 +3,7 @@ using Tropicast.Dashboard.Domain;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
+using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Infrastructure.Tests;
@@ -150,8 +151,10 @@ public sealed class PersistenceTests(PostgresFixture db)
         var tenant = Tenant.Create($"Tenant {suffix}", $"tenant-{suffix}", Now);
         var station = Station.Create(tenant.Id, "Radio", $"radio-{suffix}", Now);
         await using var context = db.CreateContext(tenant.Id);
+        var user = new AppUser { UserName = $"{suffix}@example.test", Email = $"{suffix}@example.test", CreatedAt = Now };
+        context.Users.Add(user);
         context.Tenants.Add(tenant);
-        context.Memberships.Add(Membership.Create(tenant.Id, Guid.NewGuid(), MembershipRole.Owner, Now));
+        context.Memberships.Add(Membership.Create(tenant.Id, user.Id, MembershipRole.Owner, Now));
         context.Stations.Add(station);
         await context.SaveChangesAsync(Token);
         return (tenant, station);

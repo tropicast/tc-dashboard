@@ -1,13 +1,23 @@
+using System.Text.Json.Serialization;
 using Tropicast.Dashboard.Api;
+using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.Tenants;
 using Tropicast.Dashboard.Application;
 using Tropicast.Dashboard.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
+// Malformed request bodies are the client's fault: 400, not 500.
+builder.Services.AddExceptionHandler(options =>
+    options.StatusCodeSelector = exception => exception is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError);
+// Enums travel by name ("Owner"), as they are stored; numbers are rejected, so undefined values never get in.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddDashboardAuth(builder.Configuration);
 
 var app = builder.Build();
 // Local development convenience (compose sets it); production runs the migration bundle at deploy.
@@ -21,8 +31,11 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+app.UseDashboardAuth();
 app.MapHealthChecks("/health");
 app.MapApi();
+app.MapAuth();
+app.MapInvitations();
 
 // The React SPA is built into wwwroot; client-side routes fall back to index.html.
 app.UseDefaultFiles();

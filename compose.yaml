@@ -1,6 +1,7 @@
-# Local development. `docker compose up` runs PostgreSQL and the API (which also
-# serves the built SPA on http://localhost:8080). Add `--profile dev` for the
-# Vite dev server with hot reload on http://localhost:5173, proxying /api to the API.
+# Local development. `docker compose up` runs PostgreSQL, Mailpit (catches all
+# email: http://localhost:8025) and the API (which also serves the built SPA on
+# http://localhost:8080). Add `--profile dev` for the Vite dev server with hot
+# reload on http://localhost:5173, proxying /api to the API.
 services:
   db:
     image: postgres:17
@@ -23,11 +24,24 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: Host=db;Database=tropicast;Username=tropicast;Password=${POSTGRES_PASSWORD:-tropicast-dev}
       Database__MigrateOnStartup: "true"
+      App__PublicBaseUrl: http://localhost:${API_PORT:-8080}
+      Email__From: Tropicast <no-reply@tropicast.localhost>
+      Email__Smtp__Host: mail
+      Email__Smtp__Port: "1025"
+      Email__Smtp__Security: None
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     depends_on:
       db:
         condition: service_healthy
+      mail:
+        condition: service_started
+
+  # Development SMTP server: every email lands in its web UI, nothing is delivered.
+  mail:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
 
   web:
     profiles: [dev]

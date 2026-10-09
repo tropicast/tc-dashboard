@@ -27,8 +27,7 @@ public sealed class BroadcastCredential
         Id = Guid.CreateVersion7(now),
         StationId = stationId,
         DeviceLabel = Text.Required(deviceLabel, 64, nameof(deviceLabel)),
-        SecretHash = secretHash is { Length: 64 } && secretHash.All(char.IsAsciiHexDigitLower) ? secretHash
-            : throw new ArgumentException("Expected a lowercase hex SHA-256 hash.", nameof(secretHash)),
+        SecretHash = Text.Sha256Hex(secretHash, nameof(secretHash)),
         CreatedAt = now,
     };
 
