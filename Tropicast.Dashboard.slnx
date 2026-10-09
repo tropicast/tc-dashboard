@@ -10,5 +10,6 @@
     <Project Path="tests/Tropicast.Dashboard.Application.Tests/Tropicast.Dashboard.Application.Tests.csproj" />
     <Project Path="tests/Tropicast.Dashboard.Architecture.Tests/Tropicast.Dashboard.Architecture.Tests.csproj" />
     <Project Path="tests/Tropicast.Dashboard.Domain.Tests/Tropicast.Dashboard.Domain.Tests.csproj" />
+    <Project Path="tests/Tropicast.Dashboard.Infrastructure.Tests/Tropicast.Dashboard.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

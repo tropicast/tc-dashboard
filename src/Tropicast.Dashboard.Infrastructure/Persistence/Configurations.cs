@@ -1,0 +1,119 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Tropicast.Dashboard.Domain.Plans;
+using Tropicast.Dashboard.Domain.Stations;
+using Tropicast.Dashboard.Domain.Tenants;
+
+namespace Tropicast.Dashboard.Infrastructure.Persistence;
+
+internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
+{
+    public void Configure(EntityTypeBuilder<Tenant> builder)
+    {
+        builder.Property(e => e.Name).HasMaxLength(100);
+        builder.Property(e => e.Slug).HasMaxLength(64);
+        builder.HasIndex(e => e.Slug).IsUnique();
+        builder.HasOne<Plan>().WithMany().HasForeignKey(e => e.PlanId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
+{
+    public void Configure(EntityTypeBuilder<Membership> builder)
+    {
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
+        // user_id references the identity users table (added with authentication, #4).
+        builder.HasIndex(e => new { e.TenantId, e.UserId }).IsUnique();
+        builder.HasIndex(e => e.UserId);
+    }
+}
+
+internal sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
+{
+    public void Configure(EntityTypeBuilder<Plan> builder)
+    {
+        builder.Property(e => e.Id).HasMaxLength(32);
+        builder.Property(e => e.Name).HasMaxLength(64);
+        builder.Property(e => e.Formats).HasConversion<int>();
+        builder.HasData(Plan.Catalogue);
+    }
+}
+
+internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
+{
+    public void Configure(EntityTypeBuilder<Subscription> builder)
+    {
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Plan>().WithMany().HasForeignKey(e => e.PlanId).OnDelete(DeleteBehavior.Restrict);
+        builder.Property(e => e.ProviderCustomerId).HasMaxLength(255);
+        builder.Property(e => e.ProviderSubscriptionId).HasMaxLength(255);
+        builder.HasIndex(e => e.ProviderSubscriptionId).IsUnique();
+    }
+}
+
+internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
+{
+    public void Configure(EntityTypeBuilder<Station> builder)
+    {
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.Property(e => e.PublicId).HasMaxLength(StationPublicId.Length).IsFixedLength();
+        // Part of listener URLs and Icecast mounts: never changes once saved, never reused.
+        builder.Property(e => e.PublicId).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        builder.HasIndex(e => e.PublicId).IsUnique();
+        builder.Property(e => e.Name).HasMaxLength(100);
+        builder.Property(e => e.Slug).HasMaxLength(64);
+        // A deleted station frees its slug, not its public ID.
+        builder.HasIndex(e => new { e.TenantId, e.Slug }).IsUnique().HasFilter("deleted_at IS NULL");
+        builder.Property(e => e.Description).HasMaxLength(2000);
+        builder.Property(e => e.Genre).HasMaxLength(64);
+        builder.Property(e => e.Country).HasMaxLength(2).IsFixedLength();
+        builder.Property(e => e.Language).HasMaxLength(35);
+        builder.Property(e => e.LogoUrl).HasMaxLength(2048);
+        builder.Property(e => e.Website).HasMaxLength(2048);
+        builder.Ignore(e => e.IsDeleted);
+    }
+}
+
+internal sealed class StreamAssignmentConfiguration : IEntityTypeConfiguration<StreamAssignment>
+{
+    public void Configure(EntityTypeBuilder<StreamAssignment> builder)
+    {
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => e.StationId).IsUnique();
+        builder.Property(e => e.Node).HasMaxLength(64);
+        builder.Property(e => e.MountBase).HasMaxLength(64);
+    }
+}
+
+internal sealed class BroadcastCredentialConfiguration : IEntityTypeConfiguration<BroadcastCredential>
+{
+    public void Configure(EntityTypeBuilder<BroadcastCredential> builder)
+    {
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => e.StationId);
+        builder.Property(e => e.DeviceLabel).HasMaxLength(64);
+        builder.Property(e => e.SecretHash).HasMaxLength(64).IsFixedLength();
+        builder.Ignore(e => e.IsActive);
+    }
+}
+
+internal sealed class LiveSessionConfiguration : IEntityTypeConfiguration<LiveSession>
+{
+    public void Configure(EntityTypeBuilder<LiveSession> builder)
+    {
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => new { e.StationId, e.StartedAt });
+        // At most one open session per station and format.
+        builder.HasIndex(e => new { e.StationId, e.Format }).IsUnique().HasFilter("ended_at IS NULL");
+    }
+}
+
+internal sealed class StationStatsRollupConfiguration : IEntityTypeConfiguration<StationStatsRollup>
+{
+    public void Configure(EntityTypeBuilder<StationStatsRollup> builder)
+    {
+        builder.HasKey(e => new { e.StationId, e.Interval, e.PeriodStart });
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

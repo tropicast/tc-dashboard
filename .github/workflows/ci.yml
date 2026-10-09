@@ -36,6 +36,25 @@ jobs:
 
       - run: dotnet test Tropicast.Dashboard.slnx -c Release --no-build
 
+      - name: Fail when the model changed without a migration
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/Tropicast.Dashboard.Infrastructure -c Release --no-build
+
+      # Deploys run this self-contained bundle against the database; the API never migrates in production.
+      - name: Build the migration bundle
+        run: >
+          dotnet ef migrations bundle --project src/Tropicast.Dashboard.Infrastructure -c Release
+          --self-contained -r linux-x64 -o artifacts/efbundle --force
+
+      - uses: actions/upload-artifact@v7
+        # Artifacts are a convenience: a full storage quota must not fail the build.
+        continue-on-error: true
+        with:
+          name: efbundle
+          path: artifacts/efbundle
+          retention-days: 7
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24
