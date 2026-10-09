@@ -5,6 +5,7 @@ using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Infrastructure.Identity;
+using Tropicast.Dashboard.Infrastructure.Outbox;
 
 namespace Tropicast.Dashboard.Infrastructure.Persistence;
 
@@ -142,5 +143,17 @@ internal sealed class DeviceSessionConfiguration : IEntityTypeConfiguration<Devi
         // Looked up by the session ID inside the token, then compared: no index on the hash.
         builder.Property(e => e.RefreshTokenHash).HasMaxLength(64).IsFixedLength();
         builder.HasIndex(e => e.UserId);
+    }
+}
+
+internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage>
+{
+    public void Configure(EntityTypeBuilder<OutboxMessage> builder)
+    {
+        builder.Property(e => e.Type).HasMaxLength(128);
+        builder.Property(e => e.Payload).HasColumnType("jsonb");
+        builder.Property(e => e.LastError).HasMaxLength(256);
+        // The dispatcher only reads unprocessed rows.
+        builder.HasIndex(e => e.OccurredAt).HasFilter("processed_at IS NULL");
     }
 }

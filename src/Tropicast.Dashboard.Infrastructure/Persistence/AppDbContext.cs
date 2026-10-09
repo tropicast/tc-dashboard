@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Tropicast.Dashboard.Application;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
+using Tropicast.Dashboard.Domain;
 using Tropicast.Dashboard.Infrastructure.Identity;
+using Tropicast.Dashboard.Infrastructure.Outbox;
 
 namespace Tropicast.Dashboard.Infrastructure.Persistence;
 
@@ -28,6 +31,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<Station> Stations => Set<Station>();
@@ -73,6 +77,25 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
             builder.Entity(entity.ClrType).Property<uint>("Version").IsRowVersion();
         }
     }
+
+    /// <summary>Saves the changes and the domain events they raised, in one transaction (the outbox).</summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var sources = ChangeTracker.Entries<IHasDomainEvents>().Select(e => e.Entity).Where(e => e.DomainEvents.Count > 0).ToList();
+        foreach (var domainEvent in sources.SelectMany(s => s.DomainEvents))
+        {
+            OutboxMessages.Add(OutboxMessage.From(domainEvent.GetType().Name,
+                JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), OutboxJson), domainEvent.OccurredAt));
+        }
+        var saved = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        sources.ForEach(s => s.ClearDomainEvents());
+        return saved;
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        => throw new NotSupportedException("Use SaveChangesAsync: it also writes the outbox.");
+
+    private static readonly JsonSerializerOptions OutboxJson = new(JsonSerializerDefaults.Web);
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

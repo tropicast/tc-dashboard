@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Tropicast.Dashboard.Application;
 using Tropicast.Dashboard.Application.Email;
 using Tropicast.Dashboard.Infrastructure.Email;
+using Tropicast.Dashboard.Infrastructure.Outbox;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Infrastructure;
@@ -20,6 +21,9 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<ICurrentTenant>(sp => sp.GetRequiredService<CurrentTenant>());
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
         services.TryAddSingleton<IEmailSender, SmtpEmailSender>();
+        services.Configure<OutboxOptions>(configuration.GetSection("Outbox"));
+        services.AddSingleton<OutboxDispatcher>();
+        services.AddHostedService(sp => sp.GetRequiredService<OutboxDispatcher>());
         // Read when a context is created, so hosts without a database (e.g. OpenAPI generation) still start.
         services.AddDbContext<AppDbContext>(options => PersistenceSetup.Configure(options,
             configuration.GetConnectionString("Default")

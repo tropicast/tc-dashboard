@@ -119,9 +119,9 @@ public sealed class PersistenceTests(PostgresFixture db)
         await using var second = db.CreateContext(tenant.Id);
         var a = await first.Stations.SingleAsync(s => s.Id == station.Id, Token);
         var b = await second.Stations.SingleAsync(s => s.Id == station.Id, Token);
-        a.Rename("First", "first");
+        a.Rename("First", "first", Now);
         await first.SaveChangesAsync(Token);
-        b.Rename("Second", "second");
+        b.Rename("Second", "second", Now);
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync(Token));
     }
 

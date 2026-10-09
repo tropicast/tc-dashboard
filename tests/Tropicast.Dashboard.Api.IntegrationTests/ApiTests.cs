@@ -46,4 +46,12 @@ public sealed class ApiTests(DashboardFactory factory) : IClassFixture<Dashboard
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
+
+    [Fact]
+    public async Task The_api_reference_is_served_in_development()
+    {
+        var response = await _client.GetAsync("/scalar/", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+    }
 }

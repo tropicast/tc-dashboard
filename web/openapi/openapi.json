@@ -468,6 +468,361 @@
           }
         }
       }
+    },
+    "/api/v1/tenants": {
+      "post": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "Creates a tenant on the Free plan; the caller becomes its Owner.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/current": {
+      "get": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "The current tenant (X-Tenant-Id), its plan and usage.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "Renames the current tenant. Needs If-Match.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/current/members": {
+      "get": {
+        "tags": [
+          "Members"
+        ],
+        "summary": "Members of the current tenant.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/current/members/{userId}": {
+      "delete": {
+        "tags": [
+          "Members"
+        ],
+        "summary": "Removes a member. Only an Owner removes an Owner; the last Owner stays.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/stations": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Stations of the current tenant, newest first.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedListOfStationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Creates a station within the plan's station limit and assigns it a stream.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStationCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{id}": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "One station; the ETag header is needed to change it.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Changes station settings. Needs If-Match.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStationCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Deletes the station; its history is kept and its public ID is never reused.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -514,6 +869,109 @@
             "type": "string"
           }
         }
+      },
+      "CreateStationCommand": {
+        "examples": [
+          {
+            "name": "Radio Mada",
+            "slug": "radio-mada",
+            "description": "News and salegy from Antananarivo",
+            "genre": "Talk",
+            "country": "MG",
+            "language": "mg",
+            "website": "https://radiomada.example",
+            "listInDirectory": true
+          }
+        ],
+        "required": [
+          "name",
+          "slug"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name, e.g. \"Radio Mada\"."
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL name, unique in the tenant, e.g. \"radio-mada\"."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Shown on the public page and in directories."
+          },
+          "genre": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "e.g. \"Talk\" or \"Salegy\"."
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ISO 3166-1 alpha-2, e.g. \"MG\"."
+          },
+          "language": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "BCP 47 tag, e.g. \"mg\" or \"fr\"."
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "HTTPS address of a square logo.",
+            "format": "uri"
+          },
+          "website": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The station's website.",
+            "format": "uri"
+          },
+          "listInDirectory": {
+            "type": "boolean",
+            "description": "List on RadioBrowser, if the plan includes it.",
+            "default": false
+          }
+        },
+        "description": "Creates a station in the current tenant."
+      },
+      "CreateTenantCommand": {
+        "examples": [
+          {
+            "name": "Radio Mada Group",
+            "slug": "radio-mada"
+          }
+        ],
+        "required": [
+          "name",
+          "slug"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name, e.g. \"Radio Mada Group\"."
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL name, unique across Tropicast, e.g. \"radio-mada\"."
+          }
+        },
+        "description": "Creates a tenant; the caller becomes its Owner."
       },
       "DeviceResponse": {
         "required": [
@@ -630,6 +1088,12 @@
         }
       },
       "InviteRequest": {
+        "examples": [
+          {
+            "email": "dj@example.com",
+            "role": "Broadcaster"
+          }
+        ],
         "required": [
           "email",
           "role"
@@ -654,6 +1118,29 @@
           }
         }
       },
+      "ListenerUrls": {
+        "required": [
+          "mp3",
+          "opus"
+        ],
+        "type": "object",
+        "properties": {
+          "mp3": {
+            "type": "string",
+            "description": "MP3 stream, playable everywhere.",
+            "format": "uri"
+          },
+          "opus": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Ogg Opus stream: about half the mobile data of MP3.",
+            "format": "uri"
+          }
+        },
+        "description": "Listener URLs of a station. Uri? ListenerUrls.Opus is null when the plan has no Opus."
+      },
       "LoginRequest": {
         "required": [
           "email",
@@ -669,6 +1156,36 @@
             "type": "string"
           }
         }
+      },
+      "MemberResponse": {
+        "required": [
+          "userId",
+          "email",
+          "role",
+          "joinedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The member's account ID.",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "description": "The member's email address."
+          },
+          "role": {
+            "description": "Owner, Admin or Broadcaster.",
+            "$ref": "#/components/schemas/MembershipRole"
+          },
+          "joinedAt": {
+            "type": "string",
+            "description": "When the member joined.",
+            "format": "date-time"
+          }
+        },
+        "description": "A member of the current tenant."
       },
       "MembershipResponse": {
         "required": [
@@ -724,6 +1241,123 @@
           }
         }
       },
+      "PagedListOfStationResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationResponse"
+            },
+            "description": "The items on this page."
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1-based page number.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Items per page (1-100).",
+            "format": "int32"
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Items on all pages.",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results."
+      },
+      "PlanResponse": {
+        "required": [
+          "id",
+          "name",
+          "maxStations",
+          "maxListeners",
+          "maxBitrateKbps",
+          "formats",
+          "directoryListing",
+          "embed",
+          "analytics"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Plan ID, e.g. \"starter\"."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "maxStations": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Stations the tenant may have.",
+            "format": "int32"
+          },
+          "maxListeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Concurrent listeners per station.",
+            "format": "int32"
+          },
+          "maxBitrateKbps": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Highest stream bitrate accepted.",
+            "format": "int32"
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Stream formats: \"mp3\", \"opus\"."
+          },
+          "directoryListing": {
+            "type": "boolean",
+            "description": "RadioBrowser listing allowed."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Embeddable player allowed."
+          },
+          "analytics": {
+            "type": "boolean",
+            "description": "Listener statistics included."
+          }
+        },
+        "description": "A plan's limits and features."
+      },
       "RefreshRequest": {
         "required": [
           "refreshToken"
@@ -771,6 +1405,165 @@
             "type": "string"
           }
         }
+      },
+      "StationResponse": {
+        "examples": [
+          {
+            "id": "01927f5e-6c1a-7b3e-9a52-3f1d2c4b5a69",
+            "publicId": "k3m9x2p7qa",
+            "name": "Radio Mada",
+            "slug": "radio-mada",
+            "description": "News and salegy from Antananarivo",
+            "genre": "Talk",
+            "country": "MG",
+            "language": "mg",
+            "logoUrl": null,
+            "website": "https://radiomada.example",
+            "listInDirectory": true,
+            "createdAt": "2026-10-09T12:00:00+00:00",
+            "listenerUrls": {
+              "mp3": "https://listen.tropicastradio.com/stations/k3m9x2p7qa/live.mp3",
+              "opus": "https://listen.tropicastradio.com/stations/k3m9x2p7qa/live.opus"
+            }
+          }
+        ],
+        "required": [
+          "id",
+          "publicId",
+          "name",
+          "slug",
+          "description",
+          "genre",
+          "country",
+          "language",
+          "logoUrl",
+          "website",
+          "listInDirectory",
+          "createdAt",
+          "listenerUrls"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID in the API.",
+            "format": "uuid"
+          },
+          "publicId": {
+            "type": "string",
+            "description": "ID in listener URLs and Icecast mounts; never changes."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL name, unique in the tenant."
+          },
+          "description": {
+            "type": "string",
+            "description": "Shown on the public page and in directories."
+          },
+          "genre": {
+            "type": "string",
+            "description": "Music or programme genre."
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ISO 3166-1 alpha-2 code."
+          },
+          "language": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "BCP 47 language tag."
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Logo address.",
+            "format": "uri"
+          },
+          "website": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The station's website.",
+            "format": "uri"
+          },
+          "listInDirectory": {
+            "type": "boolean",
+            "description": "Listed on RadioBrowser (only when the plan includes it)."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the station was created.",
+            "format": "date-time"
+          },
+          "listenerUrls": {
+            "description": "Where listeners play the station.",
+            "$ref": "#/components/schemas/ListenerUrls"
+          }
+        },
+        "description": "A station."
+      },
+      "TenantResponse": {
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status",
+          "plan",
+          "stationCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Tenant ID; send it as X-Tenant-Id to choose this tenant.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL name, unique across Tropicast."
+          },
+          "status": {
+            "description": "Active or Suspended.",
+            "$ref": "#/components/schemas/TenantStatus"
+          },
+          "plan": {
+            "description": "Current plan.",
+            "$ref": "#/components/schemas/PlanResponse"
+          },
+          "stationCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Stations in use, out of Plan.MaxStations.",
+            "format": "int32"
+          }
+        },
+        "description": "A tenant (customer account)."
+      },
+      "TenantStatus": {
+        "enum": [
+          "Active",
+          "Suspended"
+        ]
       },
       "TokenRequest": {
         "required": [
@@ -826,6 +1619,101 @@
         },
         "description": "Tokens for the desktop app: string TokenResponse.AccessToken lasts 15 minutes; refresh to get a new pair."
       },
+      "UpdateStationCommand": {
+        "examples": [
+          {
+            "genre": "Salegy",
+            "description": "Music all night"
+          }
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "slug": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "genre": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "language": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "website": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "listInDirectory": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "Changes station settings; omitted (null) fields keep their value."
+      },
+      "UpdateTenantCommand": {
+        "examples": [
+          {
+            "name": "Radio Mada Media"
+          }
+        ],
+        "required": [
+          "name",
+          "slug"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "slug": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Changes the tenant's name or slug; omitted fields keep their value."
+      },
       "VersionInfo": {
         "required": [
           "version"
@@ -850,6 +1738,12 @@
     },
     {
       "name": "Auth"
+    },
+    {
+      "name": "Tenants"
+    },
+    {
+      "name": "Stations"
     }
   ]
 }

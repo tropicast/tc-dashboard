@@ -101,6 +101,46 @@ public sealed partial class Browser(DashboardFactory factory)
         await db.SaveChangesAsync(Token);
     }
 
+    /// <summary>Creates a tenant through the API (the caller becomes Owner) and selects it.</summary>
+    public async Task<Guid> CreateTenantAsync()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..10];
+        var response = await SendAsync(HttpMethod.Post, "/api/v1/tenants", new { name = $"Tenant {suffix}", slug = $"t-{suffix}" });
+        response.Status(HttpStatusCode.Created);
+        var id = (await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Token)).GetProperty("id").GetGuid();
+        TenantId = id;
+        return id;
+    }
+
+    public static async Task SetPlanAsync(DashboardFactory factory, Guid tenantId, string planId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<CurrentTenant>().TenantId = tenantId;
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tenant = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleAsync(db.Tenants, Token);
+        tenant.ChangePlan(planId);
+        await db.SaveChangesAsync(Token);
+    }
+
+    /// <summary>Sends with If-Match; returns the response.</summary>
+    public async Task<HttpResponseMessage> SendIfMatchAsync(HttpMethod method, string url, string? etag, object? body = null)
+    {
+        using var request = new HttpRequestMessage(method, url) { Content = body is null ? null : JsonContent.Create(body) };
+        if (AntiforgeryToken is not null)
+        {
+            request.Headers.Add("X-XSRF-TOKEN", AntiforgeryToken);
+        }
+        if (TenantId is { } tenant)
+        {
+            request.Headers.Add("X-Tenant-Id", tenant.ToString());
+        }
+        if (etag is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", etag);
+        }
+        return await Http.SendAsync(request, Token);
+    }
+
     public static AuthenticationHeaderValue Bearer(string token) => new("Bearer", token);
 
     public static string Unique(string name) => $"{name}-{Guid.NewGuid():N}@example.test";
