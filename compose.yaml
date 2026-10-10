@@ -24,6 +24,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: Host=db;Database=tropicast;Username=tropicast;Password=${POSTGRES_PASSWORD:-tropicast-dev}
       Database__MigrateOnStartup: "true"
+      # The local Compose SPA is HTTP. Production keeps the default Secure, __Host- cookies.
+      Auth__UseSecureCookies: "false"
       App__PublicBaseUrl: http://localhost:${API_PORT:-8080}
       Email__From: Tropicast <no-reply@tropicast.localhost>
       Email__Smtp__Host: mail

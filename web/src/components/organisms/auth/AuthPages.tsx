@@ -21,8 +21,9 @@ export function Login() {
   const mutation = useMutation({
     mutationFn: (body: z.infer<typeof loginSchema>) =>
       data<void>(api.POST('/api/v1/auth/login', { body })),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
+    onSuccess: async () => {
+      await api.GET('/api/v1/auth/antiforgery');
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
       navigate('/');
     },
   });

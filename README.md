@@ -72,11 +72,21 @@ npm run test:lighthouse    # accessibility score >= 95 for sign-in and sign-up r
 
 The Playwright smoke test exercises browser navigation and client request
 payloads while intercepting `/api/v1` responses. It does **not** prove API or
-PostgreSQL behavior; .NET integration tests own that coverage. A real
-browser/API/PostgreSQL journey needs root-level orchestration, isolated
-database and email-confirmation setup before it can be added. Its prerequisite
-stack is available with `docker compose up --build`; no such frontend-only
-command exists yet.
+PostgreSQL behavior; .NET integration tests own that coverage.
+
+For the opt-in real browser/API/PostgreSQL journey, start Compose first, then
+run the dedicated command:
+
+```sh
+docker compose up --build -d  # API at http://localhost:8080; Mailpit at http://localhost:8025
+cd web
+npm run test:e2e:real
+```
+
+This test creates a unique account, tenant, and station; it retrieves the
+confirmation link from Mailpit and leaves this test data in the local Compose
+database. Override the dashboard URL with `REAL_E2E_BASE_URL`; override
+Mailpit with `REAL_E2E_MAILPIT_URL`.
 
 ## Database
 
@@ -114,6 +124,8 @@ ASP.NET Core Identity on the same database (`users`, `user_claims`,
   carry it must send the antiforgery token. `GET /antiforgery` sets the
   readable `XSRF-TOKEN` cookie, and the client echoes it in `X-XSRF-TOKEN`
   (`web/src/api/client.ts` does this). Fetch a new token after signing in.
+  Local HTTP Compose explicitly uses non-secure, non-`__Host-` cookie names;
+  production retains the secure defaults.
 - **Desktop app:** signs in with the device authorization flow
   (`/device/code`, the user approves the code on the web, `/device/token`;
   [ADR 0001](docs/adr/0001-desktop-sign-in.md)), or with `POST /token` (email

@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:real": "REAL_E2E=1 playwright test e2e/real-compose.spec.ts",
     "test:e2e:install": "playwright install chromium",
     "test:lighthouse": "lhci autorun",
     "generate:api": "openapi-typescript openapi/openapi.json -o src/api/schema.d.ts"
