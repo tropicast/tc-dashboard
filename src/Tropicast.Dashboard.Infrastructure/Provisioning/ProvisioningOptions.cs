@@ -8,7 +8,7 @@ public sealed class ProvisioningOptions
     public TimeSpan Interval { get; set; } = TimeSpan.FromSeconds(30);
     /// <summary>First retry delay after a failed apply; doubles up to 10 minutes.</summary>
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(15);
-    /// <summary>Node all stations are on (MVP: one node).</summary>
+    /// <summary>Node to provision; the API sets it from <c>Streaming:Node</c>, where stations are assigned.</summary>
     public string Node { get; set; } = "tc-stream-1";
     public SshOptions Ssh { get; set; } = new();
 }

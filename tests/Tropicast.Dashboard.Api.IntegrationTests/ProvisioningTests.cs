@@ -171,4 +171,33 @@ public sealed class ProvisioningTests(PostgresContainer postgres) : IAsyncLifeti
             await Task.Delay(100, deadline.Token);
         }
     }
+
+    [Fact]
+    public async Task Conflicting_node_settings_fail_at_startup()
+    {
+        await using var conflicting = new DashboardFactory(postgres)
+        {
+            Settings = new Dictionary<string, string> { ["Streaming:Node"] = "tc-stream-1", ["Provisioning:Node"] = "tc-stream-2" },
+        };
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(async () => await conflicting.InitializeAsync());
+        Assert.Contains("Set only Streaming:Node", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Suspended_tenants_do_not_use_node_capacity()
+    {
+        await using var small = new DashboardFactory(postgres)
+        {
+            Settings = new Dictionary<string, string> { ["Streaming:MaxListenerCaps"] = "150" },
+        };
+        await small.InitializeAsync();
+        var (owner, _) = await StationAsync(small);
+        await using (var scope = small.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tropicast.Dashboard.Infrastructure.Persistence.AppDbContext>();
+            await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlAsync(db.Database,
+                $"UPDATE tenants SET status = 'Suspended' WHERE id = {owner.TenantId}", Token);
+        }
+        await StationAsync(small);
+    }
 }

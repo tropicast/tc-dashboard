@@ -8,6 +8,7 @@ using Tropicast.Dashboard.Application.Stations;
 using Tropicast.Dashboard.Domain;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
+using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Stations;
@@ -191,7 +192,9 @@ internal static partial class StationEndpoints
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"node:" + streaming.Node}))", cancellationToken);
         var assigned = await db.StreamAssignments.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(a => a.Node == streaming.Node && a.Station.DeletedAt == null)
-            .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]), a => a.Station.TenantId, t => t.Id, (_, t) => t.PlanId)
+            // Same stations as the node's stations.json: suspended tenants are not provisioned.
+            .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.Status == TenantStatus.Active),
+                a => a.Station.TenantId, t => t.Id, (_, t) => t.PlanId)
             .Join(db.Plans, planId => planId, p => p.Id, (_, p) => p)
             .ToListAsync(cancellationToken);
         var reason = NodeCapacity.WhyNot(assigned, plan, new NodeLimits(streaming.MaxSources, streaming.MaxListenerCaps));
