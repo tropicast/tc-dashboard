@@ -39,6 +39,7 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
 
     public CapturingEmailSender Emails { get; } = new();
     public FakeNodeClient Node { get; } = new();
+    public FakeStatsClient Stats { get; } = new();
     /// <summary>Extra configuration for one factory (e.g. enabling the background loops).</summary>
     public IReadOnlyDictionary<string, string> Settings { get; init; } = new Dictionary<string, string>();
     public CapturingLoggerProvider Logs { get; } = new();
@@ -78,6 +79,8 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
             services.AddSingleton<IEmailSender>(Emails);
             services.RemoveAll<Tropicast.Dashboard.Application.Provisioning.IStreamingNodeClient>();
             services.AddSingleton<Tropicast.Dashboard.Application.Provisioning.IStreamingNodeClient>(Node);
+            services.RemoveAll<Tropicast.Dashboard.Application.Stats.IStreamingStatsClient>();
+            services.AddSingleton<Tropicast.Dashboard.Application.Stats.IStreamingStatsClient>(Stats);
         });
     }
 
@@ -120,6 +123,15 @@ public sealed class FakeNodeClient : Tropicast.Dashboard.Application.Provisionin
         _applied.Enqueue(stationsJson);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>Returns the sample a test sets, as the node's exporter would.</summary>
+public sealed class FakeStatsClient : Tropicast.Dashboard.Application.Stats.IStreamingStatsClient
+{
+    public Tropicast.Dashboard.Application.Stats.NodeSample? Next { get; set; }
+
+    public Task<Tropicast.Dashboard.Application.Stats.NodeSample> GetAsync(string node, CancellationToken cancellationToken = default)
+        => Next is { } sample ? Task.FromResult(sample) : throw new HttpRequestException("Node unreachable.");
 }
 
 public sealed class CapturingEmailSender : IEmailSender

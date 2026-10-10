@@ -10,6 +10,8 @@ using Tropicast.Dashboard.Application.Provisioning;
 using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Outbox;
 using Tropicast.Dashboard.Infrastructure.Provisioning;
+using Tropicast.Dashboard.Infrastructure.Stats;
+using Tropicast.Dashboard.Application.Stats;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Infrastructure;
@@ -35,6 +37,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IOutboxConsumer, ProvisioningOutboxConsumer>();
         services.AddHostedService<ProvisioningWorker>();
         services.AddHostedService<DeviceAuthorizationCleanup>();
+        services.Configure<StatsOptions>(configuration.GetSection("Stats"));
+        services.AddSingleton<LiveStatusStore>();
+        services.TryAddSingleton<IStreamingStatsClient, HttpStreamingStatsClient>();
+        services.AddScoped<StatsRecorder>();
+        services.AddSingleton<StatsCollector>();
+        services.AddHostedService(sp => sp.GetRequiredService<StatsCollector>());
         // Read when a context is created, so hosts without a database (e.g. OpenAPI generation) still start.
         services.AddDbContext<AppDbContext>(options => PersistenceSetup.Configure(options,
             configuration.GetConnectionString("Default")

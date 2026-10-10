@@ -79,6 +79,7 @@ Secrets and variables → Actions**). Never commit them.
 | `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | secret | step 3 |
 | `BACKUP_S3_READ_ACCESS_KEY`, `BACKUP_S3_READ_SECRET_KEY` | secret | a **read-only** key on the backup bucket, for the daily backup check |
 | `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_AGE_RECIPIENT` | variable | `https://fsn1.your-objectstorage.com`, bucket, `age1…` |
+| `STATS_URL` | variable | `http://10.20.1.2:9100/metrics` once tc-streaming sets `PRIVATE_IP` (section 4); empty: no live status |
 | `ACME_EMAIL`, `OPERATOR_EMAIL` | variable | Let's Encrypt contact; your account email (operator pages) |
 
 Optional variables: `APP_HOST` (default `app.tropicastradio.com`),
@@ -176,6 +177,13 @@ Run in this order; each step can be undone by reverting its variable.
    `PROVISIONING_ENABLED=true`, and deploy. Within a minute the API pushes
    `stations.json` (logs: "Applied station limits").
 3. Remove `STATION_LIMITS` from tc-streaming's variables.
+4. **Live status and statistics** (#10). On tc-streaming set
+   `PRIVATE_IP=10.20.1.2` (its exporter then also listens there) and deploy
+   it. Check from tc-app-1:
+   `curl -s http://10.20.1.2:9100/metrics | grep -c icecast_mount_listeners`.
+   Then set `STATS_URL=http://10.20.1.2:9100/metrics` here and deploy. A
+   station shows live within 15 s of Go Live; *Stats of node … unavailable*
+   in the API logs means the exporter cannot be reached.
 
 ## 5. Backups and restore
 

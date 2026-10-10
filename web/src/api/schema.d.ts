@@ -226,6 +226,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operator/streaming-nodes/{node}/traffic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Node egress month to date against the traffic included in the server price. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    node: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NodeTrafficResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/version": {
         parameters: {
             query?: never;
@@ -1732,6 +1777,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stations/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live or offline, listeners per format and source bitrate. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StationStatusResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Peak listeners, listener-hours and estimated egress per 5 minutes (last 30 days) or per day. */
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                    interval?: components["schemas"]["RollupInterval"];
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StationStatsResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/operator/streaming-nodes": {
         parameters: {
             query?: never;
@@ -2102,6 +2250,26 @@ export interface components {
              */
             opus: null | string;
         };
+        /** @description One live stream of a station. */
+        LiveOutputResponse: {
+            /** @description Stream format. */
+            format: components["schemas"]["AudioFormat"];
+            /**
+             * Format: int32
+             * @description Current listeners.
+             */
+            listeners: number | string;
+            /**
+             * Format: double
+             * @description Source bitrate, declared or measured; null until known.
+             */
+            bitrateKbps: null | number | string;
+            /**
+             * Format: date-time
+             * @description When the source connected.
+             */
+            liveSince: null | string;
+        };
         LoginRequest: {
             email: string;
             password: string;
@@ -2158,6 +2326,31 @@ export interface components {
             name: string;
             /** @description The user's role in the tenant. */
             role: components["schemas"]["MembershipRole"];
+        };
+        /** @description A streaming node's traffic in the current billing period, against what the server price includes. */
+        NodeTrafficResponse: {
+            /** @description Node name. */
+            node: string;
+            /**
+             * Format: int64
+             * @description Outgoing traffic month to date.
+             */
+            egressBytes: number | string;
+            /**
+             * Format: int64
+             * @description Included traffic (20 TB on the CX33).
+             */
+            includedBytes: number | string;
+            /**
+             * Format: double
+             * @description Share of the included traffic used.
+             */
+            usedPercent: number | string;
+            /**
+             * Format: date-time
+             * @description When the node was sampled (Hetzner updates its counters every few minutes).
+             */
+            updatedAt: string;
         };
         /** @description One page of results. */
         PagedListOfStationResponse: {
@@ -2229,6 +2422,8 @@ export interface components {
             code: string;
             newPassword: string;
         };
+        /** @enum {unknown} */
+        RollupInterval: "FiveMinutes" | "Day";
         /**
          * @description A station.
          * @example {
@@ -2289,6 +2484,80 @@ export interface components {
             createdAt: string;
             /** @description Where listeners play the station. */
             listenerUrls: components["schemas"]["ListenerUrls"];
+        };
+        /** @description Statistics of a station over a time range. Periods without listening time are absent. */
+        StationStatsResponse: {
+            /** @description Period length. */
+            interval: components["schemas"]["RollupInterval"];
+            /**
+             * Format: date-time
+             * @description Range start, inclusive.
+             */
+            from: string;
+            /**
+             * Format: date-time
+             * @description Range end, exclusive.
+             */
+            to: string;
+            /**
+             * Format: int32
+             * @description Highest peak of the range.
+             */
+            peakListeners: number | string;
+            /**
+             * Format: double
+             * @description Total listening time.
+             */
+            listenerHours: number | string;
+            /**
+             * Format: int64
+             * @description Total estimated traffic.
+             */
+            egressBytes: number | string;
+            /** @description The periods, oldest first. */
+            points: components["schemas"]["StatsPointResponse"][];
+        };
+        /** @description A station's live status, at most one collector interval (15 s) old. */
+        StationStatusResponse: {
+            /** @description Some source is connected; null when the node's state is not known (see bool StationStatusResponse.Stale). */
+            live: null | boolean;
+            /**
+             * Format: int32
+             * @description Listeners on all formats.
+             */
+            listeners: number | string;
+            /** @description Live streams. */
+            outputs: components["schemas"]["LiveOutputResponse"][];
+            /**
+             * Format: date-time
+             * @description When the streaming node was sampled.
+             */
+            updatedAt: null | string;
+            /** @description No recent sample: the node or the collector is down. */
+            stale: boolean;
+        };
+        /** @description One period of statistics. */
+        StatsPointResponse: {
+            /**
+             * Format: date-time
+             * @description Period start (UTC).
+             */
+            start: string;
+            /**
+             * Format: int32
+             * @description Highest listener count seen in the period.
+             */
+            peakListeners: number | string;
+            /**
+             * Format: double
+             * @description Listening time of all listeners.
+             */
+            listenerHours: number | string;
+            /**
+             * Format: int64
+             * @description Estimated traffic: bitrate × listening time × network overhead.
+             */
+            egressBytes: number | string;
         };
         /** @description A streaming node's provisioning state. */
         StreamingNodeResponse: {

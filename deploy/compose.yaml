@@ -33,6 +33,8 @@ services:
       Provisioning__Ssh__HostKeySha256: ${PROVISIONING_SSH_HOST_KEY:-}
       Provisioning__Ssh__PrivateKey: ${PROVISIONING_SSH_KEY:-}
       Operators__Emails__0: ${OPERATOR_EMAIL:-}
+      # Streaming node's exporter on the private network (tc-streaming PRIVATE_IP); empty: no live status.
+      Stats__Url: ${STATS_URL:-}
     volumes:
       - dataprotection:/data/keys
     ports:

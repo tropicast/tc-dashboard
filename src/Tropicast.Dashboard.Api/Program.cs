@@ -10,6 +10,7 @@ using Tropicast.Dashboard.Api.Tenants;
 using Tropicast.Dashboard.Application;
 using Tropicast.Dashboard.Infrastructure;
 using Tropicast.Dashboard.Infrastructure.Provisioning;
+using Tropicast.Dashboard.Infrastructure.Stats;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
@@ -34,6 +35,7 @@ if (builder.Configuration["Provisioning:Node"] is { } provisioningNode && provis
         $"Provisioning:Node ({provisioningNode}) differs from Streaming:Node ({streamingNode}). Set only Streaming:Node.");
 }
 builder.Services.PostConfigure<ProvisioningOptions>(options => options.Node = streamingNode);
+builder.Services.PostConfigure<StatsOptions>(options => options.Node = streamingNode);
 builder.Services.Configure<OperatorOptions>(builder.Configuration.GetSection("Operators"));
 builder.Services.AddScoped<IAuthorizationHandler, OperatorHandler>();
 builder.Services.AddAuthorizationBuilder()
@@ -64,6 +66,7 @@ app.MapMembers();
 app.MapStations();
 app.MapCredentials();
 app.MapDesktop();
+app.MapStationStats();
 app.MapSourceAuth();
 app.MapOperator();
 
