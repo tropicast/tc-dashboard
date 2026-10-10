@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars (git-ignored) and edit. In CI, the TFVARS
+# repository variable holds the same content.
+name        = "tc-app-1"
+location    = "fsn1"
+server_type = "cx23"
+
+ssh_public_keys = {
+  admin = "ssh-ed25519 AAAA... admin@example"
+}
+
+admin_cidrs = ["203.0.113.10/32"]
+
+# Streaming nodes to attach to the private network (name => private IP).
+streaming_nodes = { "tc-stream-1" = "10.20.1.2" }
+
+# Cloudflare zone ID of tropicastradio.com (Overview page); null to manage DNS by hand.
+cloudflare_zone_id = null
+app_hostname       = "app.tropicastradio.com"

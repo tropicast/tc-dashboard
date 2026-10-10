@@ -1,0 +1,37 @@
+name: Restore test
+
+# Monthly: restore the newest database backup into a throwaway PostgreSQL and
+# check it (#15). Needs the backup bucket and the age private key.
+on:
+  schedule:
+    - cron: "17 4 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-test
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+      - name: Restore the newest backup
+        env:
+          BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+          BACKUP_PG_IMAGE: ${{ vars.BACKUP_PG_IMAGE || 'postgres:17-alpine' }}
+          BACKUP_S3_ACCESS_KEY: ${{ secrets.BACKUP_S3_ACCESS_KEY }}
+          BACKUP_S3_SECRET_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          BACKUP_AGE_KEY: ${{ secrets.BACKUP_AGE_KEY }}
+        run: |
+          : "${BACKUP_AGE_KEY:?Set the BACKUP_AGE_KEY secret}"
+          key=$(mktemp)
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$BACKUP_AGE_KEY" > "$key"
+          BACKUP_AGE_KEY_FILE=$key RESTORE_WORK_DIR=$RUNNER_TEMP deploy/restore-test.sh | tee -a "$GITHUB_STEP_SUMMARY"
