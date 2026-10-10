@@ -4,23 +4,14 @@ import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { api } from '../../../api/client';
+import { selectedTenantId } from '../../../api/client';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
 import { data } from '../../../lib/request';
+import { stationSchema } from '../../../lib/station-validation';
 import type { Station, Tenant } from '../../../lib/types';
 
 const tenantSchema = z.object({ name: z.string().min(2), slug: z.string().regex(/^[a-z0-9-]+$/) });
-const stationSchema = z.object({
-  name: z.string().min(2),
-  slug: z.string().regex(/^[a-z0-9-]+$/),
-  description: z.string().optional(),
-  genre: z.string().optional(),
-  country: z.string().max(2).optional(),
-  language: z.string().optional(),
-  website: z.union([z.literal(''), z.url()]).optional(),
-  listInDirectory: z.boolean(),
-});
-
 export function Onboarding() {
   const queryClient = useQueryClient();
   const tenant = useForm({
@@ -59,7 +50,8 @@ export function Onboarding() {
           },
         }),
       ),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['stations'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['stations', selectedTenantId()] }),
   });
   if (!createTenant.isSuccess)
     return (

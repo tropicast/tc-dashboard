@@ -3,14 +3,14 @@ import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
-import { api } from '../../../api/client';
+import { api, refreshAntiforgery } from '../../../api/client';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
 import { FormPage } from '../../molecules/FormPage';
 import { queryClient } from '../../../lib/query-client';
 import { data } from '../../../lib/request';
 
-const loginSchema = z.object({ email: z.email(), password: z.string().min(8) });
+const loginSchema = z.object({ email: z.email(), password: z.string().min(12) });
 
 export function Login() {
   const navigate = useNavigate();
@@ -22,7 +22,7 @@ export function Login() {
     mutationFn: (body: z.infer<typeof loginSchema>) =>
       data<void>(api.POST('/api/v1/auth/login', { body })),
     onSuccess: async () => {
-      await api.GET('/api/v1/auth/antiforgery');
+      await refreshAntiforgery();
       await queryClient.invalidateQueries({ queryKey: ['me'] });
       navigate('/');
     },
@@ -33,7 +33,10 @@ export function Login() {
         <Field label="Email" error={form.formState.errors.email?.message}>
           <input autoComplete="email" {...form.register('email')} />
         </Field>
-        <Field label="Password" error={form.formState.errors.password?.message}>
+        <Field
+          label="Password (12 or more characters)"
+          error={form.formState.errors.password?.message}
+        >
           <input type="password" autoComplete="current-password" {...form.register('password')} />
         </Field>
         <Notice error={mutation.error} />
@@ -63,7 +66,7 @@ export function Signup() {
           <input autoComplete="email" {...form.register('email')} />
         </Field>
         <Field
-          label="Password (8 or more characters)"
+          label="Password (12 or more characters)"
           error={form.formState.errors.password?.message}
         >
           <input type="password" autoComplete="new-password" {...form.register('password')} />
@@ -129,7 +132,7 @@ export function Reset() {
   const [params] = useSearchParams();
   const form = useForm({
     resolver: zodResolver(
-      z.object({ email: z.email(), code: z.string().min(1), newPassword: z.string().min(8) }),
+      z.object({ email: z.email(), code: z.string().min(1), newPassword: z.string().min(12) }),
     ),
     defaultValues: {
       email: params.get('email') ?? '',
@@ -150,7 +153,7 @@ export function Reset() {
         <Field label="Reset code">
           <input {...form.register('code')} />
         </Field>
-        <Field label="New password">
+        <Field label="New password (12 or more characters)">
           <input type="password" {...form.register('newPassword')} />
         </Field>
         <Notice error={mutation.error} />

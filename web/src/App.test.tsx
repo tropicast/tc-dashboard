@@ -2,10 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App';
+import { queryClient } from './lib/query-client';
 
 afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
+  queryClient.clear();
 });
 
 function renderAt(path: string, fetcher: (request: Request) => Response | Promise<Response>) {
@@ -61,4 +63,30 @@ test('shows stations from API contract response', async () => {
   });
   expect(await screen.findByRole('link', { name: 'Radio One' })).toBeInTheDocument();
   expect(screen.getByText('Music · MG')).toBeInTheDocument();
+});
+
+test('restores antiforgery before loading tenant state', async () => {
+  const requests: string[] = [];
+  renderAt('/stations', (request) => {
+    const path = new URL(request.url).pathname;
+    requests.push(path);
+    if (path === '/api/v1/auth/me') {
+      return Response.json({
+        id: 'u1',
+        email: 'owner@example.com',
+        memberships: [{ tenantId: 't1', tenantName: 'Radio', tenantSlug: 'radio', role: 'Owner' }],
+      });
+    }
+    if (path === '/api/v1/auth/antiforgery') return new Response(null, { status: 204 });
+    if (path === '/api/v1/stations')
+      return Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0 });
+    return Response.json({ title: 'Not found' }, { status: 404 });
+  });
+
+  await screen.findByText('No stations yet.');
+  expect(requests.slice(0, 3)).toEqual([
+    '/api/v1/auth/me',
+    '/api/v1/auth/antiforgery',
+    '/api/v1/stations',
+  ]);
 });

@@ -4,8 +4,9 @@ import { api } from './api/client';
 import type { components } from './api/schema';
 
 export default function StationStats({ stationId }: { stationId: string }) {
+  const tenantId = localStorage.getItem('tenant-id');
   const stats = useQuery({
-    queryKey: ['stats', stationId],
+    queryKey: ['stats', tenantId, stationId],
     queryFn: async () => {
       const result = await api.GET('/api/v1/stations/{id}/stats', {
         params: { path: { id: stationId } },

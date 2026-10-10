@@ -10,6 +10,7 @@ src/Tropicast.Dashboard.Api/wwwroot/
 artifacts/
 web/.lighthouseci/
 web/test-results/
+web/playwright-report/
 
 # Local knowledge graph (graphify).
 graphify-out/

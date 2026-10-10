@@ -37,6 +37,9 @@ async function mockApi(page: Page) {
       });
     }
 
+    if (url.pathname === '/api/v1/auth/antiforgery' && request.method() === 'GET')
+      return fulfillJson(route, 204);
+
     if (url.pathname === '/api/v1/tenants' && request.method() === 'POST') {
       tenantCreated = true;
       return fulfillJson(route, 201, {
@@ -89,14 +92,14 @@ test('signs up then creates a workspace and first station', async ({ page }) => 
 
   await page.goto('/signup');
   await page.getByLabel('Email').fill('owner@example.com');
-  await page.getByLabel('Password (8 or more characters)').fill('password123');
+  await page.getByLabel('Password (12 or more characters)').fill('password1234');
   const registration = page.waitForRequest(
     (request) => request.url().endsWith('/api/v1/auth/register') && request.method() === 'POST',
   );
   await page.getByRole('button', { name: 'Create account' }).click();
   expect((await registration).postDataJSON()).toEqual({
     email: 'owner@example.com',
-    password: 'password123',
+    password: 'password1234',
   });
   await expect(page.getByRole('button', { name: 'Check your email' })).toBeVisible();
 
@@ -116,7 +119,7 @@ test('signs up then creates a workspace and first station', async ({ page }) => 
   await page.getByLabel('Description').fill('News and salegy from Antananarivo');
   await page.getByLabel('Genre').fill('Talk');
   await page.getByLabel('Country').fill('MG');
-  await page.getByLabel('Language').fill('mg');
+  await page.locator('.onboarding').getByLabel('Language').fill('mg');
   await page.getByLabel('Website').fill('https://radiomada.example');
   await page.getByLabel('List in directory').check();
   const station = page.waitForRequest(

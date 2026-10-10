@@ -39,3 +39,12 @@ export const api = createClient<paths>({
 });
 api.use(antiforgery);
 api.use(tenantScope);
+
+/** Obtains the cookie/header token needed for subsequent cookie-authenticated mutations. */
+export async function refreshAntiforgery() {
+  await api.GET('/api/v1/auth/antiforgery');
+}
+
+export function selectedTenantId() {
+  return globalThis.localStorage?.getItem('tenant-id') ?? undefined;
+}

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { lazy, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useParams } from 'react-router-dom';
@@ -8,15 +9,17 @@ import { CopyButton } from '../../atoms/CopyButton';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
 import { data } from '../../../lib/request';
+import { stationSchema } from '../../../lib/station-validation';
 import type { Credential, Station, Status } from '../../../lib/types';
 
 const StationStats = lazy(() => import('../../../StationStats'));
 
 export function StationDetail() {
   const { id = '' } = useParams();
+  const tenantId = localStorage.getItem('tenant-id');
   const queryClient = useQueryClient();
   const station = useQuery({
-    queryKey: ['station', id],
+    queryKey: ['station', tenantId, id],
     queryFn: async () => {
       const result = await api.GET('/api/v1/stations/{id}', { params: { path: { id } } });
       if (result.error) throw result.error;
@@ -24,13 +27,13 @@ export function StationDetail() {
     },
   });
   const status = useQuery({
-    queryKey: ['status', id],
+    queryKey: ['status', tenantId, id],
     queryFn: () =>
       data<Status>(api.GET('/api/v1/stations/{id}/status', { params: { path: { id } } })),
     refetchInterval: 15_000,
   });
   const credentials = useQuery({
-    queryKey: ['credentials', id],
+    queryKey: ['credentials', tenantId, id],
     queryFn: () =>
       data<Credential[]>(
         api.GET('/api/v1/stations/{stationId}/credentials', {
@@ -39,6 +42,7 @@ export function StationDetail() {
       ),
   });
   const form = useForm({
+    resolver: zodResolver(stationSchema),
     values: station.data
       ? {
           name: station.data.station.name,
@@ -65,7 +69,7 @@ export function StationDetail() {
           },
         }),
       ),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['station', id] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['station', tenantId, id] }),
   });
   const credentialForm = useForm({ defaultValues: { deviceLabel: '' } });
   const issue = useMutation({
@@ -76,7 +80,8 @@ export function StationDetail() {
           body,
         }),
       ),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['credentials', id] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['credentials', tenantId, id] }),
   });
   if (station.isPending) return <p>Loading station…</p>;
   if (!station.data) return <Notice error={station.error} />;

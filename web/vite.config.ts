@@ -6,6 +6,7 @@ import { defineConfig } from 'vite';
 const apiUrl = process.env.API_URL ?? 'http://localhost:5080';
 
 export default defineConfig({
+  devtools: false,
   plugins: [react()],
   server: {
     proxy: { '/api': apiUrl, '/health': apiUrl, '/openapi': apiUrl },

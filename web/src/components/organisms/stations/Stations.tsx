@@ -7,7 +7,7 @@ import type { components } from '../../../api/schema';
 
 export function Stations() {
   const stations = useQuery({
-    queryKey: ['stations'],
+    queryKey: ['stations', localStorage.getItem('tenant-id')],
     queryFn: () =>
       data<components['schemas']['PagedListOfStationResponse']>(
         api.GET('/api/v1/stations', { params: { query: { page: 1, pageSize: 50 } } }),

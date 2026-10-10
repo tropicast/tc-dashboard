@@ -8,12 +8,13 @@ import { data } from '../../../lib/request';
 import type { Tenant } from '../../../lib/types';
 
 export function Account() {
+  const tenantId = localStorage.getItem('tenant-id');
   const tenant = useQuery({
-    queryKey: ['tenant'],
+    queryKey: ['tenant', tenantId],
     queryFn: () => data<Tenant>(api.GET('/api/v1/tenants/current')),
   });
   const members = useQuery({
-    queryKey: ['members'],
+    queryKey: ['members', tenantId],
     queryFn: () =>
       data<components['schemas']['MemberResponse'][]>(api.GET('/api/v1/tenants/current/members')),
   });
