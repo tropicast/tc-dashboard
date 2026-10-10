@@ -203,3 +203,10 @@ code {
     grid-column: auto;
   }
 }
+
+.snippet {
+  display: block;
+  padding: 8px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

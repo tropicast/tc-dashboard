@@ -91,16 +91,9 @@ internal static class StationStatsEndpoints
         {
             return TypedResults.NotFound();
         }
-        var sample = store.Latest(station.Node ?? streaming.Value.Node);
-        // Three missed samples: the node or the collector is down, so live/offline is not known.
-        var stale = sample is null || !sample.IcecastUp || time.GetUtcNow() - sample.At > 3 * options.Value.Interval;
-        var outputs = sample is null || stale ? [] : sample.Mounts
-            .Where(m => m.PublicId == station.PublicId)
-            .OrderBy(m => m.Format)
-            .Select(m => new LiveOutputResponse(m.Format, m.Listeners, m.BitrateKbps > 0 ? m.BitrateKbps : null, m.StartedAt))
-            .ToList();
-        return TypedResults.Ok(new StationStatusResponse(stale ? null : outputs.Count > 0, outputs.Sum(o => o.Listeners), outputs,
-            sample?.At, stale));
+        var (live, outputs, updatedAt) = LiveStatus.Of(store, station.Node ?? streaming.Value.Node, station.PublicId,
+            options.Value.Interval, time.GetUtcNow());
+        return TypedResults.Ok(new StationStatusResponse(live, outputs.Sum(o => o.Listeners), outputs, updatedAt, live is null));
     }
 
     private static async Task<Results<Ok<StationStatsResponse>, NotFound, ValidationProblem>> GetStatsAsync(Guid id, DateTimeOffset? from,

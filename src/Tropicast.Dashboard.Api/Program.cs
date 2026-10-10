@@ -4,6 +4,7 @@ using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
 using Tropicast.Dashboard.Api.Auth;
 using Tropicast.Dashboard.Api.Operator;
+using Tropicast.Dashboard.Api.Public;
 using Tropicast.Dashboard.Api.SourceAuth;
 using Tropicast.Dashboard.Api.Stations;
 using Tropicast.Dashboard.Api.Tenants;
@@ -67,6 +68,7 @@ app.MapStations();
 app.MapCredentials();
 app.MapDesktop();
 app.MapStationStats();
+app.MapPublicStations();
 app.MapSourceAuth();
 app.MapOperator();
 

@@ -11,9 +11,13 @@
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
-		X-Frame-Options DENY
 		-Server
 	}
+
+	# Nothing may be framed except the embeddable player (#12), whose
+	# Content-Security-Policy frame-ancestors the API sets.
+	@framed_never not path /embed/*
+	header @framed_never X-Frame-Options DENY
 
 	# Source auth and other internal endpoints are never public.
 	@internal path /internal/*
