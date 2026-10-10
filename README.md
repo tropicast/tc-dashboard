@@ -31,6 +31,9 @@ layer references an outer one, or EF Core / ASP.NET Core.
 
 ## Run
 
+Step by step, with a walkthrough from sign-up to a station credential:
+[docs/how-to/run-locally.md](docs/how-to/run-locally.md).
+
 ```sh
 docker compose up --build          # PostgreSQL 17 + API serving the SPA: http://localhost:8080
 docker compose --profile dev up    # plus the Vite dev server with hot reload: http://localhost:5173
