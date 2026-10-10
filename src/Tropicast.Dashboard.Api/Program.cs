@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Tropicast.Dashboard.Api;
 using Scalar.AspNetCore;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.SourceAuth;
 using Tropicast.Dashboard.Api.Stations;
 using Tropicast.Dashboard.Api.Tenants;
 using Tropicast.Dashboard.Application;
@@ -21,6 +22,7 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddDashboardAuth(builder.Configuration);
 builder.Services.Configure<StreamingOptions>(builder.Configuration.GetSection("Streaming"));
+builder.Services.Configure<SourceAuthOptions>(builder.Configuration.GetSection("SourceAuth"));
 
 var app = builder.Build();
 // Local development convenience (compose sets it); production runs the migration bundle at deploy.
@@ -45,6 +47,7 @@ app.MapTenants();
 app.MapMembers();
 app.MapStations();
 app.MapCredentials();
+app.MapSourceAuth();
 
 // The React SPA is built into wwwroot; client-side routes fall back to index.html.
 app.UseDefaultFiles();

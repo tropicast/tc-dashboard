@@ -54,6 +54,8 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
         builder.UseSetting("App:PublicBaseUrl", "https://app.test");
         // Tests read outbox rows and drive the dispatcher themselves.
         builder.UseSetting("Outbox:Enabled", "false");
+        builder.UseSetting("SourceAuth:NodeUsername", SourceAuthNode.Username);
+        builder.UseSetting("SourceAuth:NodePassword", SourceAuthNode.Password);
         builder.UseSetting("RateLimits:Auth:PermitLimit", AuthPermitLimit.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(Logs));
         builder.ConfigureTestServices(services =>
@@ -76,6 +78,13 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
         await base.DisposeAsync();
         GC.SuppressFinalize(this);
     }
+}
+
+/// <summary>Node credentials the test Icecast "sends".</summary>
+public static class SourceAuthNode
+{
+    public const string Username = "icecast";
+    public const string Password = "node-secret-for-tests";
 }
 
 public sealed class CapturingEmailSender : IEmailSender
