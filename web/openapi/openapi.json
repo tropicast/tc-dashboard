@@ -185,6 +185,39 @@
         }
       }
     },
+    "/api/v1/operator/streaming-nodes/{node}/traffic": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Node egress month to date against the traffic included in the server price.",
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeTrafficResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/version": {
       "get": {
         "tags": [
@@ -1452,6 +1485,107 @@
         }
       }
     },
+    "/api/v1/stations/{id}/status": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Live or offline, listeners per format and source bitrate.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{id}/stats": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Peak listeners, listener-hours and estimated egress per 5 minutes (last 30 days) or per day.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RollupInterval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationStatsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operator/streaming-nodes": {
       "get": {
         "tags": [
@@ -2137,6 +2271,49 @@
         },
         "description": "Listener URLs of a station. Uri? ListenerUrls.Opus is null when the plan has no Opus."
       },
+      "LiveOutputResponse": {
+        "required": [
+          "format",
+          "listeners",
+          "bitrateKbps",
+          "liveSince"
+        ],
+        "type": "object",
+        "properties": {
+          "format": {
+            "description": "Stream format.",
+            "$ref": "#/components/schemas/AudioFormat"
+          },
+          "listeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Current listeners.",
+            "format": "int32"
+          },
+          "bitrateKbps": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Source bitrate, declared or measured; null until known.",
+            "format": "double"
+          },
+          "liveSince": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the source connected.",
+            "format": "date-time"
+          }
+        },
+        "description": "One live stream of a station."
+      },
       "LoginRequest": {
         "required": [
           "email",
@@ -2276,6 +2453,55 @@
           }
         },
         "description": "A station the signed-in user can broadcast to."
+      },
+      "NodeTrafficResponse": {
+        "required": [
+          "node",
+          "egressBytes",
+          "includedBytes",
+          "usedPercent",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Node name."
+          },
+          "egressBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Outgoing traffic month to date.",
+            "format": "int64"
+          },
+          "includedBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Included traffic (20 TB on the CX33).",
+            "format": "int64"
+          },
+          "usedPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Share of the included traffic used.",
+            "format": "double"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When the node was sampled (Hetzner updates its counters every few minutes).",
+            "format": "date-time"
+          }
+        },
+        "description": "A streaming node's traffic in the current billing period, against what the server price includes."
       },
       "PagedListOfStationResponse": {
         "required": [
@@ -2480,6 +2706,12 @@
           }
         }
       },
+      "RollupInterval": {
+        "enum": [
+          "FiveMinutes",
+          "Day"
+        ]
+      },
       "StationResponse": {
         "examples": [
           {
@@ -2588,6 +2820,161 @@
           }
         },
         "description": "A station."
+      },
+      "StationStatsResponse": {
+        "required": [
+          "interval",
+          "from",
+          "to",
+          "peakListeners",
+          "listenerHours",
+          "egressBytes",
+          "points"
+        ],
+        "type": "object",
+        "properties": {
+          "interval": {
+            "description": "Period length.",
+            "$ref": "#/components/schemas/RollupInterval"
+          },
+          "from": {
+            "type": "string",
+            "description": "Range start, inclusive.",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "description": "Range end, exclusive.",
+            "format": "date-time"
+          },
+          "peakListeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Highest peak of the range.",
+            "format": "int32"
+          },
+          "listenerHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Total listening time.",
+            "format": "double"
+          },
+          "egressBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Total estimated traffic.",
+            "format": "int64"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsPointResponse"
+            },
+            "description": "The periods, oldest first."
+          }
+        },
+        "description": "Statistics of a station over a time range. Periods without listening time are absent."
+      },
+      "StationStatusResponse": {
+        "required": [
+          "live",
+          "listeners",
+          "outputs",
+          "updatedAt",
+          "stale"
+        ],
+        "type": "object",
+        "properties": {
+          "live": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Some source is connected; null when the node's state is not known (see bool StationStatusResponse.Stale)."
+          },
+          "listeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Listeners on all formats.",
+            "format": "int32"
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveOutputResponse"
+            },
+            "description": "Live streams."
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the streaming node was sampled.",
+            "format": "date-time"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "No recent sample: the node or the collector is down."
+          }
+        },
+        "description": "A station's live status, at most one collector interval (15 s) old."
+      },
+      "StatsPointResponse": {
+        "required": [
+          "start",
+          "peakListeners",
+          "listenerHours",
+          "egressBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "Period start (UTC).",
+            "format": "date-time"
+          },
+          "peakListeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Highest listener count seen in the period.",
+            "format": "int32"
+          },
+          "listenerHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Listening time of all listeners.",
+            "format": "double"
+          },
+          "egressBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Estimated traffic: bitrate × listening time × network overhead.",
+            "format": "int64"
+          }
+        },
+        "description": "One period of statistics."
       },
       "StreamingNodeResponse": {
         "required": [
@@ -2898,6 +3285,9 @@
       "name": "Desktop"
     },
     {
+      "name": "Operator"
+    },
+    {
       "name": "Tropicast.Dashboard.Api"
     },
     {
@@ -2911,9 +3301,6 @@
     },
     {
       "name": "Credentials"
-    },
-    {
-      "name": "Operator"
     }
   ]
 }
