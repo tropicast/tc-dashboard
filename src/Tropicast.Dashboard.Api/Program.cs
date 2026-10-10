@@ -1,12 +1,15 @@
 using System.Text.Json.Serialization;
 using Tropicast.Dashboard.Api;
 using Scalar.AspNetCore;
+using Microsoft.AspNetCore.Authorization;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.Operator;
 using Tropicast.Dashboard.Api.SourceAuth;
 using Tropicast.Dashboard.Api.Stations;
 using Tropicast.Dashboard.Api.Tenants;
 using Tropicast.Dashboard.Application;
 using Tropicast.Dashboard.Infrastructure;
+using Tropicast.Dashboard.Infrastructure.Provisioning;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
@@ -23,6 +26,18 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddDashboardAuth(builder.Configuration);
 builder.Services.Configure<StreamingOptions>(builder.Configuration.GetSection("Streaming"));
 builder.Services.Configure<SourceAuthOptions>(builder.Configuration.GetSection("SourceAuth"));
+// One node setting: provisioning applies limits to the node stations are assigned to (Streaming:Node).
+var streamingNode = builder.Configuration["Streaming:Node"] ?? new StreamingOptions().Node;
+if (builder.Configuration["Provisioning:Node"] is { } provisioningNode && provisioningNode != streamingNode)
+{
+    throw new InvalidOperationException(
+        $"Provisioning:Node ({provisioningNode}) differs from Streaming:Node ({streamingNode}). Set only Streaming:Node.");
+}
+builder.Services.PostConfigure<ProvisioningOptions>(options => options.Node = streamingNode);
+builder.Services.Configure<OperatorOptions>(builder.Configuration.GetSection("Operators"));
+builder.Services.AddScoped<IAuthorizationHandler, OperatorHandler>();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(OperatorEndpoints.Policy, policy => policy.RequireAuthenticatedUser().AddRequirements(new OperatorRequirement()));
 
 var app = builder.Build();
 // Local development convenience (compose sets it); production runs the migration bundle at deploy.
@@ -48,6 +63,7 @@ app.MapMembers();
 app.MapStations();
 app.MapCredentials();
 app.MapSourceAuth();
+app.MapOperator();
 
 // The React SPA is built into wwwroot; client-side routes fall back to index.html.
 app.UseDefaultFiles();

@@ -5,7 +5,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Tropicast.Dashboard.Application;
 using Tropicast.Dashboard.Application.Email;
 using Tropicast.Dashboard.Infrastructure.Email;
+using Tropicast.Dashboard.Application.Outbox;
+using Tropicast.Dashboard.Application.Provisioning;
 using Tropicast.Dashboard.Infrastructure.Outbox;
+using Tropicast.Dashboard.Infrastructure.Provisioning;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Infrastructure;
@@ -24,6 +27,12 @@ public static class ServiceCollectionExtensions
         services.Configure<OutboxOptions>(configuration.GetSection("Outbox"));
         services.AddSingleton<OutboxDispatcher>();
         services.AddHostedService(sp => sp.GetRequiredService<OutboxDispatcher>());
+        services.Configure<ProvisioningOptions>(configuration.GetSection("Provisioning"));
+        services.TryAddSingleton<IStreamingNodeClient, SshStreamingNodeClient>();
+        services.AddSingleton<ProvisioningSignal>();
+        services.AddScoped<Reconciler>();
+        services.AddSingleton<IOutboxConsumer, ProvisioningOutboxConsumer>();
+        services.AddHostedService<ProvisioningWorker>();
         // Read when a context is created, so hosts without a database (e.g. OpenAPI generation) still start.
         services.AddDbContext<AppDbContext>(options => PersistenceSetup.Configure(options,
             configuration.GetConnectionString("Default")

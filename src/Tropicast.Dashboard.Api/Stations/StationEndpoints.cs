@@ -3,10 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Application.Provisioning;
 using Tropicast.Dashboard.Application.Stations;
 using Tropicast.Dashboard.Domain;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
+using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Stations;
@@ -38,7 +40,7 @@ internal sealed record StationResponse(Guid Id, string PublicId, string Name, st
 /// Stations of the current tenant. Stations of other tenants are invisible (404) through the tenant filter.
 /// Updates need <c>If-Match</c>; changes are published through the outbox.
 /// </summary>
-internal static class StationEndpoints
+internal static partial class StationEndpoints
 {
     internal static void MapStations(this IEndpointRouteBuilder app)
     {
@@ -47,6 +49,7 @@ internal static class StationEndpoints
             .WithSummary("Stations of the current tenant, newest first.");
         stations.MapPost("", CreateAsync).RequireAuthorization(TenantPolicies.Admin).WithETag()
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .WithSummary("Creates a station within the plan's station limit and assigns it a stream.");
         stations.MapGet("/{id:guid}", GetAsync).RequireAuthorization(TenantPolicies.Member).WithETag()
             .WithSummary("One station; the ETag header is needed to change it.");
@@ -79,9 +82,10 @@ internal static class StationEndpoints
 
     private static async Task<Results<Created<StationResponse>, ValidationProblem, ProblemHttpResult>> CreateAsync(
         CreateStationCommand command, HttpContext context, AppDbContext db, TenantAccess access,
-        IOptions<StreamingOptions> streaming, TimeProvider time, CancellationToken cancellationToken)
+        IOptions<StreamingOptions> streaming, TimeProvider time, ILoggerFactory loggers, CancellationToken cancellationToken)
     {
         var now = time.GetUtcNow();
+        var logger = loggers.CreateLogger(typeof(StationEndpoints));
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         // Locks the tenant row: concurrent creates cannot both pass the station limit.
         var tenant = await db.Tenants.FromSql($"SELECT *, xmin FROM tenants WHERE id = {access.TenantId} FOR UPDATE")
@@ -91,6 +95,11 @@ internal static class StationEndpoints
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: StationQuota.LimitMessage(plan),
                 extensions: new Dictionary<string, object?> { ["limit"] = "stations", ["max"] = plan.MaxStations });
+        }
+        if (await NodeFullAsync(db, streaming.Value, plan, logger, cancellationToken))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "No streaming capacity is free right now. The operator has been alerted; try again later.");
         }
 
         var station = Station.Create(tenant.Id, command.Name, command.Slug, now);
@@ -172,6 +181,32 @@ internal static class StationEndpoints
         station.Delete(time.GetUtcNow());
         return await Concurrency.SaveAsync(db, cancellationToken) is { } stale ? stale : TypedResults.NoContent();
     }
+
+    /// <summary>
+    /// Whether one more station on this plan would overload the node. Locks the node for the transaction, so
+    /// concurrent creates in different tenants cannot overload it together.
+    /// </summary>
+    private static async Task<bool> NodeFullAsync(AppDbContext db, StreamingOptions streaming, Plan plan, ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"node:" + streaming.Node}))", cancellationToken);
+        var assigned = await db.StreamAssignments.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .Where(a => a.Node == streaming.Node && a.Station.DeletedAt == null)
+            // Same stations as the node's stations.json: suspended tenants are not provisioned.
+            .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.Status == TenantStatus.Active),
+                a => a.Station.TenantId, t => t.Id, (_, t) => t.PlanId)
+            .Join(db.Plans, planId => planId, p => p.Id, (_, p) => p)
+            .ToListAsync(cancellationToken);
+        var reason = NodeCapacity.WhyNot(assigned, plan, new NodeLimits(streaming.MaxSources, streaming.MaxListenerCaps));
+        if (reason is not null)
+        {
+            LogNodeFull(logger, streaming.Node, reason);
+        }
+        return reason is not null;
+    }
+
+    [LoggerMessage(Level = LogLevel.Critical, Message = "Streaming node {Node} is full: {Reason}. Add a node or raise its limits.")]
+    private static partial void LogNodeFull(ILogger logger, string node, string reason);
 
     /// <summary>Saves; a duplicate slug answers 409, a concurrent change 412.</summary>
     private static async Task<ProblemHttpResult?> SaveAsync(AppDbContext db, CancellationToken cancellationToken)

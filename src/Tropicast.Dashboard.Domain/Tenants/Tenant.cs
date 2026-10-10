@@ -6,12 +6,20 @@ public enum TenantStatus
     Suspended,
 }
 
+/// <summary>A tenant's plan changed: provisioning applies the new limits to its stations (#8).</summary>
+public sealed record TenantPlanChanged(Guid TenantId, string PlanId, DateTimeOffset OccurredAt) : IDomainEvent;
+
 /// <summary>A customer account: owns stations, members and a subscription.</summary>
-public sealed class Tenant
+public sealed class Tenant : IHasDomainEvents
 {
+    private readonly List<IDomainEvent> _events = [];
+
     private Tenant()
     {
     }
+
+    public IReadOnlyList<IDomainEvent> DomainEvents => _events;
+    public void ClearDomainEvents() => _events.Clear();
 
     public Guid Id { get; private set; }
     public string Name { get; private set; } = null!;
@@ -36,5 +44,13 @@ public sealed class Tenant
         Slug = Text.Slug(slug, nameof(slug));
     }
 
-    public void ChangePlan(string planId) => PlanId = Text.Required(planId, 32, nameof(planId));
+    public void ChangePlan(string planId, DateTimeOffset now)
+    {
+        var plan = Text.Required(planId, 32, nameof(planId));
+        if (plan != PlanId)
+        {
+            PlanId = plan;
+            _events.Add(new TenantPlanChanged(Id, plan, now));
+        }
+    }
 }

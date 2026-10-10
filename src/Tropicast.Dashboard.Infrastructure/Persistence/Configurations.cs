@@ -7,6 +7,7 @@ using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Outbox;
+using Tropicast.Dashboard.Infrastructure.Provisioning;
 
 namespace Tropicast.Dashboard.Infrastructure.Persistence;
 
@@ -171,5 +172,19 @@ internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEn
         builder.Property(e => e.TargetId).HasMaxLength(64);
         builder.Property(e => e.Summary).HasMaxLength(256);
         builder.HasIndex(e => new { e.TenantId, e.OccurredAt });
+    }
+}
+
+internal sealed class StreamingNodeStateConfiguration : IEntityTypeConfiguration<StreamingNodeState>
+{
+    public void Configure(EntityTypeBuilder<StreamingNodeState> builder)
+    {
+        builder.ToTable("streaming_nodes");
+        builder.HasKey(e => e.Node);
+        builder.Property(e => e.Node).HasMaxLength(64);
+        builder.Property(e => e.DesiredVersion).HasMaxLength(16);
+        builder.Property(e => e.AppliedVersion).HasMaxLength(16);
+        builder.Property(e => e.LastError).HasMaxLength(500);
+        builder.Ignore(e => e.InSync);
     }
 }

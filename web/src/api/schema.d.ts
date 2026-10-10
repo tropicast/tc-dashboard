@@ -1104,6 +1104,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["ProblemDetails"];
                     };
                 };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -1407,6 +1416,85 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operator/streaming-nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Station limits applied to each streaming node, with failures. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StreamingNodeResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operator/streaming-nodes/{node}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retries applying station limits now. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    node: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1749,6 +1837,39 @@ export interface components {
             createdAt: string;
             /** @description Where listeners play the station. */
             listenerUrls: components["schemas"]["ListenerUrls"];
+        };
+        /** @description A streaming node's provisioning state. */
+        StreamingNodeResponse: {
+            /** @description Node name. */
+            node: string;
+            /** @description The node runs the desired station limits. */
+            inSync: boolean;
+            /** @description Version of the limits the database asks for. */
+            desiredVersion: null | string;
+            /** @description Version last applied to the node. */
+            appliedVersion: null | string;
+            /**
+             * Format: date-time
+             * @description When it was applied.
+             */
+            appliedAt: null | string;
+            /**
+             * Format: date-time
+             * @description Last apply attempt.
+             */
+            lastAttemptAt: null | string;
+            /**
+             * Format: int32
+             * @description Failures since the last success.
+             */
+            failedAttempts: number | string;
+            /**
+             * Format: date-time
+             * @description Next retry after a failure.
+             */
+            nextAttemptAt: null | string;
+            /** @description Last failure. */
+            lastError: null | string;
         };
         /** @description A tenant (customer account). */
         TenantResponse: {

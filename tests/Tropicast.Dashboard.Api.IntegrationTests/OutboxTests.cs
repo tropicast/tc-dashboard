@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tropicast.Dashboard.Application.Outbox;
@@ -55,17 +56,22 @@ public sealed class OutboxTests(PostgresContainer postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Without_consumers_messages_stay_pending_for_later()
+    public async Task Event_types_without_a_consumer_stay_pending_for_later()
     {
         var owner = new Browser(_factory);
         await owner.SignUpAndLoginAsync(Browser.Unique("owner"));
         await owner.CreateTenantAsync();
-        await owner.SendAsync(HttpMethod.Post, "/api/v1/stations", new { name = "Radio", slug = "pending" });
+        var created = await owner.SendAsync(HttpMethod.Post, "/api/v1/stations", new { name = "Radio", slug = "pending" });
+        var id = (await created.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Token)).GetProperty("id").GetGuid();
+        await owner.SendIfMatchAsync(HttpMethod.Patch, $"/api/v1/stations/{id}", created.Headers.ETag!.ToString(), new { genre = "Talk" });
 
-        Assert.Equal(0, await _factory.Services.GetRequiredService<OutboxDispatcher>().DispatchBatchAsync(Token));
+        // StationCreated has a consumer (provisioning); StationChanged has none until RadioBrowser (#13).
+        await _factory.Services.GetRequiredService<OutboxDispatcher>().DispatchBatchAsync(Token);
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.All(await db.OutboxMessages.ToListAsync(Token), m => Assert.Null(m.ProcessedAt));
+        var messages = await db.OutboxMessages.ToListAsync(Token);
+        Assert.NotNull(Assert.Single(messages, m => m.Type == "StationCreated").ProcessedAt);
+        Assert.Null(Assert.Single(messages, m => m.Type == "StationChanged").ProcessedAt);
     }
 
     private sealed class RecordingConsumer : IOutboxConsumer

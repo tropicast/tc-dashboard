@@ -10,6 +10,7 @@ using Tropicast.Dashboard.Domain;
 using Tropicast.Dashboard.Domain.Audit;
 using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Outbox;
+using Tropicast.Dashboard.Infrastructure.Provisioning;
 
 namespace Tropicast.Dashboard.Infrastructure.Persistence;
 
@@ -34,6 +35,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<StreamingNodeState> StreamingNodes => Set<StreamingNodeState>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<Station> Stations => Set<Station>();
