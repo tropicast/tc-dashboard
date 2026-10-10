@@ -8,3 +8,6 @@ TestResults/
 # Built by `npm run build` in web/.
 src/Tropicast.Dashboard.Api/wwwroot/
 artifacts/
+
+# Local knowledge graph (graphify).
+graphify-out/
