@@ -127,6 +127,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stations the signed-in user can broadcast to, in every tenant. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MyStationResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{id}/broadcast-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest URLs, username and a new password for this desktop device; replaces the device's previous one. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BroadcastTargetResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/version": {
         parameters: {
             query?: never;
@@ -522,7 +621,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Signs the device out. */
+        /** Signs the device out and revokes the broadcast credentials it got for itself. */
         post: {
             parameters: {
                 query?: never;
@@ -714,7 +813,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Signs one desktop device out. */
+        /** Signs one desktop device out and revokes the broadcast credentials it got for itself. */
         delete: {
             parameters: {
                 query?: never;
@@ -742,6 +841,209 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/device/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Starts a desktop sign-in: a secret device code to poll with and a short user code to show. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeviceCodeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeviceCodeResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/device/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Polls a desktop sign-in; returns the device's tokens once the user approved it. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeviceTokenRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TokenResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/device/{userCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A pending desktop sign-in, to confirm before approving it. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userCode: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeviceRequestResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/device/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Signs the device with this code in to the signed-in account. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UserCodeRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/device/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refuses the desktop sign-in with this code. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UserCodeRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1507,6 +1809,59 @@ export interface components {
         AcceptInvitationRequest: {
             token: string;
         };
+        /**
+         * @description A stream format, as in the mount `/stations/{id}/live.{mp3,opus}`.
+         * @enum {unknown}
+         */
+        AudioFormat: "Mp3" | "Opus";
+        /** @description One stream to publish. */
+        BroadcastOutput: {
+            /** @description Stream format. */
+            format: components["schemas"]["AudioFormat"];
+            /** @description Send it as the source's `Content-Type`. */
+            contentType: string;
+            /**
+             * Format: uri
+             * @description Where to publish (HTTP PUT, Icecast source protocol, TLS).
+             */
+            ingestUrl: string;
+            /**
+             * Format: uri
+             * @description Where listeners play it.
+             */
+            listenerUrl: string;
+        };
+        /**
+         * @description Everything the desktop app needs to go live on a station. Contract version 1 (docs/desktop-api.md); it never
+         *     contains node, admin or relay credentials.
+         */
+        BroadcastTargetResponse: {
+            /**
+             * Format: uuid
+             * @description Station ID in the API.
+             */
+            stationId: string;
+            /** @description Station ID in mounts and listener URLs. */
+            publicId: string;
+            /** @description Station name, e.g. for the `Ice-Name` header. */
+            stationName: string;
+            /**
+             * Format: uuid
+             * @description The device's broadcast credential, listed under the station's credentials.
+             */
+            credentialId: string;
+            /** @description Source username: the station's public ID. */
+            username: string;
+            /** @description Source password of this device. Shown only here: store it now. Asking again replaces it. */
+            password: string;
+            /**
+             * Format: int32
+             * @description Highest bitrate the plan accepts, per stream.
+             */
+            maxBitrateKbps: number | string;
+            /** @description Streams the plan allows, MP3 first. */
+            outputs: components["schemas"]["BroadcastOutput"][];
+        };
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
@@ -1606,6 +1961,53 @@ export interface components {
              */
             revokedAt: null | string;
         };
+        DeviceCodeRequest: {
+            deviceName: string;
+        };
+        /** @description A started desktop sign-in. Show string DeviceCodeResponse.UserCode and Uri DeviceCodeResponse.VerificationUri, then poll. */
+        DeviceCodeResponse: {
+            /** @description Secret: send it to `/auth/device/token` only. Never show it. */
+            deviceCode: string;
+            /** @description Short code the user types on the web page, e.g. `BCDF-GHJK`. */
+            userCode: string;
+            /**
+             * Format: uri
+             * @description Web page where the user enters the code.
+             */
+            verificationUri: string;
+            /**
+             * Format: uri
+             * @description The same page with the code filled in, e.g. for a button or a QR code.
+             */
+            verificationUriComplete: string;
+            /**
+             * Format: int64
+             * @description Seconds until the codes expire.
+             */
+            expiresIn: number | string;
+            /**
+             * Format: int64
+             * @description Minimum seconds between two polls.
+             */
+            interval: number | string;
+        };
+        /** @description A pending desktop sign-in, shown to the user before they approve it. */
+        DeviceRequestResponse: {
+            /** @description The code, as the device shows it. */
+            userCode: string;
+            /** @description Name the device gave itself; it becomes the device's name in the account. */
+            deviceName: string;
+            /**
+             * Format: date-time
+             * @description When the device asked.
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When the request expires.
+             */
+            expiresAt: string;
+        };
         DeviceResponse: {
             /** Format: uuid */
             id: string;
@@ -1615,6 +2017,9 @@ export interface components {
             /** Format: date-time */
             lastUsedAt: string;
             current: boolean;
+        };
+        DeviceTokenRequest: {
+            deviceCode: string;
         };
         EmailRequest: {
             email: string;
@@ -1706,6 +2111,27 @@ export interface components {
             id: string;
             email: string;
             memberships: components["schemas"]["MembershipResponse"][];
+        };
+        /** @description A station the signed-in user can broadcast to. */
+        MyStationResponse: {
+            /**
+             * Format: uuid
+             * @description Send it as `X-Tenant-Id` when asking for the broadcast target.
+             */
+            tenantId: string;
+            /** @description The station's tenant. */
+            tenantName: string;
+            /**
+             * Format: uuid
+             * @description Station ID in the API.
+             */
+            stationId: string;
+            /** @description Station ID in mounts and listener URLs. */
+            publicId: string;
+            /** @description Station name. */
+            name: string;
+            /** @description The user's role in the tenant. */
+            role: components["schemas"]["MembershipRole"];
         };
         /** @description One page of results. */
         PagedListOfStationResponse: {
@@ -1942,6 +2368,9 @@ export interface components {
         UpdateTenantCommand: {
             name?: null | string;
             slug?: null | string;
+        };
+        UserCodeRequest: {
+            userCode: string;
         };
         /** @description API version information. */
         VersionInfo: {

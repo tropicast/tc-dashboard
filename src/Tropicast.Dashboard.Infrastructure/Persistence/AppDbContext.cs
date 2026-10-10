@@ -33,6 +33,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
+    public DbSet<DeviceAuthorization> DeviceAuthorizations => Set<DeviceAuthorization>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<StreamingNodeState> StreamingNodes => Set<StreamingNodeState>();

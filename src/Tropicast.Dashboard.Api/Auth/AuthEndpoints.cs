@@ -51,14 +51,16 @@ internal static class AuthEndpoints
         credentials.MapPost("/reset-password", ResetPasswordAsync).WithSummary("Sets a new password and signs out every desktop device.");
         credentials.MapPost("/token", IssueTokenAsync).WithSummary("Signs a desktop device in: access and refresh token.");
         credentials.MapPost("/token/refresh", RefreshTokenAsync).WithSummary("Exchanges a refresh token for a new pair; the old one stops working.");
-        credentials.MapPost("/token/revoke", RevokeTokenAsync).WithSummary("Signs the device out.");
+        credentials.MapPost("/token/revoke", RevokeTokenAsync)
+            .WithSummary("Signs the device out and revokes the broadcast credentials it got for itself.");
 
         var signedIn = auth.MapGroup("").RequireAuthorization();
         signedIn.MapPost("/logout", LogoutAsync).WithSummary("Ends the cookie session.");
         signedIn.MapPost("/change-password", ChangePasswordAsync).WithSummary("Changes the password and signs out every desktop device.");
         signedIn.MapGet("/me", GetMeAsync).WithSummary("The signed-in account and its tenants.");
         signedIn.MapGet("/devices", ListDevicesAsync).WithSummary("Signed-in desktop devices.");
-        signedIn.MapDelete("/devices/{id:guid}", RevokeDeviceAsync).WithSummary("Signs one desktop device out.");
+        signedIn.MapDelete("/devices/{id:guid}", RevokeDeviceAsync)
+            .WithSummary("Signs one desktop device out and revokes the broadcast credentials it got for itself.");
     }
 
     private static NoContent GetAntiforgeryToken(HttpContext context, IAntiforgery antiforgery)
@@ -239,6 +241,7 @@ internal static class AuthEndpoints
             // A token of this session that is no longer current was copied: end the session for every holder.
             session.Revoke(now);
             await db.SaveChangesAsync(cancellationToken);
+            await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.Id == session.Id), now, cancellationToken);
             return refused;
         }
         var user = await users.FindByIdAsync(session.UserId.ToString());
@@ -267,6 +270,7 @@ internal static class AuthEndpoints
         {
             session.Revoke(time.GetUtcNow());
             await db.SaveChangesAsync(cancellationToken);
+            await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.Id == sessionId), time.GetUtcNow(), cancellationToken);
         }
         return TypedResults.NoContent();
     }
@@ -297,6 +301,7 @@ internal static class AuthEndpoints
         }
         session.Revoke(time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
+        await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.Id == id), time.GetUtcNow(), cancellationToken);
         return TypedResults.NoContent();
     }
 
@@ -305,6 +310,7 @@ internal static class AuthEndpoints
         var sessions = await db.DeviceSessions.Where(s => s.UserId == userId && s.RevokedAt == null).ToListAsync(cancellationToken);
         sessions.ForEach(s => s.Revoke(now));
         await db.SaveChangesAsync(cancellationToken);
+        await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.UserId == userId), now, cancellationToken);
     }
 
     /// <summary>Lockout still applies server-side; the answer stays the same.</summary>

@@ -97,11 +97,17 @@ ASP.NET Core Identity on the same database (`users`, `user_claims`,
   carry it must send the antiforgery token. `GET /antiforgery` sets the
   readable `XSRF-TOKEN` cookie, and the client echoes it in `X-XSRF-TOKEN`
   (`web/src/api/client.ts` does this). Fetch a new token after signing in.
-- **Desktop app:** `POST /token` returns a 15-minute bearer access token and a
+- **Desktop app:** signs in with the device authorization flow
+  (`/device/code`, the user approves the code on the web, `/device/token`;
+  [ADR 0001](docs/adr/0001-desktop-sign-in.md)), or with `POST /token` (email
+  and password, for scripts). Both return a 15-minute bearer access token and a
   refresh token for one named device. `POST /token/refresh` rotates the pair;
   presenting an old refresh token again ends that device's session.
   `POST /token/revoke` or `DELETE /devices/{id}` signs one device out on its
-  next refresh. A password change or reset signs every device out.
+  next refresh, and revokes the broadcast credentials it got for itself. A
+  password change or reset signs every device out. The desktop contract
+  (`/me/stations`, `/stations/{id}/broadcast-target`) is in
+  [docs/desktop-api.md](docs/desktop-api.md).
 - **Accounts:** sign up, email confirmation (required before signing in),
   password reset and change, lockout after 5 failures (15 minutes), and
   passwords of at least 12 characters. Credential endpoints are rate limited

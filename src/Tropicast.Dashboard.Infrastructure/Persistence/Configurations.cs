@@ -97,8 +97,13 @@ internal sealed class BroadcastCredentialConfiguration : IEntityTypeConfiguratio
     {
         builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => e.StationId);
-        // One active credential per device label; revoking frees the label.
-        builder.HasIndex(e => new { e.StationId, e.DeviceLabel }).IsUnique().HasFilter("revoked_at IS NULL");
+        // One active admin-issued credential per device label; revoking frees the label.
+        builder.HasIndex(e => new { e.StationId, e.DeviceLabel }).IsUnique()
+            .HasFilter("revoked_at IS NULL AND device_session_id IS NULL");
+        // One active credential per station and desktop device session; a new one replaces it.
+        builder.HasOne<DeviceSession>().WithMany().HasForeignKey(e => e.DeviceSessionId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasIndex(e => new { e.StationId, e.DeviceSessionId }).IsUnique()
+            .HasFilter("revoked_at IS NULL AND device_session_id IS NOT NULL");
         builder.Property(e => e.DeviceLabel).HasMaxLength(64);
         builder.Property(e => e.SecretHash).HasMaxLength(64).IsFixedLength();
         builder.Ignore(e => e.IsActive);
@@ -147,6 +152,20 @@ internal sealed class DeviceSessionConfiguration : IEntityTypeConfiguration<Devi
         // Looked up by the session ID inside the token, then compared: no index on the hash.
         builder.Property(e => e.RefreshTokenHash).HasMaxLength(64).IsFixedLength();
         builder.HasIndex(e => e.UserId);
+    }
+}
+
+internal sealed class DeviceAuthorizationConfiguration : IEntityTypeConfiguration<DeviceAuthorization>
+{
+    public void Configure(EntityTypeBuilder<DeviceAuthorization> builder)
+    {
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.Property(e => e.DeviceName).HasMaxLength(64);
+        builder.Property(e => e.DeviceCodeHash).HasMaxLength(64).IsFixedLength();
+        builder.Property(e => e.UserCode).HasMaxLength(DeviceAuthorization.UserCodeLength).IsFixedLength();
+        // Expired requests are deleted when new ones start, so a code is unique among the live ones.
+        builder.HasIndex(e => e.UserCode).IsUnique();
+        builder.HasIndex(e => e.ExpiresAt);
     }
 }
 

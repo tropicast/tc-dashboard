@@ -108,6 +108,83 @@
         }
       }
     },
+    "/api/v1/me/stations": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "summary": "Stations the signed-in user can broadcast to, in every tenant.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyStationResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{id}/broadcast-target": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "summary": "Ingest URLs, username and a new password for this desktop device; replaces the device's previous one.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastTargetResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/version": {
       "get": {
         "tags": [
@@ -375,7 +452,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Signs the device out.",
+        "summary": "Signs the device out and revokes the broadcast credentials it got for itself.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -487,7 +564,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Signs one desktop device out.",
+        "summary": "Signs one desktop device out and revokes the broadcast credentials it got for itself.",
         "parameters": [
           {
             "name": "id",
@@ -505,6 +582,152 @@
           },
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/device/code": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Starts a desktop sign-in: a secret device code to poll with and a short user code to show.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/device/token": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Polls a desktop sign-in; returns the device's tokens once the user approved it.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/device/{userCode}": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "A pending desktop sign-in, to confirm before approving it.",
+        "parameters": [
+          {
+            "name": "userCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRequestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/device/approve": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Signs the device with this code in to the signed-in account.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/device/deny": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Refuses the desktop sign-in with this code.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -1283,6 +1506,101 @@
           }
         }
       },
+      "AudioFormat": {
+        "enum": [
+          "Mp3",
+          "Opus"
+        ],
+        "description": "A stream format, as in the mount `/stations/{id}/live.{mp3,opus}`."
+      },
+      "BroadcastOutput": {
+        "required": [
+          "format",
+          "contentType",
+          "ingestUrl",
+          "listenerUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "format": {
+            "description": "Stream format.",
+            "$ref": "#/components/schemas/AudioFormat"
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Send it as the source's `Content-Type`."
+          },
+          "ingestUrl": {
+            "type": "string",
+            "description": "Where to publish (HTTP PUT, Icecast source protocol, TLS).",
+            "format": "uri"
+          },
+          "listenerUrl": {
+            "type": "string",
+            "description": "Where listeners play it.",
+            "format": "uri"
+          }
+        },
+        "description": "One stream to publish."
+      },
+      "BroadcastTargetResponse": {
+        "required": [
+          "stationId",
+          "publicId",
+          "stationName",
+          "credentialId",
+          "username",
+          "password",
+          "maxBitrateKbps",
+          "outputs"
+        ],
+        "type": "object",
+        "properties": {
+          "stationId": {
+            "type": "string",
+            "description": "Station ID in the API.",
+            "format": "uuid"
+          },
+          "publicId": {
+            "type": "string",
+            "description": "Station ID in mounts and listener URLs."
+          },
+          "stationName": {
+            "type": "string",
+            "description": "Station name, e.g. for the `Ice-Name` header."
+          },
+          "credentialId": {
+            "type": "string",
+            "description": "The device's broadcast credential, listed under the station's credentials.",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string",
+            "description": "Source username: the station's public ID."
+          },
+          "password": {
+            "type": "string",
+            "description": "Source password of this device. Shown only here: store it now. Asking again replaces it."
+          },
+          "maxBitrateKbps": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Highest bitrate the plan accepts, per stream.",
+            "format": "int32"
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BroadcastOutput"
+            },
+            "description": "Streams the plan allows, MP3 first."
+          }
+        },
+        "description": "Everything the desktop app needs to go live on a station. Contract version 1 (docs/desktop-api.md); it never\ncontains node, admin or relay credentials."
+      },
       "ChangePasswordRequest": {
         "required": [
           "currentPassword",
@@ -1478,6 +1796,98 @@
         },
         "description": "A broadcast credential, without its secret."
       },
+      "DeviceCodeRequest": {
+        "required": [
+          "deviceName"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceName": {
+            "maxLength": 64,
+            "type": "string"
+          }
+        }
+      },
+      "DeviceCodeResponse": {
+        "required": [
+          "deviceCode",
+          "userCode",
+          "verificationUri",
+          "verificationUriComplete",
+          "expiresIn",
+          "interval"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceCode": {
+            "type": "string",
+            "description": "Secret: send it to `/auth/device/token` only. Never show it."
+          },
+          "userCode": {
+            "type": "string",
+            "description": "Short code the user types on the web page, e.g. `BCDF-GHJK`."
+          },
+          "verificationUri": {
+            "type": "string",
+            "description": "Web page where the user enters the code.",
+            "format": "uri"
+          },
+          "verificationUriComplete": {
+            "type": "string",
+            "description": "The same page with the code filled in, e.g. for a button or a QR code.",
+            "format": "uri"
+          },
+          "expiresIn": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Seconds until the codes expire.",
+            "format": "int64"
+          },
+          "interval": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Minimum seconds between two polls.",
+            "format": "int64"
+          }
+        },
+        "description": "A started desktop sign-in. Show string DeviceCodeResponse.UserCode and Uri DeviceCodeResponse.VerificationUri, then poll."
+      },
+      "DeviceRequestResponse": {
+        "required": [
+          "userCode",
+          "deviceName",
+          "createdAt",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userCode": {
+            "type": "string",
+            "description": "The code, as the device shows it."
+          },
+          "deviceName": {
+            "type": "string",
+            "description": "Name the device gave itself; it becomes the device's name in the account."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the device asked.",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the request expires.",
+            "format": "date-time"
+          }
+        },
+        "description": "A pending desktop sign-in, shown to the user before they approve it."
+      },
       "DeviceResponse": {
         "required": [
           "id",
@@ -1505,6 +1915,18 @@
           },
           "current": {
             "type": "boolean"
+          }
+        }
+      },
+      "DeviceTokenRequest": {
+        "required": [
+          "deviceCode"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceCode": {
+            "maxLength": 256,
+            "type": "string"
           }
         }
       },
@@ -1768,6 +2190,46 @@
             }
           }
         }
+      },
+      "MyStationResponse": {
+        "required": [
+          "tenantId",
+          "tenantName",
+          "stationId",
+          "publicId",
+          "name",
+          "role"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "description": "Send it as `X-Tenant-Id` when asking for the broadcast target.",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string",
+            "description": "The station's tenant."
+          },
+          "stationId": {
+            "type": "string",
+            "description": "Station ID in the API.",
+            "format": "uuid"
+          },
+          "publicId": {
+            "type": "string",
+            "description": "Station ID in mounts and listener URLs."
+          },
+          "name": {
+            "type": "string",
+            "description": "Station name."
+          },
+          "role": {
+            "description": "The user's role in the tenant.",
+            "$ref": "#/components/schemas/MembershipRole"
+          }
+        },
+        "description": "A station the signed-in user can broadcast to."
       },
       "PagedListOfStationResponse": {
         "required": [
@@ -2355,6 +2817,18 @@
         },
         "description": "Changes the tenant's name or slug; omitted fields keep their value."
       },
+      "UserCodeRequest": {
+        "required": [
+          "userCode"
+        ],
+        "type": "object",
+        "properties": {
+          "userCode": {
+            "maxLength": 32,
+            "type": "string"
+          }
+        }
+      },
       "VersionInfo": {
         "required": [
           "version"
@@ -2373,6 +2847,9 @@
   "tags": [
     {
       "name": "Members"
+    },
+    {
+      "name": "Desktop"
     },
     {
       "name": "Tropicast.Dashboard.Api"
