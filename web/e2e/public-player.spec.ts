@@ -30,13 +30,22 @@ const playedSeconds = (page: Page) =>
 
 test('the page weighs under 100 KB before audio and plays Opus', async ({ page }) => {
   await trackMedia(page);
-  let bytes = 0;
-  page.on('response', async (response) => {
+  // Keep every body read, and await them all before adding up: the handler itself is not awaited.
+  const bodies: Promise<number>[] = [];
+  page.on('response', (response) => {
     if (!/live\.(mp3|opus)/.test(response.url()))
-      bytes += (await response.body().catch(() => Buffer.alloc(0))).length;
+      bodies.push(
+        response.body().then(
+          (body) => body.length,
+          () => 0,
+        ),
+      );
   });
   await page.goto(path);
   await page.waitForLoadState('networkidle');
+  const bytes = (await Promise.all(bodies)).reduce((sum, length) => sum + length, 0);
+  expect(bodies.length).toBeGreaterThan(0);
+  expect(bytes).toBeGreaterThan(0);
   expect(bytes).toBeLessThan(100_000);
 
   const listener = page.waitForRequest(/live\.opus/);
