@@ -1,3 +1,5 @@
 dist
 openapi
 src/api/schema.d.ts
+test-results
+.lighthouseci

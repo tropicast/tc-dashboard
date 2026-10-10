@@ -20,6 +20,15 @@ export const antiforgery: Middleware = {
   },
 };
 
+/** Keeps API requests scoped to the tenant selected by the signed-in account. */
+export const tenantScope: Middleware = {
+  onRequest({ request }) {
+    const tenantId = globalThis.localStorage?.getItem('tenant-id');
+    if (tenantId) request.headers.set('X-Tenant-Id', tenantId);
+    return request;
+  },
+};
+
 /** Typed client for the dashboard API, generated from web/openapi/openapi.json (npm run generate:api). */
 export const api = createClient<paths>({
   // Same origin as the SPA: the API serves it, and Vite proxies /api in development.
@@ -29,3 +38,4 @@ export const api = createClient<paths>({
   credentials: 'same-origin',
 });
 api.use(antiforgery);
+api.use(tenantScope);
