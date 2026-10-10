@@ -22,7 +22,8 @@ FROM api AS bundle
 COPY dotnet-tools.json ./
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet tool restore && \
-    dotnet ef migrations bundle --project src/Tropicast.Dashboard.Infrastructure --configuration Release \
+    dotnet ef migrations bundle --project src/Tropicast.Dashboard.Infrastructure \
+      --startup-project src/Tropicast.Dashboard.Infrastructure --configuration Release \
       --self-contained -r linux-x64 -o /out/efbundle --force
 
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS migrations

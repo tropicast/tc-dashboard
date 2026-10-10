@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Restore the latest backup into a throwaway PostgreSQL and check it (#15).
-# Run monthly by .github/workflows/restore-test.yml, or by hand (docs/runbook.md).
+# Run monthly by the operator, on a machine that holds the age private key
+# (docs/runbook.md, section 5). Never in CI: the key stays offline.
 #
 # Environment:
 #   BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY
-#   BACKUP_AGE_KEY_FILE  age identity file (the private key; never on the node)
+#   BACKUP_AGE_KEY_FILE  age identity file (the private key; never on the node or in GitHub)
 #   BACKUP_PG_IMAGE      default postgres:17-alpine (the dump's major version or newer)
 #   BACKUP_NAME          a specific dump under db/; default: the newest
 #   KEEP=1               leave the database running on 127.0.0.1:${RESTORE_PORT:-55433}

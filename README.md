@@ -241,7 +241,8 @@ cancelled when superseded; runs on `main` always finish.
 One Hetzner CX23 (`tc-app-1`) runs the API and Caddy for
 `app.tropicastradio.com`. It shares a private network with the streaming
 node, which calls source auth over it. The database is Neon PostgreSQL, with
-nightly encrypted dumps to object storage and a monthly restore test.
+nightly encrypted dumps to object storage, a daily backup check, and a monthly
+restore test run offline.
 
 | Path | What |
 |---|---|

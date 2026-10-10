@@ -24,4 +24,7 @@ skip_region_validation      = true
 skip_requesting_account_id  = true
 skip_metadata_api_check     = true
 skip_s3_checksum            = true
+
+# Lock file next to the state (S3 conditional writes); see terraform-deploy.yml.
+use_lockfile = true
 HCL

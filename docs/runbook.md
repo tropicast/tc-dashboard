@@ -43,9 +43,11 @@ Secrets and variables → Actions**). Never commit them.
 2. **SMTP** (Brevo or Resend): a sending domain for `tropicastradio.com` with
    SPF and DKIM, and SMTP credentials.
 3. **Backups**: an Object Storage bucket (e.g. `tropicast-backups`, `fsn1`)
-   and an access key limited to it. An age key pair:
+   and an access key limited to it (read/write, for the node), plus a
+   read-only key (for the daily check). An age key pair:
    `age-keygen -o tropicast-backup.key`. Keep the private key **offline**
-   (password manager); only the public key (`age1…`) goes to the node.
+   (password manager, operator machine). It is never stored on the node or in
+   GitHub: only the public key (`age1…`) is.
 4. **Cloudflare**: an API token with *Zone → DNS → Edit* on
    `tropicastradio.com`, and the zone ID (zone *Overview*).
 5. **SSH keys** (ed25519, no passphrase, generated on your machine):
@@ -75,7 +77,7 @@ Secrets and variables → Actions**). Never commit them.
 | `PROVISIONING_SSH_HOST_KEY` | variable | section 4 |
 | `PROVISIONING_ENABLED` | variable | `false` until the cutover, then `true` |
 | `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | secret | step 3 |
-| `BACKUP_AGE_KEY` | secret | the age **private** key, for the monthly restore test only |
+| `BACKUP_S3_READ_ACCESS_KEY`, `BACKUP_S3_READ_SECRET_KEY` | secret | a **read-only** key on the backup bucket, for the daily backup check |
 | `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_AGE_RECIPIENT` | variable | `https://fsn1.your-objectstorage.com`, bucket, `age1…` |
 | `ACME_EMAIL`, `OPERATOR_EMAIL` | variable | Let's Encrypt contact; your account email (operator pages) |
 
@@ -88,7 +90,10 @@ Values must not contain a single quote (`'`): the workflow writes them quoted.
 
 ## 2. Provision the node
 
-1. **Terraform**: run the *Terraform deploy* workflow with `action=plan`, read
+1. **Terraform**: run the *Terraform deploy* workflow with `action=plan`. It
+   first checks that the state bucket enforces conditional writes (the state
+   lock depends on them) and stops if not. Run it only through this workflow,
+   or locally with the same backend settings (`use_lockfile = true`). Read
    the plan in the run summary, then run it with `action=apply` and that
    run's ID. It creates `tc-app-1`, its firewall and primary IPs, the private
    network, attaches **tc-stream-1 at 10.20.1.2** (live, no restart), and the
@@ -185,10 +190,22 @@ journalctl -u tc-dashboard-backup --since yesterday
 sudo systemctl start tc-dashboard-backup      # back up now
 ```
 
-**Monthly restore test**: the *Restore test* workflow (1st of the month, or
-run it by hand) restores the newest dump into a throwaway PostgreSQL and
-checks the migrations and tables. A failed run sends the usual GitHub
-notification.
+**Daily check**: the *Backup check* workflow (06:17 UTC) fails when the
+newest dump is older than 26 hours or nearly empty. It lists the bucket with
+a read-only key and cannot decrypt anything.
+
+**Monthly restore test**: on the 1st, *Backup check* opens a "Restore test"
+issue. On an operator machine with Docker, `age` and the private key, restore
+the newest dump into a throwaway PostgreSQL, then close the issue with the
+output:
+
+```sh
+export BACKUP_S3_ENDPOINT=… BACKUP_S3_BUCKET=… BACKUP_S3_ACCESS_KEY=… BACKUP_S3_SECRET_KEY=…   # read-only key is enough
+BACKUP_AGE_KEY_FILE=tropicast-backup.key deploy/restore-test.sh
+```
+
+It checks the migrations and the main tables. The private key never leaves
+that machine.
 
 **Restore into a fresh database** (e.g. after data loss):
 
@@ -219,8 +236,9 @@ API) unless noted.
 | `SOURCE_AUTH_PASSWORD` | Brief source-auth outage: update here and tc-streaming's `ICECAST_SOURCE_AUTH_PASSWORD`, deploy both (dashboard first). Live sources stay connected; only new connects are refused in between. |
 | `PROVISIONING_SSH_KEY` | Add the new public key to tc-streaming `provisioning_ssh_keys`, run its playbook, update the secret, deploy, then remove the old key there. |
 | `DEPLOY_SSH_KEY` | Add the new key to `deploy_ssh_keys`, run `site.yml`, update the secret, remove the old key and run again. |
-| Backup keys | New Object Storage key: update both, deploy. New age key pair: update `BACKUP_AGE_RECIPIENT` and `BACKUP_AGE_KEY`; keep the old private key while old dumps exist (30 days). |
+| Backup keys | New Object Storage keys: update them, deploy. New age key pair: update `BACKUP_AGE_RECIPIENT`, deploy; keep the old private key offline while old dumps exist (30 days). |
 | `CLOUDFLARE_API_TOKEN`, `HCLOUD_TOKEN` | Roll the token at the provider and update the secret (no deploy). |
+| Terraform state lock | A run that died can leave `tc-dashboard/mvp.tfstate.tflock` in the state bucket. Check no run is active, then `terraform force-unlock <id>` (the ID is in the error). |
 | Data Protection keys | On the node: `deploy.sh compose down api && docker volume rm tc-dashboard_dataprotection`, then deploy. Signs **everyone** out (browser sessions and desktop devices). |
 
 ## 7. Rebuild the node from scratch

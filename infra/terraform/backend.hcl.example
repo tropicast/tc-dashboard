@@ -16,6 +16,7 @@ skip_requesting_account_id  = true
 skip_metadata_api_check     = true
 skip_s3_checksum            = true
 
-# State locking with a lock file needs S3 conditional writes; enable it only
-# after checking the storage provider supports them.
-# use_lockfile = true
+# Lock file next to the state (S3 conditional writes). Every writer, local or
+# CI, must use it: .github/workflows/terraform-deploy.yml checks the store
+# supports conditional writes before each run.
+use_lockfile = true
