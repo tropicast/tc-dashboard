@@ -118,7 +118,7 @@ public sealed partial class Browser(DashboardFactory factory)
         scope.ServiceProvider.GetRequiredService<CurrentTenant>().TenantId = tenantId;
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tenant = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleAsync(db.Tenants, Token);
-        tenant.ChangePlan(planId);
+        tenant.ChangePlan(planId, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(Token);
     }
 

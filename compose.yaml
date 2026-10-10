@@ -32,6 +32,8 @@ services:
       # Icecast's node credentials for source auth (tc-streaming ICECAST_SOURCE_AUTH_USER/_PASSWORD).
       SourceAuth__NodeUsername: icecast
       SourceAuth__NodePassword: ${SOURCE_AUTH_PASSWORD:-source-auth-dev}
+      # No streaming node to SSH to locally (see README, "Provisioning").
+      Provisioning__Enabled: "false"
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
       # Internal source-auth endpoint, for a local Icecast (tc-streaming).

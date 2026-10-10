@@ -886,6 +886,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1202,6 +1212,55 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/operator/streaming-nodes": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Station limits applied to each streaming node, with failures.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StreamingNodeResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operator/streaming-nodes/{node}/reconcile": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Retries applying station limits now.",
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted"
           },
           "404": {
             "description": "Not Found"
@@ -2022,6 +2081,85 @@
         },
         "description": "A station."
       },
+      "StreamingNodeResponse": {
+        "required": [
+          "node",
+          "inSync",
+          "desiredVersion",
+          "appliedVersion",
+          "appliedAt",
+          "lastAttemptAt",
+          "failedAttempts",
+          "nextAttemptAt",
+          "lastError"
+        ],
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Node name."
+          },
+          "inSync": {
+            "type": "boolean",
+            "description": "The node runs the desired station limits."
+          },
+          "desiredVersion": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Version of the limits the database asks for."
+          },
+          "appliedVersion": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Version last applied to the node."
+          },
+          "appliedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was applied.",
+            "format": "date-time"
+          },
+          "lastAttemptAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Last apply attempt.",
+            "format": "date-time"
+          },
+          "failedAttempts": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Failures since the last success.",
+            "format": "int32"
+          },
+          "nextAttemptAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Next retry after a failure.",
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Last failure."
+          }
+        },
+        "description": "A streaming node's provisioning state."
+      },
       "TenantResponse": {
         "required": [
           "id",
@@ -2250,6 +2388,9 @@
     },
     {
       "name": "Credentials"
+    },
+    {
+      "name": "Operator"
     }
   ]
 }
