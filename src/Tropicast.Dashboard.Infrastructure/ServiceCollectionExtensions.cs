@@ -7,6 +7,7 @@ using Tropicast.Dashboard.Application.Email;
 using Tropicast.Dashboard.Infrastructure.Email;
 using Tropicast.Dashboard.Application.Outbox;
 using Tropicast.Dashboard.Application.Provisioning;
+using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Outbox;
 using Tropicast.Dashboard.Infrastructure.Provisioning;
 using Tropicast.Dashboard.Infrastructure.Persistence;
@@ -33,6 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<Reconciler>();
         services.AddSingleton<IOutboxConsumer, ProvisioningOutboxConsumer>();
         services.AddHostedService<ProvisioningWorker>();
+        services.AddHostedService<DeviceAuthorizationCleanup>();
         // Read when a context is created, so hosts without a database (e.g. OpenAPI generation) still start.
         services.AddDbContext<AppDbContext>(options => PersistenceSetup.Configure(options,
             configuration.GetConnectionString("Default")

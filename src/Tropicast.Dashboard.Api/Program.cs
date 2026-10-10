@@ -57,11 +57,13 @@ app.UseDashboardAuth();
 app.MapHealthChecks("/health");
 app.MapApi();
 app.MapAuth();
+app.MapDeviceAuthorization();
 app.MapInvitations();
 app.MapTenants();
 app.MapMembers();
 app.MapStations();
 app.MapCredentials();
+app.MapDesktop();
 app.MapSourceAuth();
 app.MapOperator();
 
