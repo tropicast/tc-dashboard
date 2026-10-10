@@ -26,6 +26,14 @@ async function confirmationLink(
   return Text.match(/https?:\/\/[^\s]+\/confirm-email\?[^\s]+/)?.[0];
 }
 
+async function apiIsHealthy(request: APIRequestContext): Promise<boolean> {
+  try {
+    return (await request.get('/health')).ok();
+  } catch {
+    return false;
+  }
+}
+
 test.skip(process.env.REAL_E2E !== '1', 'Requires REAL_E2E=1 and a running Compose stack.');
 
 test('signs up, confirms email, and creates a first station against Compose', async ({
@@ -37,6 +45,7 @@ test('signs up, confirms email, and creates a first station against Compose', as
   const slug = `playwright-${suffix}`;
   const password = 'Playwright-real-e2e-123!';
 
+  await expect.poll(() => apiIsHealthy(request), { timeout: 30_000 }).toBe(true);
   await page.goto('/signup');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password (12 or more characters)').fill(password);

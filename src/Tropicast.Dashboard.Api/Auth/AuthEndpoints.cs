@@ -63,12 +63,16 @@ internal static class AuthEndpoints
             .WithSummary("Signs one desktop device out and revokes the broadcast credentials it got for itself.");
     }
 
-    private static NoContent GetAntiforgeryToken(HttpContext context, IAntiforgery antiforgery)
+    private static NoContent GetAntiforgeryToken(HttpContext context, IAntiforgery antiforgery,
+        IOptions<AuthCookieOptions> cookieOptions)
     {
         var tokens = antiforgery.GetAndStoreTokens(context);
         context.Response.Cookies.Append(AuthSetup.AntiforgeryRequestCookie, tokens.RequestToken!, new CookieOptions
         {
-            HttpOnly = false, Secure = true, SameSite = SameSiteMode.Strict, Path = "/",
+            HttpOnly = false,
+            Secure = cookieOptions.Value.UseSecureCookies || context.Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            Path = "/",
         });
         return TypedResults.NoContent();
     }
@@ -166,7 +170,7 @@ internal static class AuthEndpoints
 
     private static async Task<Results<NoContent, ValidationProblem>> ChangePasswordAsync(ChangePasswordRequest request,
         HttpContext context, UserManager<AppUser> users, SignInManager<AppUser> signIn, AppDbContext db, TimeProvider time,
-        CancellationToken cancellationToken)
+        IOptions<AuthCookieOptions> cookieOptions, CancellationToken cancellationToken)
     {
         var user = await users.GetUserAsync(context.User) ?? throw new InvalidOperationException("Signed-in user not found.");
         var result = await users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
@@ -176,7 +180,7 @@ internal static class AuthEndpoints
         }
         await RevokeAllDevicesAsync(db, user.Id, time.GetUtcNow(), cancellationToken);
         // The security stamp changed: renew this browser's cookie so only other sessions end.
-        if (context.Request.Cookies.ContainsKey(AuthSetup.SessionCookie))
+        if (context.Request.Cookies.ContainsKey(cookieOptions.Value.SessionCookieName))
         {
             await signIn.RefreshSignInAsync(user);
         }
