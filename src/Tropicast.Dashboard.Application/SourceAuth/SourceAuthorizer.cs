@@ -80,22 +80,33 @@ public static partial class SourceAuthorizer
         {
             return SourceAuthDecision.Deny($"format {match.Groups["format"].Value} not in the {station.Plan.Name} plan");
         }
-        if (DeclaredKbps(request) is { } kbps && kbps > station.Plan.MaxBitrateKbps)
+        switch (DeclaredKbps(request))
         {
-            return SourceAuthDecision.Deny($"bitrate {kbps} kbps above the {station.Plan.Name} plan's {station.Plan.MaxBitrateKbps} kbps");
+            case { Declared: true, Kbps: null }:
+                // Present but unreadable (or beyond any real bitrate): never let it skip the plan limit.
+                return SourceAuthDecision.Deny("unreadable declared bitrate");
+            case { Kbps: { } kbps } when kbps > station.Plan.MaxBitrateKbps:
+                return SourceAuthDecision.Deny($"bitrate {kbps} kbps above the {station.Plan.Name} plan's {station.Plan.MaxBitrateKbps} kbps");
         }
         return new SourceAuthDecision(true, "", credential, format);
     }
 
-    /// <summary>Ice-Bitrate, else bitrate= in Ice-Audio-Info. A source that declares nothing is allowed.</summary>
-    public static int? DeclaredKbps(SourceAuthRequest request)
+    /// <summary>
+    /// Ice-Bitrate, else bitrate= in Ice-Audio-Info. Not declared: allowed (egress monitoring catches abuse).
+    /// Declared but not a whole number in range: <c>Declared</c> with a null <c>Kbps</c>.
+    /// </summary>
+    public static (bool Declared, long? Kbps) DeclaredKbps(SourceAuthRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var value = request.IceBitrate;
-        if (string.IsNullOrWhiteSpace(value) && AudioInfoBitrate().Match(request.IceAudioInfo ?? "") is { Success: true } match)
+        var value = request.IceBitrate?.Trim();
+        if (string.IsNullOrEmpty(value) && AudioInfoBitrate().Match(request.IceAudioInfo ?? "") is { Success: true } match)
         {
             value = match.Groups[1].Value;
         }
-        return int.TryParse(value?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var kbps) ? kbps : null;
+        if (string.IsNullOrEmpty(value))
+        {
+            return (false, null);
+        }
+        return long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var kbps) ? (true, kbps) : (true, null);
     }
 }

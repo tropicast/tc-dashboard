@@ -190,4 +190,41 @@ public sealed class SourceAuthTests(DashboardFactory factory) : IClassFixture<Da
         }
         Assert.True(timer.Elapsed < TimeSpan.FromSeconds(4), $"20 decisions took {timer.Elapsed}");
     }
+
+    [Fact]
+    public async Task A_spoofed_host_on_the_public_listener_does_not_reach_it()
+    {
+        var (_, station, secret, _) = await StationAsync();
+        var client = Icecast();
+        client.DefaultRequestHeaders.Add("X-Test-Local-Port", "8080");
+        var response = await AskAsync(client, $"/stations/{station.PublicId}/live.mp3", station.PublicId, secret);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.False(response.Headers.Contains("icecast-auth-user"));
+    }
+
+    [Fact]
+    public async Task Malformed_or_oversized_forms_are_denied_not_errors()
+    {
+        var (_, station, secret, _) = await StationAsync();
+        using var huge = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["mount"] = $"/stations/{station.PublicId}/live.mp3", ["user"] = station.PublicId, ["pass"] = secret,
+            ["padding"] = new string('x', 10_000),
+        });
+        Denied(await Icecast().PostAsync("/internal/icecast/source-auth", huge, Token));
+        using var broken = new StringContent("mount=%ZZ&user=", Encoding.UTF8, "application/x-www-form-urlencoded");
+        var response = await Icecast().PostAsync("/internal/icecast/source-auth", broken, Token);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(response.Headers.Contains("icecast-auth-user"));
+    }
+
+    [Fact]
+    public async Task An_out_of_range_bitrate_cannot_bypass_the_plan()
+    {
+        var (_, station, secret, _) = await StationAsync();
+        var mount = $"/stations/{station.PublicId}/live.mp3";
+        Denied(await AskAsync(Icecast(), mount, station.PublicId, secret, ("header.ice-bitrate", "99999999999999999999999")));
+        Denied(await AskAsync(Icecast(), mount, station.PublicId, secret, ("header.ice-audio-info", "bitrate=99999999999999999999")));
+        Denied(await AskAsync(Icecast(), mount, station.PublicId, secret, ("header.ice-bitrate", "fast")));
+    }
 }

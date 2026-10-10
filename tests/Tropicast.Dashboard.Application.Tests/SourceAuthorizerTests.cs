@@ -59,6 +59,9 @@ public sealed class SourceAuthorizerTests
     [InlineData(null, "samplerate=44100;ice-bitrate=48", true)]
     [InlineData("", "", true)]
     [InlineData(null, null, true)]
+    [InlineData("99999999999999999999", null, false)]
+    [InlineData("64k", null, false)]
+    [InlineData(null, "bitrate=99999999999999999999999", false)]
     public void A_declared_bitrate_must_fit_the_plan(string? iceBitrate, string? audioInfo, bool allowed)
         => Assert.Equal(allowed, SourceAuthorizer.Decide(Request(bitrate: iceBitrate, audioInfo: audioInfo), Free()).Allowed);
 }

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Tropicast.Dashboard.Application.SourceAuth;
@@ -36,41 +37,49 @@ internal static partial class SourceAuthEndpoint
     {
         var port = app.Services.GetRequiredService<IOptions<SourceAuthOptions>>().Value.Port;
         app.MapPost(Path, HandleAsync)
-            .RequireHost($"*:{port}")
             .ExcludeFromDescription()
             .DisableAntiforgery();
-        // Anywhere else (the public port): not found, never the SPA.
+        // Other internal paths: not found, never the SPA.
         app.Map("/internal/{**path}", () => Results.NotFound()).ExcludeFromDescription();
     }
 
-    private static async Task HandleAsync(HttpContext context, IOptions<SourceAuthOptions> options, AppDbContext db,
-        TimeProvider time, ILoggerFactory loggers)
+    private static async Task HandleAsync(HttpContext context, IOptions<SourceAuthOptions> options, TimeProvider time,
+        ILoggerFactory loggers)
     {
+        // The listener the connection actually arrived on, not the Host header (which a client controls).
+        if (context.Connection.LocalPort != options.Value.Port)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
         var logger = loggers.CreateLogger(typeof(SourceAuthEndpoint));
         if (!NodeAuthenticated(context.Request, options.Value))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
         }
-        var form = context.Request.HasFormContentType ? await context.Request.ReadFormAsync(context.RequestAborted) : null;
-        var request = new SourceAuthRequest(form?["mount"], form?["user"], form?["pass"],
-            form?["header.ice-bitrate"], form?["header.ice-audio-info"]);
+        string? mount = null;
         SourceAuthDecision decision;
         try
         {
+            // One budget for reading the form and deciding; anything going wrong denies.
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
             timeout.CancelAfter(options.Value.Timeout);
+            var request = await ReadAsync(context.Request, timeout.Token);
+            mount = request.Mount;
+            // Resolved here, so a missing or broken database denies instead of failing the request.
+            var db = context.RequestServices.GetRequiredService<AppDbContext>();
             db.Database.SetCommandTimeout(options.Value.Timeout);
             decision = await DecideAndRecordAsync(request, db, time.GetUtcNow(), timeout.Token);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !context.RequestAborted.IsCancellationRequested)
         {
-            // Fail closed: an outage must never let a source in.
-            LogError(logger, ex.GetType().Name, request.Mount);
+            // Fail closed: malformed input, a timeout or an outage must never let a source in.
+            LogError(logger, ex.GetType().Name, mount);
             decision = SourceAuthDecision.Deny("temporary error, try again");
         }
 
-        LogDecision(logger, decision.Allowed ? "allow" : "deny", request.Mount, decision.Reason);
+        LogDecision(logger, decision.Allowed ? "allow" : "deny", mount, decision.Reason);
         context.Response.StatusCode = StatusCodes.Status200OK;
         if (decision.Allowed)
         {
@@ -80,6 +89,22 @@ internal static partial class SourceAuthEndpoint
         {
             context.Response.Headers["icecast-auth-message"] = decision.Reason;
         }
+    }
+
+    /// <summary>Icecast sends a handful of short fields: anything larger is not Icecast.</summary>
+    private static readonly FormOptions FormLimits = new()
+    {
+        ValueCountLimit = 64, KeyLengthLimit = 128, ValueLengthLimit = 4096, BufferBody = false,
+    };
+
+    private static async Task<SourceAuthRequest> ReadAsync(HttpRequest request, CancellationToken cancellationToken)
+    {
+        if (!request.HasFormContentType)
+        {
+            return new SourceAuthRequest(null, null, null, null, null);
+        }
+        var form = await new FormFeature(request, FormLimits).ReadFormAsync(cancellationToken);
+        return new SourceAuthRequest(form["mount"], form["user"], form["pass"], form["header.ice-bitrate"], form["header.ice-audio-info"]);
     }
 
     private static async Task<SourceAuthDecision> DecideAndRecordAsync(SourceAuthRequest request, AppDbContext db,
@@ -103,9 +128,15 @@ internal static partial class SourceAuthEndpoint
             return decision;
         }
 
-        var credential = await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
-            .SingleAsync(c => c.Id == decision.CredentialId, cancellationToken);
-        credential.RecordUse(now);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        // Re-check atomically: a credential revoked since the snapshot above must not be let in.
+        var stillActive = await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .Where(c => c.Id == decision.CredentialId && c.RevokedAt == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(c => c.LastUsedAt, now), cancellationToken);
+        if (stillActive == 0)
+        {
+            return SourceAuthDecision.Deny("wrong or revoked credential");
+        }
         // Icecast refuses a second source on a live mount, so an open session here is stale (e.g. after a node restart).
         var stale = await db.LiveSessions.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(s => s.StationId == station!.Id && s.Format == decision.Format && s.EndedAt == null)
@@ -118,6 +149,7 @@ internal static partial class SourceAuthEndpoint
         }
         db.LiveSessions.Add(LiveSession.Start(station!.Id, decision.Format!.Value, now));
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return decision;
     }
 
