@@ -20,7 +20,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=api /out ./
 COPY --from=web /out/wwwroot ./wwwroot
-ENV ASPNETCORE_HTTP_PORTS=8080
-EXPOSE 8080
+# 8080: public API and SPA (behind the gateway). 8081: internal source-auth for the streaming node only.
+ENV ASPNETCORE_HTTP_PORTS=8080;8081
+EXPOSE 8080 8081
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Tropicast.Dashboard.Api.dll"]

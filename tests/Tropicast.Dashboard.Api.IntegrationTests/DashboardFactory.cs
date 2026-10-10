@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -54,10 +55,13 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
         builder.UseSetting("App:PublicBaseUrl", "https://app.test");
         // Tests read outbox rows and drive the dispatcher themselves.
         builder.UseSetting("Outbox:Enabled", "false");
+        builder.UseSetting("SourceAuth:NodeUsername", SourceAuthNode.Username);
+        builder.UseSetting("SourceAuth:NodePassword", SourceAuthNode.Password);
         builder.UseSetting("RateLimits:Auth:PermitLimit", AuthPermitLimit.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(Logs));
         builder.ConfigureTestServices(services =>
         {
+            services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter, LocalPortFilter>();
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(Emails);
         });
@@ -76,6 +80,13 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
         await base.DisposeAsync();
         GC.SuppressFinalize(this);
     }
+}
+
+/// <summary>Node credentials the test Icecast "sends".</summary>
+public static class SourceAuthNode
+{
+    public const string Username = "icecast";
+    public const string Password = "node-secret-for-tests";
 }
 
 public sealed class CapturingEmailSender : IEmailSender
@@ -114,4 +125,23 @@ public sealed class CapturingLoggerProvider : ILoggerProvider
             Func<TState, Exception?, string> formatter)
             => lines.Enqueue($"{logLevel} {category}: {formatter(state, exception)} {exception}");
     }
+}
+
+/// <summary>
+/// TestServer has no sockets: set the connection's local port like Kestrel would. The listener is the Host header's
+/// port unless X-Test-Local-Port says the request really arrived elsewhere (to test a spoofed Host).
+/// </summary>
+internal sealed class LocalPortFilter : Microsoft.AspNetCore.Hosting.IStartupFilter
+{
+    public Action<Microsoft.AspNetCore.Builder.IApplicationBuilder> Configure(Action<Microsoft.AspNetCore.Builder.IApplicationBuilder> next)
+        => app =>
+        {
+            app.Use((Microsoft.AspNetCore.Http.HttpContext context, Func<Task> nextMiddleware) =>
+            {
+                context.Connection.LocalPort = int.TryParse(context.Request.Headers["X-Test-Local-Port"], out var port)
+                    ? port : context.Request.Host.Port ?? 80;
+                return nextMiddleware();
+            });
+            next(app);
+        };
 }
