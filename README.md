@@ -9,14 +9,14 @@ through this service; it is served by
 
 ## Layout
 
-| Path | Contents |
-|---|---|
-| `src/Tropicast.Dashboard.Domain` | Entities, value objects, domain errors. No framework references |
-| `src/Tropicast.Dashboard.Application` | Use cases, ports (`IClock`, …), validation (FluentValidation) |
-| `src/Tropicast.Dashboard.Infrastructure` | Adapters for the ports: EF Core, Identity, email, background services |
-| `src/Tropicast.Dashboard.Api` | Minimal API under `/api/v1`, OpenAPI, Problem Details, `/health`; serves the SPA |
-| `web/` | React 19 + TypeScript + Vite SPA, typed API client generated from OpenAPI |
-| `tests/` | Domain, Application, architecture and API integration tests |
+| Path                                     | Contents                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `src/Tropicast.Dashboard.Domain`         | Entities, value objects, domain errors. No framework references                  |
+| `src/Tropicast.Dashboard.Application`    | Use cases, ports (`IClock`, …), validation (FluentValidation)                    |
+| `src/Tropicast.Dashboard.Infrastructure` | Adapters for the ports: EF Core, Identity, email, background services            |
+| `src/Tropicast.Dashboard.Api`            | Minimal API under `/api/v1`, OpenAPI, Problem Details, `/health`; serves the SPA |
+| `web/`                                   | React 19 + TypeScript + Vite SPA, typed API client generated from OpenAPI        |
+| `tests/`                                 | Domain, Application, architecture and API integration tests                      |
 
 Dependencies point inward (Domain ← Application ← Infrastructure ← Api).
 `tests/Tropicast.Dashboard.Architecture.Tests` fails the build when an inner
@@ -60,6 +60,23 @@ After changing an endpoint, build the API and run `npm run generate:api`,
 then commit both files: CI fails when the OpenAPI document or the generated
 client is stale. In development the document is also served at
 `/openapi/v1.json`.
+
+### Browser checks
+
+```sh
+cd web
+npm run test:e2e:install  # install Chromium once
+npm run test:e2e           # SPA E2E: mocked API contract responses only
+npm run test:lighthouse    # accessibility score >= 95 for sign-in and sign-up routes
+```
+
+The Playwright smoke test exercises browser navigation and client request
+payloads while intercepting `/api/v1` responses. It does **not** prove API or
+PostgreSQL behavior; .NET integration tests own that coverage. A real
+browser/API/PostgreSQL journey needs root-level orchestration, isolated
+database and email-confirmation setup before it can be added. Its prerequisite
+stack is available with `docker compose up --build`; no such frontend-only
+command exists yet.
 
 ## Database
 
@@ -117,11 +134,11 @@ ASP.NET Core Identity on the same database (`users`, `user_claims`,
   (optional when the user has one membership). Endpoints authorize with
   `TenantPolicies`:
 
-  | Policy | Roles |
-  |---|---|
-  | `Member`, `Broadcaster` | Owner, Admin, Broadcaster |
-  | `Admin` | Owner, Admin |
-  | `Owner` | Owner |
+    | Policy                  | Roles                     |
+    | ----------------------- | ------------------------- |
+    | `Member`, `Broadcaster` | Owner, Admin, Broadcaster |
+    | `Admin`                 | Owner, Admin              |
+    | `Owner`                 | Owner                     |
 
 - **Invitations:** `POST /api/v1/tenants/current/invitations` (Admin; only an
   Owner can invite an Owner) emails a 7-day link.
@@ -139,22 +156,22 @@ validation (FluentValidation in Application). In Development, the OpenAPI
 document is at `/openapi/v1.json`, and an interactive reference with examples
 is at `/scalar`.
 
-| Endpoint | Policy | Notes |
-|---|---|---|
-| `POST /tenants` | signed in | Creates a tenant on the Free plan; the caller is Owner |
-| `GET /tenants/current` | Member | Plan, limits and station count; `ETag` |
-| `PATCH /tenants/current` | Admin | Needs `If-Match` |
-| `GET /tenants/current/members` | Member | |
-| `DELETE /tenants/current/members/{userId}` | Admin | Only an Owner removes an Owner; the last Owner stays |
-| `POST /tenants/current/invitations` | Admin | How members are added |
-| `GET /stations?page=&pageSize=` | Member | Paged (1-100 per page) |
-| `POST /stations` | Admin | Within the plan's station limit; assigns the stream and returns listener URLs |
-| `GET /stations/{id}` | Member | `ETag` |
-| `PATCH /stations/{id}` | Admin | Needs `If-Match` (428 without, 412 when stale) |
-| `DELETE /stations/{id}` | Admin | Soft delete; optional `If-Match` |
-| `GET /stations/{id}/credentials` | Admin | Per-device broadcast credentials, active first; never the secret |
-| `POST /stations/{id}/credentials` | Admin | Issues a 256-bit secret for one device; the only response that shows it (`Cache-Control: no-store`) |
-| `DELETE /stations/{id}/credentials/{credentialId}` | Admin | Revokes that device only; idempotent |
+| Endpoint                                           | Policy    | Notes                                                                                               |
+| -------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------- |
+| `POST /tenants`                                    | signed in | Creates a tenant on the Free plan; the caller is Owner                                              |
+| `GET /tenants/current`                             | Member    | Plan, limits and station count; `ETag`                                                              |
+| `PATCH /tenants/current`                           | Admin     | Needs `If-Match`                                                                                    |
+| `GET /tenants/current/members`                     | Member    |                                                                                                     |
+| `DELETE /tenants/current/members/{userId}`         | Admin     | Only an Owner removes an Owner; the last Owner stays                                                |
+| `POST /tenants/current/invitations`                | Admin     | How members are added                                                                               |
+| `GET /stations?page=&pageSize=`                    | Member    | Paged (1-100 per page)                                                                              |
+| `POST /stations`                                   | Admin     | Within the plan's station limit; assigns the stream and returns listener URLs                       |
+| `GET /stations/{id}`                               | Member    | `ETag`                                                                                              |
+| `PATCH /stations/{id}`                             | Admin     | Needs `If-Match` (428 without, 412 when stale)                                                      |
+| `DELETE /stations/{id}`                            | Admin     | Soft delete; optional `If-Match`                                                                    |
+| `GET /stations/{id}/credentials`                   | Admin     | Per-device broadcast credentials, active first; never the secret                                    |
+| `POST /stations/{id}/credentials`                  | Admin     | Issues a 256-bit secret for one device; the only response that shows it (`Cache-Control: no-store`) |
+| `DELETE /stations/{id}/credentials/{credentialId}` | Admin     | Revokes that device only; idempotent                                                                |
 
 Stations of other tenants answer 404. Broadcast credentials are stored as
 SHA-256 hashes; the Icecast username is the station's public ID. Credential
@@ -220,12 +237,12 @@ apply-stations` reloads Icecast with no restart.
 
 Production settings (`Provisioning:Ssh`):
 
-| Setting | Value |
-|---|---|
-| `Host`, `Port` | The streaming node over the private network, `22` |
-| `Username` | `deploy` |
-| `PrivateKey` | An ed25519 key used only for this (secret). On the node, its public key is installed with the forced command `deploy.sh apply-stations` (tc-streaming Ansible `provisioning_ssh_keys`). |
-| `HostKeySha256` | The node's ed25519 host key: `ssh-keyscan -t ed25519 <host> \| ssh-keygen -lf -` |
+| Setting         | Value                                                                                                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Host`, `Port`  | The streaming node over the private network, `22`                                                                                                                                       |
+| `Username`      | `deploy`                                                                                                                                                                                |
+| `PrivateKey`    | An ed25519 key used only for this (secret). On the node, its public key is installed with the forced command `deploy.sh apply-stations` (tc-streaming Ansible `provisioning_ssh_keys`). |
+| `HostKeySha256` | The node's ed25519 host key: `ssh-keyscan -t ed25519 <host> \| ssh-keygen -lf -`                                                                                                        |
 
 Compose sets `Provisioning__Enabled=false`: locally there is no node.
 
@@ -244,13 +261,13 @@ node, which calls source auth over it. The database is Neon PostgreSQL, with
 nightly encrypted dumps to object storage, a daily backup check, and a monthly
 restore test run offline.
 
-| Path | What |
-|---|---|
-| `infra/terraform` | server, firewall, primary IPs, private network, Cloudflare DNS |
-| `infra/ansible` | hardening, Docker, deploy user, backup timer |
-| `deploy/` | production Compose file, Caddyfile, `deploy.sh`, `backup.sh`, `restore-test.sh` |
-| `.github/workflows/image.yml` | images `ghcr.io/tropicast/dashboard{,-migrations}:sha-<commit>` for each commit on `main` |
-| `.github/workflows/deploy.yml` | manual deploy: migrate, swap, health check, automatic return to the running release |
+| Path                           | What                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------- |
+| `infra/terraform`              | server, firewall, primary IPs, private network, Cloudflare DNS                            |
+| `infra/ansible`                | hardening, Docker, deploy user, backup timer                                              |
+| `deploy/`                      | production Compose file, Caddyfile, `deploy.sh`, `backup.sh`, `restore-test.sh`           |
+| `.github/workflows/image.yml`  | images `ghcr.io/tropicast/dashboard{,-migrations}:sha-<commit>` for each commit on `main` |
+| `.github/workflows/deploy.yml` | manual deploy: migrate, swap, health check, automatic return to the running release       |
 
 Setup, deploy, rollback, restore and secret rotation:
 [docs/runbook.md](docs/runbook.md).
