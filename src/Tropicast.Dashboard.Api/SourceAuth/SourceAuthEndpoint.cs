@@ -119,6 +119,9 @@ internal static partial class SourceAuthEndpoint
             .SingleOrDefaultAsync(cancellationToken);
         var credentials = station is null ? [] : await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(c => c.StationId == station.Id && c.RevokedAt == null)
+            // A desktop device's own credential ends with its device session: signed out, revoked or expired.
+            .Where(c => c.DeviceSessionId == null
+                || db.DeviceSessions.Any(d => d.Id == c.DeviceSessionId && d.RevokedAt == null && d.ExpiresAt > now))
             .Select(c => new { c.Id, c.SecretHash })
             .ToListAsync(cancellationToken);
         var decision = SourceAuthorizer.Decide(request, station is null ? null : new SourceAuthStation(station.PublicId,

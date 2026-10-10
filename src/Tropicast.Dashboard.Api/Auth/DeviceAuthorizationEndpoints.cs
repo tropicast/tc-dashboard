@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +24,16 @@ internal sealed record UserCodeRequest([property: Required, MaxLength(32)] strin
 /// <param name="Interval">Minimum seconds between two polls.</param>
 internal sealed record DeviceCodeResponse(string DeviceCode, string UserCode, Uri VerificationUri, Uri VerificationUriComplete,
     long ExpiresIn, long Interval);
+
+/// <summary>A poll that gave no tokens (Problem Details).</summary>
+/// <param name="Type">Problem type URI.</param>
+/// <param name="Title">Human-readable explanation.</param>
+/// <param name="Status">Always 400.</param>
+/// <param name="Error">
+/// What to do, as in RFC 8628 section 3.5: <c>authorization_pending</c> (poll again after the interval), <c>slow_down</c>
+/// (wait longer), <c>access_denied</c> (the user refused: stop) or <c>expired_token</c> (expired, used or unknown: start again).
+/// </param>
+internal sealed record DevicePollProblem(string? Type, string Title, int Status, string Error);
 
 /// <summary>A pending desktop sign-in, shown to the user before they approve it.</summary>
 /// <param name="UserCode">The code, as the device shows it.</param>
@@ -55,9 +67,13 @@ internal static class DeviceAuthorizationEndpoints
             .WithSummary("Starts a desktop sign-in: a secret device code to poll with and a short user code to show.");
         // Polled every few seconds: the poll interval limits it, not the per-IP sign-in limit.
         device.MapPost("/token", PollAsync)
-            .WithSummary("Polls a desktop sign-in; returns the device's tokens once the user approved it.");
+            .WithSummary("Polls a desktop sign-in; returns the device's tokens once the user approved it.")
+            .Produces<DevicePollProblem>(StatusCodes.Status400BadRequest, "application/problem+json");
 
-        var signedIn = device.MapGroup("").RequireAuthorization().RequireRateLimiting(AuthSetup.AuthRateLimit);
+        // Only the browser session approves: never a device's bearer token, and always with the antiforgery token.
+        var browserOnly = new AuthorizationPolicyBuilder(IdentityConstants.ApplicationScheme).RequireAuthenticatedUser().Build();
+        var signedIn = device.MapGroup("").RequireAuthorization(browserOnly).RequireRateLimiting(AuthSetup.AuthRateLimit)
+            .AddEndpointFilter(RequireAntiforgeryAsync);
         signedIn.MapGet("/{userCode}", GetAsync).WithSummary("A pending desktop sign-in, to confirm before approving it.");
         signedIn.MapPost("/approve", ApproveAsync).WithSummary("Signs the device with this code in to the signed-in account.");
         signedIn.MapPost("/deny", DenyAsync).WithSummary("Refuses the desktop sign-in with this code.");
@@ -197,6 +213,28 @@ internal static class DeviceAuthorizationEndpoints
         var code = DeviceAuthorization.NormalizeUserCode(userCode);
         var pending = code is null ? null : await db.DeviceAuthorizations.SingleOrDefaultAsync(r => r.UserCode == code, cancellationToken);
         return pending is not null && pending.IsPending(now) ? pending : null;
+    }
+
+    /// <summary>
+    /// The global check skips requests with a bearer header; approval must not. A cross-site form cannot send the
+    /// header, but a page could combine one with the victim's cookie, so check here regardless.
+    /// </summary>
+    private static async ValueTask<object?> RequireAntiforgeryAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    {
+        var http = context.HttpContext;
+        if (!HttpMethods.IsGet(http.Request.Method))
+        {
+            try
+            {
+                await http.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(http);
+            }
+            catch (AntiforgeryValidationException)
+            {
+                return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest,
+                    title: $"Missing or invalid antiforgery token. Get one from /api/v1/auth/antiforgery and send it in {AuthSetup.AntiforgeryHeader}.");
+            }
+        }
+        return await next(context);
     }
 
     private static ProblemHttpResult Failed(string error, string title) => TypedResults.Problem(

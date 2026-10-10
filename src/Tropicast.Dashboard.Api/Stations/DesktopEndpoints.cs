@@ -85,8 +85,12 @@ internal static class DesktopEndpoints
     {
         var now = time.GetUtcNow();
         var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        // The session row stays locked until the credential is committed: a concurrent sign-out either finishes first
+        // (and this request sees it) or waits, then revokes the new credential with the others.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var session = Guid.TryParse(context.User.FindFirst(TokenService.DeviceSessionClaim)?.Value, out var sessionId)
-            ? await db.DeviceSessions.SingleOrDefaultAsync(s => s.Id == sessionId, cancellationToken)
+            ? await db.DeviceSessions.FromSql($"SELECT *, xmin FROM device_sessions WHERE id = {sessionId} FOR UPDATE")
+                .SingleOrDefaultAsync(cancellationToken)
             : null;
         if (session is null || session.UserId.ToString() != userId || !session.IsActive(now))
         {
@@ -109,7 +113,6 @@ internal static class DesktopEndpoints
 
         var secret = Secrets.New();
         var credential = BroadcastCredential.CreateForDevice(station.Id, session.Id, session.DeviceName, Secrets.Hash(secret), now);
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.BroadcastCredentials
             .Where(c => c.StationId == station.Id && c.DeviceSessionId == session.Id && c.RevokedAt == null)
             .ExecuteUpdateAsync(set => set.SetProperty(c => c.RevokedAt, now), cancellationToken);

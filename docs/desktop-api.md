@@ -73,7 +73,8 @@ response is `Cache-Control: no-store`. A device code gives tokens **once**.
 | `access_denied` | The user refused | Stop; offer to start again |
 | `expired_token` | Expired (10 minutes), already used, or unknown | Stop; start again |
 
-**Approve** (web page, signed-in user; for the SPA, #11):
+**Approve** (web page, browser session only, with the antiforgery token; a
+device's bearer token is refused; for the SPA, #11):
 
 - `GET /api/v1/auth/device/{userCode}` shows `deviceName`, `createdAt` and
   `expiresAt`, so the user checks it is their device.
@@ -156,6 +157,8 @@ stations are left out.
   labelled with the device name, and can revoke it.
 - Signing the device out (`/auth/token/revoke`, *Devices* in the web app, or a
   password change or reset) revokes every password the device got this way.
+  When the device session expires (60 days without a refresh), Icecast refuses
+  them too.
 
 Errors:
 

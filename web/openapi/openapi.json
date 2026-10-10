@@ -652,6 +652,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicePollProblem"
+                }
+              }
+            }
           }
         }
       }
@@ -1857,6 +1867,42 @@
           }
         },
         "description": "A started desktop sign-in. Show string DeviceCodeResponse.UserCode and Uri DeviceCodeResponse.VerificationUri, then poll."
+      },
+      "DevicePollProblem": {
+        "required": [
+          "type",
+          "title",
+          "status",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Problem type URI."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable explanation."
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Always 400.",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string",
+            "description": "What to do, as in RFC 8628 section 3.5: `authorization_pending` (poll again after the interval), `slow_down`\n(wait longer), `access_denied` (the user refused: stop) or `expired_token` (expired, used or unknown: start again)."
+          }
+        },
+        "description": "A poll that gave no tokens (Problem Details)."
       },
       "DeviceRequestResponse": {
         "required": [

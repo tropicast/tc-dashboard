@@ -927,6 +927,15 @@ export interface paths {
                         "application/json": components["schemas"]["TokenResponse"];
                     };
                 };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["DevicePollProblem"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -1990,6 +1999,23 @@ export interface components {
              * @description Minimum seconds between two polls.
              */
             interval: number | string;
+        };
+        /** @description A poll that gave no tokens (Problem Details). */
+        DevicePollProblem: {
+            /** @description Problem type URI. */
+            type: null | string;
+            /** @description Human-readable explanation. */
+            title: string;
+            /**
+             * Format: int32
+             * @description Always 400.
+             */
+            status: number | string;
+            /**
+             * @description What to do, as in RFC 8628 section 3.5: `authorization_pending` (poll again after the interval), `slow_down`
+             *     (wait longer), `access_denied` (the user refused: stop) or `expired_token` (expired, used or unknown: start again).
+             */
+            error: string;
         };
         /** @description A pending desktop sign-in, shown to the user before they approve it. */
         DeviceRequestResponse: {

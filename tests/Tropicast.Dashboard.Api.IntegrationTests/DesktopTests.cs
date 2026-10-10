@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,6 +168,92 @@ public sealed class DesktopTests(DashboardFactory factory) : IClassFixture<Dashb
             .Status(HttpStatusCode.BadRequest);
         await RewindAsync(code.DeviceCode);
         Assert.Equal(DeviceAuthorizationEndpoints.Errors.Pending, await PollErrorAsync(desktop, code.DeviceCode));
+    }
+
+    [Fact]
+    public async Task A_device_token_cannot_approve_another_device()
+    {
+        var user = new Browser(factory);
+        await user.SignUpAndLoginAsync(Browser.Unique("dj"));
+        var desktop = factory.CreateClient();
+        var tokens = await SignInDeviceAsync(user, desktop);
+        var code = await StartAsync(desktop, "Intruder");
+
+        (await SendAsync(desktop, HttpMethod.Get, $"/api/v1/auth/device/{code.UserCode}", tokens.AccessToken)).Status(HttpStatusCode.Unauthorized);
+        using (var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/device/approve")
+        {
+            Content = JsonContent.Create(new { userCode = code.UserCode }),
+        })
+        {
+            request.Headers.Authorization = Browser.Bearer(tokens.AccessToken);
+            (await desktop.SendAsync(request, Token)).Status(HttpStatusCode.Unauthorized);
+        }
+        // A bearer header next to the browser's cookie does not skip the antiforgery check either.
+        using (var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/device/approve")
+        {
+            Content = JsonContent.Create(new { userCode = code.UserCode }),
+        })
+        {
+            request.Headers.Authorization = Browser.Bearer(tokens.AccessToken);
+            (await user.Http.SendAsync(request, Token)).Status(HttpStatusCode.BadRequest);
+        }
+        await RewindAsync(code.DeviceCode);
+        Assert.Equal(DeviceAuthorizationEndpoints.Errors.Pending, await PollErrorAsync(desktop, code.DeviceCode));
+    }
+
+    [Fact]
+    public async Task Expired_requests_are_cleaned_up_without_new_sign_ins()
+    {
+        var desktop = factory.CreateClient();
+        var expired = await StartAsync(desktop);
+        var live = await StartAsync(desktop);
+        await RewindAsync(expired.DeviceCode, expire: true);
+
+        var scopes = factory.Services.GetRequiredService<IServiceScopeFactory>();
+        Assert.True(await DeviceAuthorizationCleanup.DeleteExpiredAsync(scopes, DateTimeOffset.UtcNow, Token) >= 1);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(DeviceAuthorization.TryGetId(expired.DeviceCode, out var expiredId));
+        Assert.True(DeviceAuthorization.TryGetId(live.DeviceCode, out var liveId));
+        Assert.False(await db.DeviceAuthorizations.AnyAsync(r => r.Id == expiredId, Token));
+        Assert.True(await db.DeviceAuthorizations.AnyAsync(r => r.Id == liveId, Token));
+    }
+
+    [Fact]
+    public async Task Icecast_refuses_a_device_password_once_its_session_is_over()
+    {
+        var (owner, tenantId, station) = await StationAsync();
+        var desktop = factory.CreateClient();
+        var tokens = await SignInDeviceAsync(owner, desktop);
+        var target = await TargetAsync(desktop, tokens, tenantId, station.Id);
+        var mount = $"/stations/{station.PublicId}/live.mp3";
+        Assert.True(await SourceAuthAllowsAsync(mount, target.Username, target.Password));
+
+        // The session expires without any sign-out: nothing revokes the credential row, source auth still refuses it.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.True(DeviceSession.TryGetSessionId(tokens.RefreshToken, out var sessionId));
+            await db.DeviceSessions.Where(s => s.Id == sessionId)
+                .ExecuteUpdateAsync(set => set.SetProperty(s => s.ExpiresAt, DateTimeOffset.UtcNow.AddMinutes(-1)), Token);
+        }
+        Assert.False(await SourceAuthAllowsAsync(mount, target.Username, target.Password));
+    }
+
+    /// <summary>Asks source auth the way Icecast does: internal port, node credentials, form body.</summary>
+    private async Task<bool> SourceAuthAllowsAsync(string mount, string user, string pass)
+    {
+        var icecast = factory.CreateClient(new() { BaseAddress = new Uri("http://localhost:8081") });
+        icecast.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes($"{SourceAuthNode.Username}:{SourceAuthNode.Password}")));
+        var response = await icecast.PostAsync("/internal/icecast/source-auth", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["action"] = "stream_auth", ["mount"] = mount, ["user"] = user, ["pass"] = pass, ["ip"] = "172.18.0.3",
+            ["header.content-type"] = "audio/mpeg",
+        }), Token);
+        response.Status(HttpStatusCode.OK);
+        return response.Headers.Contains("icecast-auth-user");
     }
 
     [Fact]

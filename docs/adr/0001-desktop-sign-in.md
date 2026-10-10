@@ -32,11 +32,12 @@ Details:
 - Device code: `{request id}.{256-bit secret}`; only the SHA-256 hash is stored,
   compared in constant time; it gives tokens once.
 - User code: 8 letters from 20 consonants (about 2.6 × 10¹⁰ codes), valid for
-  10 minutes, approved only by a signed-in user (cookie + antiforgery), behind
+  10 minutes, approved only by a browser session (cookie + antiforgery; a
+  device's bearer token cannot approve another device), behind
   the per-IP sign-in rate limit.
 - Polling: at most every 5 seconds (`slow_down` otherwise). It is not behind
   the sign-in rate limit; the 256-bit device code cannot be guessed.
-- Requests are deleted once expired.
+- Expired requests are deleted every hour, and whenever a sign-in starts.
 - JSON bodies and Problem Details with an RFC 8628 `error` member, instead of
   form-encoded OAuth requests: there is one first-party client and no
   `client_id`.
