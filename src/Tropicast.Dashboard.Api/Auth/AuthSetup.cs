@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Tropicast.Dashboard.Domain.Tenants;
@@ -35,6 +36,14 @@ internal static class AuthSetup
     {
         services.Configure<AppOptions>(configuration.GetSection("App"));
         services.Configure<AuthRateLimitOptions>(configuration.GetSection("RateLimits:Auth"));
+
+        // Cookies, bearer and refresh tokens are protected with these keys: keep them across container restarts.
+        // DataProtection:KeysDirectory is a volume in production (deploy/compose.yaml); in the database later (#16).
+        var dataProtection = services.AddDataProtection().SetApplicationName("tropicast-dashboard");
+        if (configuration["DataProtection:KeysDirectory"] is { Length: > 0 } keys)
+        {
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keys));
+        }
 
         services.AddIdentityCore<AppUser>(options =>
             {

@@ -1,0 +1,76 @@
+# Production stack of the control plane (#15). Deployed to /opt/tc-dashboard
+# by deploy.sh; settings and secrets come from /opt/tc-dashboard/.env.
+# Public traffic reaches the API only through Caddy. Source auth (8081) is
+# published on the private network address only, for the streaming nodes.
+name: tc-dashboard
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+
+services:
+  api:
+    <<: *hardening
+    image: ghcr.io/tropicast/dashboard:${DASHBOARD_IMAGE_TAG:?DASHBOARD_IMAGE_TAG is set by deploy.sh}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Behind Caddy: client address and HTTPS from X-Forwarded-*. Port 8080
+      # is not published, so only Caddy can send them.
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__Default: ${DATABASE_CONNECTION:?}
+      App__PublicBaseUrl: https://${APP_HOST:?}
+      DataProtection__KeysDirectory: /data/keys
+      Email__From: ${EMAIL_FROM:?}
+      Email__Smtp__Host: ${SMTP_HOST:?}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__Username: ${SMTP_USERNAME:?}
+      Email__Smtp__Password: ${SMTP_PASSWORD:?}
+      SourceAuth__NodeUsername: ${SOURCE_AUTH_USER:-icecast}
+      SourceAuth__NodePassword: ${SOURCE_AUTH_PASSWORD:?}
+      Provisioning__Enabled: ${PROVISIONING_ENABLED:-true}
+      Provisioning__Ssh__Host: ${PROVISIONING_SSH_HOST:-}
+      Provisioning__Ssh__HostKeySha256: ${PROVISIONING_SSH_HOST_KEY:-}
+      Provisioning__Ssh__PrivateKey: ${PROVISIONING_SSH_KEY:-}
+      Operators__Emails__0: ${OPERATOR_EMAIL:-}
+    volumes:
+      - dataprotection:/data/keys
+    ports:
+      # Source auth for Icecast on the streaming nodes (private network).
+      - "${PRIVATE_IP:?}:8081:8081"
+      # Health checks from the node itself (deploy.sh).
+      - "127.0.0.1:8080:8080"
+    tmpfs:
+      - /tmp
+
+  caddy:
+    <<: *hardening
+    image: caddy:2.11.6
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      APP_HOST: ${APP_HOST:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy:/etc/caddy:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [api]
+
+  # One-off: `deploy.sh` runs it before swapping the API. Direct (non-pooled)
+  # connection: migrations need session features the pooler lacks.
+  migrate:
+    image: ghcr.io/tropicast/dashboard-migrations:${DASHBOARD_IMAGE_TAG:?}
+    profiles: [migrate]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    environment:
+      ConnectionStrings__Default: ${DATABASE_MIGRATION_CONNECTION:?}
+
+volumes:
+  dataprotection:
+  caddy-data:
+  caddy-config:

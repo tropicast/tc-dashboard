@@ -1,0 +1,23 @@
+# TLS gateway for the control plane (#15). Caddy is the only public entry
+# point; the API stays on the internal Docker network.
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+
+	# Source auth and other internal endpoints are never public.
+	@internal path /internal/*
+	respond @internal 404
+
+	reverse_proxy api:8080
+}

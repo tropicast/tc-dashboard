@@ -1,0 +1,51 @@
+name: Backup check
+
+# Daily: the newest database dump exists, is recent and not empty (#15).
+# Uses a read-only view of the bucket and never the age private key: dumps
+# cannot be decrypted here. On the 1st of the month it also opens the issue
+# for the restore test, which the operator runs offline (docs/runbook.md).
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: backup-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Newest dump is less than 26 hours old
+        env:
+          BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_READ_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_READ_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          : "${BACKUP_S3_ENDPOINT:?}" "${BACKUP_S3_BUCKET:?}" "${AWS_ACCESS_KEY_ID:?Set BACKUP_S3_READ_ACCESS_KEY}"
+          read -r key modified size < <(aws s3api list-objects-v2 --endpoint-url "$BACKUP_S3_ENDPOINT" \
+            --bucket "$BACKUP_S3_BUCKET" --prefix db/ --output text \
+            --query 'sort_by(Contents, &LastModified)[-1].[Key, LastModified, Size]')
+          [[ $key == db/*.dump.age ]] || { echo "No dump found in s3://$BACKUP_S3_BUCKET/db/" >&2; exit 1; }
+          age_hours=$(( ($(date -u +%s) - $(date -u -d "$modified" +%s)) / 3600 ))
+          echo "Newest: $key, $size bytes, $age_hours h old" | tee -a "$GITHUB_STEP_SUMMARY"
+          (( age_hours < 26 )) || { echo "The nightly backup did not run: check tc-dashboard-backup on the node." >&2; exit 1; }
+          (( size > 1024 )) || { echo "The newest dump is suspiciously small." >&2; exit 1; }
+
+      - name: Open the monthly restore-test issue
+        if: github.event_name == 'schedule' && startsWith(github.event.schedule, '17 6') && format('{0}', github.run_attempt) == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          [[ $(date -u +%d) == 01 ]] || exit 0
+          month=$(date -u +%Y-%m)
+          gh issue create --title "Restore test $month" --body \
+            "Run the monthly restore test on an operator machine that holds the age private key: docs/runbook.md, section 5 (*Monthly restore test*). Close this issue with the output."

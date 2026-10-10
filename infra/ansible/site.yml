@@ -1,0 +1,111 @@
+# Harden the control-plane node and install the runtime (#15).
+# Run: ansible-playbook site.yml
+- name: Control-plane node baseline
+  hosts: app
+  # Root needs no sudo; the first run on a fresh node may lack it.
+  become: "{{ (ansible_user | default('root')) != 'root' }}"
+  vars:
+    app_dir: /opt/tc-dashboard
+    ssh_allow_users: [ops, deploy]
+    backup_time: "*-*-* 02:30:00"
+  pre_tasks:
+    - name: Require admin and deploy keys
+      ansible.builtin.assert:
+        that:
+          - ops_ssh_keys | default([]) | length > 0
+          - deploy_ssh_keys | default([]) | length > 0
+        fail_msg: Set ops_ssh_keys (group_vars/all.yml) and deploy_ssh_keys (group_vars/app.yml).
+
+  tasks:
+    - name: Host baseline (users, SSH, updates, Docker)
+      ansible.builtin.import_tasks: tasks/baseline.yml
+
+    - name: Install backup tools
+      ansible.builtin.apt:
+        name:
+          # Encrypts each dump to a public key; the private key stays offline.
+          - age
+          - jq
+
+    - name: Create the deploy user
+      ansible.builtin.user:
+        name: deploy
+        shell: /bin/bash
+
+    - name: Create the deploy .ssh directory
+      ansible.builtin.file:
+        path: /home/deploy/.ssh
+        state: directory
+        owner: deploy
+        group: deploy
+        mode: "0700"
+
+    - name: Install the deploy SSH keys
+      ansible.builtin.copy:
+        dest: /home/deploy/.ssh/authorized_keys
+        content: "{{ deploy_ssh_keys | join('\n') }}\n"
+        owner: deploy
+        group: deploy
+        mode: "0600"
+
+    # Membership of the docker group is root-equivalent; only the deploy
+    # pipeline key logs in as this user.
+    - name: Let the deploy user run containers
+      ansible.builtin.user:
+        name: deploy
+        groups: docker
+        append: true
+
+    - name: Create the application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: deploy
+        group: deploy
+        mode: "0750"
+
+    # Nightly encrypted pg_dump to object storage (deploy/backup.sh, installed
+    # by each deploy). Settings come from the deploy's .env.
+    - name: Install the backup service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/tc-dashboard-backup.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Back up the tc-dashboard database
+          After=docker.service network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          User=deploy
+          ExecStart=/usr/bin/bash {{ app_dir }}/backup.sh
+      notify: Reload systemd units
+
+    - name: Install the backup timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/tc-dashboard-backup.timer
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Nightly tc-dashboard database backup
+
+          [Timer]
+          OnCalendar={{ backup_time }}
+          RandomizedDelaySec=10m
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+      notify: Reload systemd units
+
+    - name: Enable the backup timer
+      ansible.builtin.systemd_service:
+        name: tc-dashboard-backup.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Shared handlers
+      ansible.builtin.import_tasks: handlers/main.yml

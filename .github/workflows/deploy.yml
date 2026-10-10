@@ -1,0 +1,225 @@
+name: Deploy
+
+# Deploy the control plane to its node (#15): migrate, swap, health check;
+# deploy.sh goes back to the running release if the new one is unhealthy.
+# Setup and operations: docs/runbook.md
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit on main to deploy (SHA, or "main"). Use an older SHA to roll back.
+        type: string
+        default: main
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_SERVER: ${{ vars.DEPLOY_SERVER || 'tc-app-1' }}
+      APP_HOST: ${{ vars.APP_HOST || 'app.tropicastradio.com' }}
+      REMOTE_ROOT: /opt/tc-dashboard
+    steps:
+      - name: Isolate the Docker config
+        run: |
+          mkdir -p "$RUNNER_TEMP/docker"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
+
+      - name: Allow only main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "Run this workflow from main." >&2
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Resolve the release
+        id: release
+        run: |
+          sha=$(git rev-parse HEAD)
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "$sha is not on main." >&2
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "image_tag=sha-$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check the images exist
+        env:
+          IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker buildx imagetools inspect "ghcr.io/tropicast/dashboard:$IMAGE_TAG" >/dev/null
+          docker buildx imagetools inspect "ghcr.io/tropicast/dashboard-migrations:$IMAGE_TAG" >/dev/null
+          docker logout ghcr.io
+
+      # The node's firewall only allows admin CIDRs on SSH. Open port 22 to
+      # this runner alone for the length of the job; closed again below.
+      - name: Open SSH for this runner
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: deploy/ci-ssh-access.sh open "$GITHUB_RUN_ID"
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          : "${DEPLOY_HOST:?Set the DEPLOY_HOST variable}"
+          : "${DEPLOY_SSH_KEY:?Set the DEPLOY_SSH_KEY secret}"
+          : "${DEPLOY_KNOWN_HOSTS:?Set the DEPLOY_KNOWN_HOSTS variable}"
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 0600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CFG
+          Host node
+            HostName $DEPLOY_HOST
+            User deploy
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ConnectTimeout 10
+          CFG
+          # The firewall change can take a few seconds to reach the node.
+          for attempt in $(seq 1 12); do
+            ssh node true && exit 0
+            echo "SSH not reachable yet (attempt $attempt)"
+            sleep 5
+          done
+          exit 1
+
+      - name: Write settings and secrets to the node
+        env:
+          # Neon connection URIs (postgresql://...): pooled for the API, direct
+          # for migrations and backups.
+          DATABASE_POOLED_URL: ${{ secrets.DATABASE_POOLED_URL }}
+          DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SOURCE_AUTH_PASSWORD: ${{ secrets.SOURCE_AUTH_PASSWORD }}
+          PROVISIONING_SSH_KEY: ${{ secrets.PROVISIONING_SSH_KEY }}
+          BACKUP_S3_ACCESS_KEY: ${{ secrets.BACKUP_S3_ACCESS_KEY }}
+          BACKUP_S3_SECRET_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+          PRIVATE_IP: ${{ vars.PRIVATE_IP || '10.20.1.10' }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
+          SMTP_USERNAME: ${{ vars.SMTP_USERNAME }}
+          SOURCE_AUTH_USER: ${{ vars.SOURCE_AUTH_USER || 'icecast' }}
+          PROVISIONING_ENABLED: ${{ vars.PROVISIONING_ENABLED || 'false' }}
+          PROVISIONING_SSH_HOST: ${{ vars.PROVISIONING_SSH_HOST }}
+          PROVISIONING_SSH_HOST_KEY: ${{ vars.PROVISIONING_SSH_HOST_KEY }}
+          OPERATOR_EMAIL: ${{ vars.OPERATOR_EMAIL }}
+          BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          BACKUP_PG_IMAGE: ${{ vars.BACKUP_PG_IMAGE || 'postgres:17-alpine' }}
+        run: |
+          required=(DATABASE_POOLED_URL DATABASE_DIRECT_URL SMTP_PASSWORD SOURCE_AUTH_PASSWORD
+                    ACME_EMAIL EMAIL_FROM SMTP_HOST SMTP_USERNAME BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET
+                    BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY BACKUP_AGE_RECIPIENT)
+          if [[ $PROVISIONING_ENABLED == true ]]; then
+            required+=(PROVISIONING_SSH_HOST PROVISIONING_SSH_HOST_KEY PROVISIONING_SSH_KEY)
+          fi
+          for name in "${required[@]}"; do
+            [[ -n ${!name} ]] || { echo "Missing secret or variable: $name" >&2; exit 1; }
+          done
+          # Npgsql takes key=value connection strings, not URIs.
+          # shellcheck disable=SC2034 # read through ${!name} below
+          DATABASE_CONNECTION=$(python3 deploy/npgsql.py "$DATABASE_POOLED_URL")
+          # shellcheck disable=SC2034
+          DATABASE_MIGRATION_CONNECTION=$(python3 deploy/npgsql.py "$DATABASE_DIRECT_URL")
+          names=(APP_HOST ACME_EMAIL PRIVATE_IP DATABASE_CONNECTION DATABASE_MIGRATION_CONNECTION
+                 DATABASE_DIRECT_URL EMAIL_FROM SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD
+                 SOURCE_AUTH_USER SOURCE_AUTH_PASSWORD PROVISIONING_ENABLED PROVISIONING_SSH_HOST
+                 PROVISIONING_SSH_HOST_KEY PROVISIONING_SSH_KEY OPERATOR_EMAIL BACKUP_S3_ENDPOINT
+                 BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY BACKUP_AGE_RECIPIENT
+                 BACKUP_PG_IMAGE)
+          # Single quotes: Compose reads the values literally ($ stays $).
+          # Sent over stdin, never on a command line.
+          for name in "${names[@]}"; do
+            value=${!name}
+            [[ $value != *"'"* ]] || { echo "$name must not contain a single quote" >&2; exit 1; }
+            printf "%s='%s'\n" "$name" "$value"
+          done | ssh node "umask 077 && cat > $REMOTE_ROOT/.env.new && mv $REMOTE_ROOT/.env.new $REMOTE_ROOT/.env"
+
+      - name: Upload the release bundle
+        env:
+          IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
+        run: |
+          bundle=$(mktemp -d)
+          cp deploy/compose.yaml deploy/deploy.sh deploy/backup.sh deploy/caddy/Caddyfile "$bundle/"
+          printf 'DASHBOARD_IMAGE_TAG=%s\n' "$IMAGE_TAG" > "$bundle/release.env"
+          tar -C "$bundle" -cz . |
+            ssh node "rm -rf $REMOTE_ROOT/incoming && install -d -m 0750 $REMOTE_ROOT/incoming && tar -xz -C $REMOTE_ROOT/incoming"
+
+      - name: Activate
+        env:
+          SHA: ${{ steps.release.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Short-lived registry login: the job token expires when the job ends.
+          echo "$GH_TOKEN" | ssh node "docker login ghcr.io -u '${{ github.actor }}' --password-stdin" >/dev/null
+          status=0
+          ssh node "bash $REMOTE_ROOT/incoming/deploy.sh activate $REMOTE_ROOT/incoming $SHA" || status=$?
+          ssh node "docker logout ghcr.io" >/dev/null || true
+          exit "$status"
+
+      - name: Check the public endpoints
+        run: |
+          # The first deploy may wait for Let's Encrypt; retry for ~2 minutes.
+          check() {
+            local url=$1 expected=$2 code
+            for _ in $(seq 1 24); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$url" || true)
+              [[ $code == "$expected" ]] && { echo "ok   $url -> $code"; return 0; }
+              sleep 5
+            done
+            echo "FAIL $url -> $code (expected $expected)" >&2
+            return 1
+          }
+          check "https://$APP_HOST/health" 200
+          check "https://$APP_HOST/" 200
+          check "https://$APP_HOST/internal/icecast/source-auth" 404
+          check "http://$APP_HOST/" 308
+
+      - name: Close SSH for this runner
+        if: always()
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: deploy/ci-ssh-access.sh close "$GITHUB_RUN_ID"
+
+      # Never leave the deploy key or a registry login behind.
+      - name: Remove credentials from the runner
+        if: always()
+        run: |
+          rm -f ~/.ssh/id_ed25519 ~/.ssh/config
+          docker logout ghcr.io >/dev/null 2>&1 || true
+
+      - name: Summary
+        if: always()
+        env:
+          SHA: ${{ steps.release.outputs.sha }}
+          IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
+        run: |
+          {
+            echo "## Deploy"
+            echo "- Commit: \`$SHA\`"
+            echo "- Images: \`ghcr.io/tropicast/dashboard:$IMAGE_TAG\`, \`dashboard-migrations:$IMAGE_TAG\`"
+            echo "- Node: \`$DEPLOY_HOST\` (https://$APP_HOST)"
+          } >> "$GITHUB_STEP_SUMMARY"

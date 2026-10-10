@@ -11,3 +11,12 @@ artifacts/
 
 # Local knowledge graph (graphify).
 graphify-out/
+
+# Terraform and Ansible local files.
+infra/terraform/.terraform/
+infra/terraform/terraform.tfvars
+infra/terraform/backend.hcl
+infra/terraform/tfplan
+infra/terraform/*.tfstate*
+infra/ansible/inventory.ini
+infra/ansible/group_vars/*.yml

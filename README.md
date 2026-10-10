@@ -236,6 +236,25 @@ tests plus the stale-client check, web format/lint/test/build, and a Docker
 image build with a `/health` and SPA smoke test. Pull request runs are
 cancelled when superseded; runs on `main` always finish.
 
+## Production
+
+One Hetzner CX23 (`tc-app-1`) runs the API and Caddy for
+`app.tropicastradio.com`. It shares a private network with the streaming
+node, which calls source auth over it. The database is Neon PostgreSQL, with
+nightly encrypted dumps to object storage, a daily backup check, and a monthly
+restore test run offline.
+
+| Path | What |
+|---|---|
+| `infra/terraform` | server, firewall, primary IPs, private network, Cloudflare DNS |
+| `infra/ansible` | hardening, Docker, deploy user, backup timer |
+| `deploy/` | production Compose file, Caddyfile, `deploy.sh`, `backup.sh`, `restore-test.sh` |
+| `.github/workflows/image.yml` | images `ghcr.io/tropicast/dashboard{,-migrations}:sha-<commit>` for each commit on `main` |
+| `.github/workflows/deploy.yml` | manual deploy: migrate, swap, health check, automatic return to the running release |
+
+Setup, deploy, rollback, restore and secret rotation:
+[docs/runbook.md](docs/runbook.md).
+
 ## License
 
 Copyright 2026 Tropicast. Licensed under the [Apache License, Version 2.0](LICENSE);
