@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore: ['**.md', LICENSE, NOTICE]
+    paths-ignore: ["**.md", LICENSE, NOTICE]
   pull_request:
-    paths-ignore: ['**.md', LICENSE, NOTICE]
+    paths-ignore: ["**.md", LICENSE, NOTICE]
   workflow_dispatch:
 
 permissions:
@@ -113,6 +113,9 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - run: npm run test:e2e:install
+      - run: npm run test:e2e
+      - run: npm run test:lighthouse
 
   image:
     name: Image build and smoke test

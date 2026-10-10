@@ -22,6 +22,15 @@ internal sealed class AuthRateLimitOptions
     public TimeSpan Window { get; set; } = TimeSpan.FromMinutes(1);
 }
 
+/// <summary>Cookie security settings (<c>Auth</c> section).</summary>
+internal sealed class AuthCookieOptions
+{
+    public bool UseSecureCookies { get; set; } = true;
+    public string SessionCookieName => UseSecureCookies ? AuthSetup.SessionCookie : "tropicast";
+    public string AntiforgeryCookieName => UseSecureCookies ? "__Host-tropicast-af" : "tropicast-af";
+    public CookieSecurePolicy SecurePolicy => UseSecureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+}
+
 internal static class AuthSetup
 {
     /// <summary>The SPA's session cookie: HttpOnly, Secure, SameSite=Strict, host-only.</summary>
@@ -36,6 +45,8 @@ internal static class AuthSetup
     {
         services.Configure<AppOptions>(configuration.GetSection("App"));
         services.Configure<AuthRateLimitOptions>(configuration.GetSection("RateLimits:Auth"));
+        services.Configure<AuthCookieOptions>(configuration.GetSection("Auth"));
+        var cookieOptions = configuration.GetSection("Auth").Get<AuthCookieOptions>() ?? new();
 
         // Cookies, bearer and refresh tokens are protected with these keys: keep them across container restarts.
         // DataProtection:KeysDirectory is a volume in production (deploy/compose.yaml); in the database later (#16).
@@ -78,9 +89,9 @@ internal static class AuthSetup
 
         services.ConfigureApplicationCookie(options =>
         {
-            options.Cookie.Name = SessionCookie;
+            options.Cookie.Name = cookieOptions.SessionCookieName;
             options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.SecurePolicy = cookieOptions.SecurePolicy;
             options.Cookie.SameSite = SameSiteMode.Strict;
             options.ExpireTimeSpan = TimeSpan.FromDays(14);
             options.SlidingExpiration = true;
@@ -92,8 +103,8 @@ internal static class AuthSetup
         services.AddAntiforgery(options =>
         {
             options.HeaderName = AntiforgeryHeader;
-            options.Cookie.Name = "__Host-tropicast-af";
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.Name = cookieOptions.AntiforgeryCookieName;
+            options.Cookie.SecurePolicy = cookieOptions.SecurePolicy;
             options.Cookie.SameSite = SameSiteMode.Strict;
         });
 
@@ -140,7 +151,8 @@ internal static class AuthSetup
     private static async Task ValidateAntiforgeryForSessionsAsync(HttpContext context, RequestDelegate next)
     {
         var method = context.Request.Method;
-        if (context.Request.Path.StartsWithSegments("/api") && context.Request.Cookies.ContainsKey(SessionCookie)
+        var sessionCookie = context.RequestServices.GetRequiredService<IOptions<AuthCookieOptions>>().Value.SessionCookieName;
+        if (context.Request.Path.StartsWithSegments("/api") && context.Request.Cookies.ContainsKey(sessionCookie)
             && !IsBearer(context.Request)
             && !(HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method) || HttpMethods.IsTrace(method)))
         {

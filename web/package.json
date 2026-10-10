@@ -10,15 +10,29 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:real": "REAL_E2E=1 playwright test e2e/real-compose.spec.ts",
+    "test:e2e:install": "playwright install chromium",
+    "test:lighthouse": "lhci autorun",
     "generate:api": "openapi-typescript openapi/openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@tanstack/react-query": "^5.87.4",
+    "i18next": "^25.5.2",
     "openapi-fetch": "^0.17.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-hook-form": "^7.62.0",
+    "react-i18next": "^15.7.3",
+    "react-router-dom": "^7.8.2",
+    "recharts": "^3.1.2",
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.64.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.3",
