@@ -23,13 +23,15 @@ variable "image" {
 }
 
 variable "ssh_public_keys" {
-  description = "Admin SSH public keys, keyed by name."
+  description = "Admin SSH public keys to register, keyed by name. Hetzner refuses a key already registered in the project: list those in existing_ssh_key_names instead."
   type        = map(string)
+  default     = {}
+}
 
-  validation {
-    condition     = length(var.ssh_public_keys) > 0
-    error_message = "Provide at least one SSH public key."
-  }
+variable "existing_ssh_key_names" {
+  description = "Names of admin SSH keys already registered in the Hetzner project, e.g. by tc-streaming (\"tc-stream-1-admin\")."
+  type        = list(string)
+  default     = []
 }
 
 variable "admin_cidrs" {

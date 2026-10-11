@@ -13,6 +13,19 @@ resource "hcloud_ssh_key" "admin" {
   labels     = local.labels
 }
 
+# Keys another stack already registered (Hetzner keys are unique per project).
+data "hcloud_ssh_key" "existing" {
+  for_each = toset(var.existing_ssh_key_names)
+  name     = each.key
+}
+
+locals {
+  admin_ssh_key_ids = concat(
+    [for key in hcloud_ssh_key.admin : key.id],
+    [for key in data.hcloud_ssh_key.existing : key.id],
+  )
+}
+
 # Primary IPs outlive the server, so a rebuilt node keeps its addresses and
 # DNS does not change.
 resource "hcloud_primary_ip" "ipv4" {
@@ -101,7 +114,7 @@ resource "hcloud_server" "app" {
   server_type        = var.server_type
   image              = var.image
   location           = var.location
-  ssh_keys           = [for key in hcloud_ssh_key.admin : key.id]
+  ssh_keys           = local.admin_ssh_key_ids
   firewall_ids       = [hcloud_firewall.app.id]
   delete_protection  = true
   rebuild_protection = true
@@ -124,6 +137,11 @@ resource "hcloud_server" "app" {
   # image or bootstrap file changes.
   lifecycle {
     ignore_changes = [image, user_data, ssh_keys]
+
+    precondition {
+      condition     = length(local.admin_ssh_key_ids) > 0
+      error_message = "Set ssh_public_keys or existing_ssh_key_names: the node needs at least one admin SSH key."
+    }
   }
 
   depends_on = [hcloud_network_subnet.private]
