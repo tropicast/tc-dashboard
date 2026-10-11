@@ -92,7 +92,7 @@ public static class StationLimitsDocument
     /// refuses would fail the whole apply.
     /// </summary>
     private static string? Url(Uri? url)
-        => url is { Scheme: "http" or "https" } && url.AbsoluteUri.Length <= 512 && !url.AbsoluteUri.Any(char.IsWhiteSpace)
+        => url is { Scheme: "http" or "https", UserInfo.Length: 0 } && url.AbsoluteUri.Length <= 512 && !url.AbsoluteUri.Any(char.IsWhiteSpace)
             ? url.AbsoluteUri
             : null;
 

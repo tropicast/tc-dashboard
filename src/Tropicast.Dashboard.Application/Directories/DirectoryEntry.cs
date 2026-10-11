@@ -43,8 +43,8 @@ public sealed record DirectoryEntry(bool Listed, string Name, string? Descriptio
             station.Name,
             Trim(station.Description, 512),
             Tags(station.Genre),
-            station.Website ?? publicPage,
-            station.LogoUrl is { Scheme: "https" or "http" } logo ? logo : null,
+            Public(station.Website) ?? publicPage,
+            Public(station.LogoUrl),
             station.Country is { Length: 2 } country && country.All(char.IsAsciiLetter) ? country.ToUpperInvariant() : null,
             language is not null && Iso6391.Contains(language) ? language : null,
             streamUrl);
@@ -61,6 +61,9 @@ public sealed record DirectoryEntry(bool Listed, string Name, string? Descriptio
         tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo xh yi yo za zh zu
         """.Split((char[])[' ', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries),
     ];
+
+    /// <summary>An http(s) address safe to publish: never one carrying a user name or password.</summary>
+    private static Uri? Public(Uri? url) => url is { IsAbsoluteUri: true, Scheme: "https" or "http", UserInfo.Length: 0 } ? url : null;
 
     private static string? Trim(string text, int max)
     {
@@ -85,6 +88,9 @@ public interface IRadioDirectory
 {
     /// <summary>Adds the station and returns its directory ID. Throws <see cref="DirectoryException"/> when refused or unreachable.</summary>
     Task<string> AddAsync(DirectoryEntry entry, CancellationToken cancellationToken = default);
+
+    /// <summary>The ID of an existing entry with this stream URL, or null. Throws <see cref="DirectoryException"/> when unreachable.</summary>
+    Task<string?> FindAsync(Uri streamUrl, CancellationToken cancellationToken = default);
 }
 
 /// <summary>A failed directory call; the message is safe to show to the station owner.</summary>

@@ -1,5 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tropicast.Dashboard.Application.Directories;
@@ -8,23 +8,20 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 namespace Tropicast.Dashboard.Infrastructure.Directories;
 
 /// <summary>
-/// Adds opted-in stations to RadioBrowser once they are live, once each. Never throws: failures are recorded on
-/// <see cref="DirectoryListing"/> and retried with backoff; nothing else waits for it.
+/// Adds opted-in stations to RadioBrowser once they are live, once each. RadioBrowser has no idempotent add, so:
+/// before adding, look the stream URL up there (an earlier add whose result was lost is adopted, not repeated);
+/// record the attempt durably before calling (and wait a while after an unconfirmed one); record the result right
+/// after. Never throws for one station: failures are recorded on <see cref="DirectoryListing"/> and retried with
+/// backoff; nothing else waits for it.
 /// </summary>
 internal sealed partial class DirectoryPublisher(AppDbContext db, IRadioDirectory directory, IOptions<DirectoryOptions> options,
     TimeProvider time, ILogger<DirectoryPublisher> logger)
 {
-    private const long LockKey = 0x54_43_44_49_52; // "TCDIR"
+    /// <summary>Time for a new entry to replicate to every RadioBrowser server before its URL is looked up.</summary>
+    internal static readonly TimeSpan ConfirmationWindow = TimeSpan.FromMinutes(10);
 
     public async Task PublishAsync(CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var locked = await db.Database.SqlQuery<bool>($"SELECT pg_try_advisory_xact_lock({LockKey}) AS \"Value\"").SingleAsync(cancellationToken);
-        if (!locked)
-        {
-            return;
-        }
-        var now = time.GetUtcNow();
         // Opted in, not deleted, live now, not added yet.
         var live = db.LiveSessions.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(l => l.EndedAt == null);
         var candidates = await db.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter])
@@ -38,43 +35,71 @@ internal sealed partial class DirectoryPublisher(AppDbContext db, IRadioDirector
             return;
         }
         var entries = await DirectoryEntries.ForAsync(db, options.Value, candidates, cancellationToken);
-        var listings = await db.DirectoryListings.Where(l => candidates.Contains(l.StationId)).ToDictionaryAsync(l => l.StationId, cancellationToken);
         foreach (var (stationId, entry) in entries.Where(e => e.Value.Listed))
         {
-            if (!listings.TryGetValue(stationId, out var listing))
-            {
-                listing = DirectoryListing.For(stationId);
-                db.DirectoryListings.Add(listing);
-            }
-            if (entry.Problem is { } problem)
-            {
-                listing.Blocked(problem);
-                continue;
-            }
-            if (!listing.Due(now))
-            {
-                continue;
-            }
             try
             {
-                var uuid = await directory.AddAsync(entry, cancellationToken);
-                listing.Added(uuid, time.GetUtcNow());
-                LogAdded(logger, stationId, uuid);
+                await PublishAsync(stationId, entry, cancellationToken);
             }
-            catch (DirectoryException ex)
+            catch (DbUpdateException)
             {
-                listing.Failed(ex.Message, time.GetUtcNow(), options.Value.RetryDelay, options.Value.MaxRetryDelay);
-                LogFailed(logger, stationId, listing.FailedAttempts);
+                // Another instance changed the same listing (row version or new row): it handles this station.
             }
-            // Keep each result even if a later station's call is cancelled.
+            finally
+            {
+                db.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    private async Task PublishAsync(Guid stationId, DirectoryEntry entry, CancellationToken cancellationToken)
+    {
+        var listing = await db.DirectoryListings.SingleOrDefaultAsync(l => l.StationId == stationId, cancellationToken);
+        if (listing is null)
+        {
+            listing = DirectoryListing.For(stationId);
+            db.DirectoryListings.Add(listing);
+        }
+        var now = time.GetUtcNow();
+        if (entry.Problem is { } problem)
+        {
+            listing.Blocked(problem);
             await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+        if (!listing.Due(now) || listing.AwaitingConfirmation(now, ConfirmationWindow))
+        {
+            return;
+        }
+        try
+        {
+            if (await directory.FindAsync(entry.StreamUrl, cancellationToken) is { } existing)
+            {
+                listing.Added(existing, time.GetUtcNow());
+                await db.SaveChangesAsync(cancellationToken);
+                LogAdopted(logger, stationId, existing);
+                return;
+            }
+            // Durable before the call: if the result is lost, the next pass looks the URL up instead of adding again.
+            listing.Requested(now);
+            await db.SaveChangesAsync(cancellationToken);
+            var uuid = await directory.AddAsync(entry, cancellationToken);
+            listing.Added(uuid, time.GetUtcNow());
+            LogAdded(logger, stationId, uuid);
+        }
+        catch (DirectoryException ex)
+        {
+            listing.Failed(ex.Message, time.GetUtcNow(), options.Value.RetryDelay, options.Value.MaxRetryDelay);
+            LogFailed(logger, stationId, listing.FailedAttempts);
         }
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Station {StationId} added to RadioBrowser as {Uuid}")]
     private static partial void LogAdded(ILogger logger, Guid stationId, string uuid);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Station {StationId} already on RadioBrowser as {Uuid}; recorded")]
+    private static partial void LogAdopted(ILogger logger, Guid stationId, string uuid);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Adding station {StationId} to RadioBrowser failed, attempt {Attempts}; will retry")]
     private static partial void LogFailed(ILogger logger, Guid stationId, int attempts);

@@ -18,6 +18,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     station_id = table.Column<Guid>(type: "uuid", nullable: false),
                     radio_browser_uuid = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     listed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    add_requested_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     last_attempt_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     failed_attempts = table.Column<int>(type: "integer", nullable: false),
                     next_attempt_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),

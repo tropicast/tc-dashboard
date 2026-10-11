@@ -15,6 +15,11 @@ public sealed class DirectoryListing
     /// <summary>RadioBrowser station UUID once added.</summary>
     public string? RadioBrowserUuid { get; private set; }
     public DateTimeOffset? ListedAt { get; private set; }
+    /// <summary>
+    /// When an add was last sent. Committed before the call, so an add whose result was lost (crash, failed save)
+    /// is found on RadioBrowser by its stream URL instead of being sent again.
+    /// </summary>
+    public DateTimeOffset? AddRequestedAt { get; private set; }
     public DateTimeOffset? LastAttemptAt { get; private set; }
     public int FailedAttempts { get; private set; }
     public DateTimeOffset? NextAttemptAt { get; private set; }
@@ -26,6 +31,15 @@ public sealed class DirectoryListing
     internal static DirectoryListing For(Guid stationId) => new() { StationId = stationId };
 
     internal bool Due(DateTimeOffset now) => NextAttemptAt is null || now >= NextAttemptAt;
+
+    /// <summary>
+    /// An add was sent and neither its result nor a failure was recorded: wait, so a new entry has time to reach
+    /// every RadioBrowser server before the stream URL is looked up there.
+    /// </summary>
+    internal bool AwaitingConfirmation(DateTimeOffset now, TimeSpan window)
+        => RadioBrowserUuid is null && FailedAttempts == 0 && AddRequestedAt is { } sent && now - sent < window;
+
+    internal void Requested(DateTimeOffset now) => AddRequestedAt = now;
 
     internal void Added(string uuid, DateTimeOffset now)
     {

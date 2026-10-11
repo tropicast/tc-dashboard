@@ -174,4 +174,46 @@ public sealed class DirectoryTests(DashboardFactory factory) : IClassFixture<Das
         await PublishAsync();
         Assert.Equal(1, AddedFor(station));
     }
+
+    [Fact]
+    public async Task An_add_whose_result_was_lost_is_found_on_radiobrowser_not_repeated()
+    {
+        var (owner, _, station) = await StationAsync();
+        await GoLiveAsync(station.Id);
+        // An add was sent, but its result never reached the database (crash or failed save); RadioBrowser has the entry.
+        var existing = Guid.NewGuid().ToString();
+        factory.Directory.Has(station.ListenerUrls.Mp3, existing);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.ExecuteSqlAsync(
+                $"INSERT INTO directory_listings (station_id, failed_attempts, add_requested_at) VALUES ({station.Id}, 0, {DateTimeOffset.UtcNow})", Token);
+        }
+
+        // Within the confirmation window: nothing is sent.
+        await PublishAsync();
+        Assert.Equal(DirectoryState.WaitingForLive, (await StatusAsync(owner, station.Id)).State);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.DirectoryListings.Where(l => l.StationId == station.Id).ExecuteUpdateAsync(
+                set => set.SetProperty(l => l.AddRequestedAt, DateTimeOffset.UtcNow - DirectoryPublisher.ConfirmationWindow), Token);
+        }
+        await PublishAsync();
+
+        Assert.Equal(0, AddedFor(station));
+        var status = await StatusAsync(owner, station.Id);
+        Assert.Equal((DirectoryState.Listed, existing), (status.State, status.RadioBrowserUuid));
+    }
+
+    [Fact]
+    public async Task Station_addresses_with_credentials_are_refused()
+    {
+        var owner = new Browser(factory);
+        await owner.SignUpAndLoginAsync(Browser.Unique("owner"));
+        await owner.CreateTenantAsync();
+        (await owner.SendAsync(HttpMethod.Post, "/api/v1/stations",
+            new { name = "Radio", slug = "radio", website = "https://admin:secret@radiomada.example/" })).Status(HttpStatusCode.BadRequest);
+    }
 }

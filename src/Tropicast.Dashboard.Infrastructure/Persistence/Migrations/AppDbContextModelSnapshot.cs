@@ -819,6 +819,10 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("station_id");
 
+                    b.Property<DateTimeOffset?>("AddRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("add_requested_at");
+
                     b.Property<int>("FailedAttempts")
                         .HasColumnType("integer")
                         .HasColumnName("failed_attempts");

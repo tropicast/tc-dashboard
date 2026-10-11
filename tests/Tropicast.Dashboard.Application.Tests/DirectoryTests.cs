@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Tropicast.Dashboard.Application.Directories;
 using Tropicast.Dashboard.Application.Provisioning;
 using Tropicast.Dashboard.Domain.Plans;
@@ -88,4 +89,29 @@ public sealed class DirectoryTests
         Assert.False(directory.TryGetProperty("homepage", out _));
         Assert.False(directory.TryGetProperty("country_code", out _));
     }
+
+    [Fact]
+    public void Addresses_with_a_user_name_or_password_are_never_published()
+    {
+        var station = Domain.Stations.Station.Create(Guid.NewGuid(), "Radio Mada", "radio-mada", Now);
+        station.Describe(null, null, "MG", null, new Uri("https://user:secret@cdn.example.test/logo.png"),
+            new Uri("https://admin:secret@radiomada.example/"), Now);
+        station.SetDirectoryListing(true, Plan.Starter, Now);
+
+        var entry = DirectoryEntry.For(station, Plan.Starter, false, Stream, Page)!;
+
+        Assert.Equal(Page, entry.Homepage);
+        Assert.Null(entry.Logo);
+        var json = StationLimitsDocument.Render([new StationLimits("aaa", Plan.Starter, entry)], 100).Json;
+        Assert.DoesNotContain("secret", json, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://radiomada.example/", true)]
+    [InlineData("https://admin:secret@radiomada.example/", false)]
+    [InlineData("ftp://radiomada.example/", false)]
+    public void Station_addresses_must_be_public_web_addresses(string url, bool valid)
+        => Assert.Equal(valid, new Microsoft.Extensions.DependencyInjection.ServiceCollection().AddApplication().BuildServiceProvider()
+            .GetRequiredService<FluentValidation.IValidator<Stations.CreateStationCommand>>()
+            .Validate(new Stations.CreateStationCommand("Radio", "radio", Website: new Uri(url))).IsValid);
 }

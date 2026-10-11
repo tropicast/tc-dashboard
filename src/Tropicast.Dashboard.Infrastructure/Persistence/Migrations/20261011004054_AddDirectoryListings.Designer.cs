@@ -12,7 +12,7 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261011001807_AddDirectoryListings")]
+    [Migration("20261011004054_AddDirectoryListings")]
     partial class AddDirectoryListings
     {
         /// <inheritdoc />
@@ -821,6 +821,10 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("StationId")
                         .HasColumnType("uuid")
                         .HasColumnName("station_id");
+
+                    b.Property<DateTimeOffset?>("AddRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("add_requested_at");
 
                     b.Property<int>("FailedAttempts")
                         .HasColumnType("integer")

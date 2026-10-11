@@ -28,7 +28,9 @@ internal static class StationRules
     internal static bool IsLanguage(string? value)
         => value is { Length: <= 35 } && System.Text.RegularExpressions.Regex.IsMatch(value, "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$");
 
-    internal static bool IsWebAddress(Uri? value) => value is { IsAbsoluteUri: true } && value.Scheme is "https" or "http";
+    /// <summary>Absolute http(s), without a user name or password: these addresses are public.</summary>
+    internal static bool IsWebAddress(Uri? value)
+        => value is { IsAbsoluteUri: true } && value.Scheme is "https" or "http" && value.UserInfo.Length == 0;
 }
 
 internal sealed class CreateStationValidator : AbstractValidator<CreateStationCommand>
@@ -41,8 +43,8 @@ internal sealed class CreateStationValidator : AbstractValidator<CreateStationCo
         RuleFor(c => c.Genre).MaximumLength(64);
         RuleFor(c => c.Country).Must(StationRules.IsCountry).WithMessage("Use a two-letter country code, e.g. MG.").When(c => !string.IsNullOrEmpty(c.Country));
         RuleFor(c => c.Language).Must(StationRules.IsLanguage).WithMessage("Use a language tag, e.g. mg or fr.").When(c => !string.IsNullOrEmpty(c.Language));
-        RuleFor(c => c.LogoUrl).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address.").When(c => c.LogoUrl is not null);
-        RuleFor(c => c.Website).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address.").When(c => c.Website is not null);
+        RuleFor(c => c.LogoUrl).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address without a user name or password.").When(c => c.LogoUrl is not null);
+        RuleFor(c => c.Website).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address without a user name or password.").When(c => c.Website is not null);
     }
 }
 
@@ -56,7 +58,7 @@ internal sealed class UpdateStationValidator : AbstractValidator<UpdateStationCo
         RuleFor(c => c.Genre).MaximumLength(64);
         RuleFor(c => c.Country).Must(StationRules.IsCountry).WithMessage("Use a two-letter country code, e.g. MG.").When(c => !string.IsNullOrEmpty(c.Country));
         RuleFor(c => c.Language).Must(StationRules.IsLanguage).WithMessage("Use a language tag, e.g. mg or fr.").When(c => !string.IsNullOrEmpty(c.Language));
-        RuleFor(c => c.LogoUrl).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address.").When(c => c.LogoUrl is not null);
-        RuleFor(c => c.Website).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address.").When(c => c.Website is not null);
+        RuleFor(c => c.LogoUrl).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address without a user name or password.").When(c => c.LogoUrl is not null);
+        RuleFor(c => c.Website).Must(StationRules.IsWebAddress).WithMessage("Use an absolute http(s) address without a user name or password.").When(c => c.Website is not null);
     }
 }

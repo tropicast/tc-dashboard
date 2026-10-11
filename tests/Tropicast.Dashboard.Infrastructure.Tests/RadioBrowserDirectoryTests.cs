@@ -78,4 +78,32 @@ public sealed class RadioBrowserDirectoryTests
         Assert.Contains("unreachable", outage.Message, StringComparison.Ordinal);
         Assert.Equal(2, down.Requests.Count);
     }
+
+    [Fact]
+    public async Task An_unreadable_answer_moves_on_and_ends_as_a_directory_failure()
+    {
+        var handler = new Handler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html>maintenance</html>") });
+        using var directory = Directory(handler, "https://a.radio-browser.info", "https://b.radio-browser.info");
+
+        var error = await Assert.ThrowsAsync<DirectoryException>(() => directory.AddAsync(Entry, Token));
+        Assert.Contains("unexpectedly", error.Message, StringComparison.Ordinal);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Finds_an_existing_entry_by_its_exact_stream_url()
+    {
+        var uuid = Guid.NewGuid().ToString();
+        var handler = new Handler(_ => Json(HttpStatusCode.OK, $$"""
+            [{"stationuuid":"{{Guid.NewGuid()}}","url":"https://listen.tropicastradio.com/stations/k3m9x2p7qa/live.mp3?x=1"},
+             {"stationuuid":"{{uuid}}","url":"https://listen.tropicastradio.com/stations/k3m9x2p7qa/live.mp3"}]
+            """));
+        using var directory = Directory(handler, "https://de1.api.radio-browser.info");
+
+        Assert.Equal(uuid, await directory.FindAsync(Entry.StreamUrl, Token));
+        Assert.Equal("https://de1.api.radio-browser.info/json/stations/byurl", handler.Requests[0].Url.AbsoluteUri);
+
+        using var empty = Directory(new Handler(_ => Json(HttpStatusCode.OK, "[]")), "https://de1.api.radio-browser.info");
+        Assert.Null(await empty.FindAsync(Entry.StreamUrl, Token));
+    }
 }

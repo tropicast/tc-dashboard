@@ -38,42 +38,54 @@ internal sealed class RadioBrowserDirectory : IRadioDirectory, IDisposable
         Add(fields, "languagecodes", entry.LanguageCodes);
         Add(fields, "tags", entry.Genre);
 
+        var result = await PostAsync<AddResult>("/json/add", fields, cancellationToken);
+        if (result is { Ok: true, Uuid: { Length: > 0 } uuid } && Guid.TryParse(uuid, out _))
+        {
+            return uuid;
+        }
+        // Never show server text beyond a short message.
+        var message = result?.Message is { Length: > 0 } text ? text[..Math.Min(text.Length, 200)] : "no station ID in the answer";
+        throw new DirectoryException($"RadioBrowser refused the station: {message}");
+    }
+
+    public async Task<string?> FindAsync(Uri streamUrl, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(streamUrl);
+        var stations = await PostAsync<List<FoundStation>>("/json/stations/byurl",
+            new Dictionary<string, string> { ["url"] = streamUrl.AbsoluteUri }, cancellationToken);
+        return stations?.FirstOrDefault(s => s.Url == streamUrl.AbsoluteUri && Guid.TryParse(s.StationUuid, out _))?.StationUuid;
+    }
+
+    /// <summary>
+    /// Posts a form to the servers in turn: a network error, a 5xx or an unreadable answer moves to the next server;
+    /// any other answer is returned (null for a 4xx).
+    /// </summary>
+    private async Task<T?> PostAsync<T>(string path, Dictionary<string, string> fields, CancellationToken cancellationToken) where T : class
+    {
         var servers = await ServersAsync(cancellationToken);
         if (servers.Count == 0)
         {
-            throw new DirectoryException("No RadioBrowser server found.");
+            throw new DirectoryException("No RadioBrowser server found. The listing is retried later.");
         }
         foreach (var server in servers)
         {
-            HttpResponseMessage response;
             try
             {
                 using var content = new FormUrlEncodedContent(fields);
-                response = await _http.PostAsync(new Uri(server, "/json/add"), content, cancellationToken);
-            }
-            catch (Exception ex) when (ex is HttpRequestException || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
-            {
-                continue; // Next server.
-            }
-            using (response)
-            {
+                using var response = await _http.PostAsync(new Uri(server, path), content, cancellationToken);
                 if (response.StatusCode >= HttpStatusCode.InternalServerError)
                 {
                     continue;
                 }
-                var result = response.IsSuccessStatusCode
-                    ? await response.Content.ReadFromJsonAsync<AddResult>(cancellationToken)
-                    : null;
-                if (result is { Ok: true, Uuid: { Length: > 0 } uuid } && Guid.TryParse(uuid, out _))
-                {
-                    return uuid;
-                }
-                // Never show server text verbatim beyond a short message.
-                var message = result?.Message is { Length: > 0 } text ? text[..Math.Min(text.Length, 200)] : $"HTTP {(int)response.StatusCode}";
-                throw new DirectoryException($"RadioBrowser refused the station: {message}");
+                return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<T>(cancellationToken) : null;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or NotSupportedException
+                || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+            {
+                // Unreachable, or an answer that is not the expected JSON: try the next server.
             }
         }
-        throw new DirectoryException("RadioBrowser is unreachable. The listing is retried later.");
+        throw new DirectoryException("RadioBrowser is unreachable or answered unexpectedly. The listing is retried later.");
     }
 
     /// <summary>Configured servers, else the reverse DNS names of <c>all.api.radio-browser.info</c>, shuffled.</summary>
@@ -127,6 +139,9 @@ internal sealed class RadioBrowserDirectory : IRadioDirectory, IDisposable
     }
 
     public void Dispose() => _http.Dispose();
+
+    private sealed record FoundStation([property: JsonPropertyName("stationuuid")] string? StationUuid,
+        [property: JsonPropertyName("url")] string? Url);
 
     private sealed record AddResult([property: JsonPropertyName("ok")] bool Ok, [property: JsonPropertyName("message")] string? Message,
         [property: JsonPropertyName("uuid")] string? Uuid);

@@ -143,8 +143,20 @@ public sealed class FakeRadioDirectory : Tropicast.Dashboard.Application.Directo
             throw new Tropicast.Dashboard.Application.Directories.DirectoryException("RadioBrowser is unreachable. The listing is retried later.");
         }
         _added.Enqueue(entry);
-        return Task.FromResult(Guid.NewGuid().ToString());
+        var uuid = Guid.NewGuid().ToString();
+        _entries[entry.StreamUrl] = uuid;
+        return Task.FromResult(uuid);
     }
+
+    private readonly ConcurrentDictionary<Uri, string> _entries = new();
+
+    /// <summary>Entries RadioBrowser already has, by stream URL (including ones added outside a test's view).</summary>
+    public void Has(Uri streamUrl, string uuid) => _entries[streamUrl] = uuid;
+
+    public Task<string?> FindAsync(Uri streamUrl, CancellationToken cancellationToken = default)
+        => Fail
+            ? throw new Tropicast.Dashboard.Application.Directories.DirectoryException("RadioBrowser is unreachable. The listing is retried later.")
+            : Task.FromResult(_entries.GetValueOrDefault(streamUrl));
 }
 
 /// <summary>Returns the sample a test sets, as the node's exporter would.</summary>
