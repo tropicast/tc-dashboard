@@ -66,6 +66,9 @@ public sealed class SourceAuthTests(DashboardFactory factory) : IClassFixture<Da
             .Content.ReadFromJsonAsync<StationResponse>(Browser.Json, Token))!;
         var issued = (await (await owner.SendAsync(HttpMethod.Post, $"/api/v1/stations/{station.Id}/credentials", new { deviceLabel = "Studio PC" }))
             .Content.ReadFromJsonAsync<IssuedCredentialResponse>(Browser.Json, Token))!;
+        Assert.Equal(station.PublicId, issued.Username);
+        Assert.Equal($"/stations/{station.PublicId}/live.mp3", issued.IngestUrl.AbsolutePath);
+        Assert.Equal(Uri.UriSchemeHttps, issued.IngestUrl.Scheme);
         return (owner, station, issued.Secret, issued.Credential.Id);
     }
 
