@@ -92,7 +92,7 @@ Secrets and variables → Actions**). Never commit them.
 Optional variables: `APP_HOST` (default `app.tropicastradio.com`),
 `DEPLOY_SERVER` (`tc-app-1`), `PRIVATE_IP` (`10.20.1.10`), `SMTP_PORT`
 (`587`), `SOURCE_AUTH_USER` (`icecast`), `BACKUP_PG_IMAGE`
-(`postgres:17-alpine`: match Neon's major version).
+(`postgres:18-alpine`: match Neon's major version).
 
 Values must not contain a single quote (`'`): the workflow writes them quoted.
 

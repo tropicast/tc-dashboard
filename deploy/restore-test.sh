@@ -6,7 +6,7 @@
 # Environment:
 #   BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY
 #   BACKUP_AGE_KEY_FILE  age identity file (the private key; never on the node or in GitHub)
-#   BACKUP_PG_IMAGE      default postgres:17-alpine (the dump's major version or newer)
+#   BACKUP_PG_IMAGE      default postgres:18-alpine (the dump's major version or newer)
 #   BACKUP_NAME          a specific dump under db/; default: the newest
 #   KEEP=1               leave the database running on 127.0.0.1:${RESTORE_PORT:-55433}
 #   RESTORE_TARGET_URL   after the check, also restore into this empty database
@@ -15,7 +15,7 @@ set -euo pipefail
 
 : "${BACKUP_S3_ENDPOINT:?}" "${BACKUP_S3_BUCKET:?}" "${BACKUP_S3_ACCESS_KEY:?}" "${BACKUP_S3_SECRET_KEY:?}"
 : "${BACKUP_AGE_KEY_FILE:?}"
-pg_image=${BACKUP_PG_IMAGE:-postgres:17-alpine}
+pg_image=${BACKUP_PG_IMAGE:-postgres:18-alpine}
 rclone_image=rclone/rclone:1.71.1
 port=${RESTORE_PORT:-55433}
 container=tc-restore-test-$$
@@ -24,6 +24,7 @@ log() { printf '[restore] %s\n' "$*"; }
 
 export RCLONE_CONFIG_S3_TYPE=s3 RCLONE_CONFIG_S3_PROVIDER=Other RCLONE_CONFIG_S3_ENDPOINT=$BACKUP_S3_ENDPOINT
 export RCLONE_CONFIG_S3_ACCESS_KEY_ID=$BACKUP_S3_ACCESS_KEY RCLONE_CONFIG_S3_SECRET_ACCESS_KEY=$BACKUP_S3_SECRET_KEY
+export RCLONE_CONFIG_S3_NO_CHECK_BUCKET=true   # read-only key: never try to create the bucket
 work=$(mktemp -d "${RESTORE_WORK_DIR:-$PWD}/.restore.XXXXXX")
 cleanup() {
     rm -rf "$work"
@@ -33,7 +34,7 @@ trap cleanup EXIT
 
 rclone() {
     docker run --rm -e RCLONE_CONFIG_S3_TYPE -e RCLONE_CONFIG_S3_PROVIDER -e RCLONE_CONFIG_S3_ENDPOINT \
-        -e RCLONE_CONFIG_S3_ACCESS_KEY_ID -e RCLONE_CONFIG_S3_SECRET_ACCESS_KEY \
+        -e RCLONE_CONFIG_S3_ACCESS_KEY_ID -e RCLONE_CONFIG_S3_SECRET_ACCESS_KEY -e RCLONE_CONFIG_S3_NO_CHECK_BUCKET \
         -v "$work:/restore" "$rclone_image" "$@" 2> >(grep -v 'rclone.conf" not found' >&2)
 }
 

@@ -145,7 +145,7 @@ jobs:
           BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
           BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
           BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
-          BACKUP_PG_IMAGE: ${{ vars.BACKUP_PG_IMAGE || 'postgres:17-alpine' }}
+          BACKUP_PG_IMAGE: ${{ vars.BACKUP_PG_IMAGE || 'postgres:18-alpine' }}
         run: |
           required=(DATABASE_POOLED_URL DATABASE_DIRECT_URL SMTP_PASSWORD SOURCE_AUTH_PASSWORD
                     ACME_EMAIL EMAIL_FROM SMTP_HOST SMTP_USERNAME BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET
