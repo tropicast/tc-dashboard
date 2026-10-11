@@ -218,6 +218,47 @@
         }
       }
     },
+    "/api/v1/public/stations/{tenantSlug}/{stationSlug}": {
+      "get": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "A station's public information, live state and listener streams. Cacheable; no tenant data.",
+        "parameters": [
+          {
+            "name": "tenantSlug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stationSlug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/version": {
       "get": {
         "tags": [
@@ -2658,6 +2699,118 @@
           }
         }
       },
+      "PublicStationResponse": {
+        "required": [
+          "name",
+          "description",
+          "genre",
+          "country",
+          "language",
+          "logoUrl",
+          "website",
+          "live",
+          "streams",
+          "pageUrl",
+          "embedUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Station name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description."
+          },
+          "genre": {
+            "type": "string",
+            "description": "Genre."
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ISO 3166-1 alpha-2 code."
+          },
+          "language": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "BCP 47 language tag."
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Logo address.",
+            "format": "uri"
+          },
+          "website": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The station's website.",
+            "format": "uri"
+          },
+          "live": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "On air now; null when not known."
+          },
+          "streams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicStreamResponse"
+            },
+            "description": "Streams, Opus first (less data) when the plan includes it, then MP3 (plays everywhere)."
+          },
+          "pageUrl": {
+            "type": "string",
+            "description": "Public page.",
+            "format": "uri"
+          },
+          "embedUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Embeddable player, or null when the station's plan does not include embedding.",
+            "format": "uri"
+          }
+        },
+        "description": "What anyone may see about a station. No tenant, plan or listener data."
+      },
+      "PublicStreamResponse": {
+        "required": [
+          "format",
+          "contentType",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "format": {
+            "description": "Stream format.",
+            "$ref": "#/components/schemas/AudioFormat"
+          },
+          "contentType": {
+            "type": "string",
+            "description": "MIME type, for the player's format check."
+          },
+          "url": {
+            "type": "string",
+            "description": "HTTPS listener URL.",
+            "format": "uri"
+          }
+        },
+        "description": "A stream listeners can play. Audio goes from the listener host to the player, never through the API."
+      },
       "RefreshRequest": {
         "required": [
           "refreshToken"
@@ -3286,6 +3439,9 @@
     },
     {
       "name": "Operator"
+    },
+    {
+      "name": "Public"
     },
     {
       "name": "Tropicast.Dashboard.Api"

@@ -271,6 +271,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/stations/{tenantSlug}/{stationSlug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A station's public information, live state and listener streams. Cacheable; no tenant data. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tenantSlug: string;
+                    stationSlug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicStationResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/version": {
         parameters: {
             query?: never;
@@ -2409,6 +2455,55 @@ export interface components {
             status?: null | number | string;
             detail?: null | string;
             instance?: null | string;
+        };
+        /** @description What anyone may see about a station. No tenant, plan or listener data. */
+        PublicStationResponse: {
+            /** @description Station name. */
+            name: string;
+            /** @description Description. */
+            description: string;
+            /** @description Genre. */
+            genre: string;
+            /** @description ISO 3166-1 alpha-2 code. */
+            country: null | string;
+            /** @description BCP 47 language tag. */
+            language: null | string;
+            /**
+             * Format: uri
+             * @description Logo address.
+             */
+            logoUrl: null | string;
+            /**
+             * Format: uri
+             * @description The station's website.
+             */
+            website: null | string;
+            /** @description On air now; null when not known. */
+            live: null | boolean;
+            /** @description Streams, Opus first (less data) when the plan includes it, then MP3 (plays everywhere). */
+            streams: components["schemas"]["PublicStreamResponse"][];
+            /**
+             * Format: uri
+             * @description Public page.
+             */
+            pageUrl: string;
+            /**
+             * Format: uri
+             * @description Embeddable player, or null when the station's plan does not include embedding.
+             */
+            embedUrl: null | string;
+        };
+        /** @description A stream listeners can play. Audio goes from the listener host to the player, never through the API. */
+        PublicStreamResponse: {
+            /** @description Stream format. */
+            format: components["schemas"]["AudioFormat"];
+            /** @description MIME type, for the player's format check. */
+            contentType: string;
+            /**
+             * Format: uri
+             * @description HTTPS listener URL.
+             */
+            url: string;
         };
         RefreshRequest: {
             refreshToken: string;

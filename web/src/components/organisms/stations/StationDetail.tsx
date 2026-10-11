@@ -8,6 +8,7 @@ import type { components } from '../../../api/schema';
 import { CopyButton } from '../../atoms/CopyButton';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
+import { SharePanel } from './SharePanel';
 import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
 import type { Credential, Station, Status } from '../../../lib/types';
@@ -113,6 +114,7 @@ export function StationDetail() {
           {item.listenerUrls.opus && <CopyUrl label="Opus" value={item.listenerUrls.opus} />}
         </article>
       </div>
+      <SharePanel stationSlug={item.slug} />
       <article className="panel">
         <h2>Station settings</h2>
         <form className="form-grid" onSubmit={form.handleSubmit((value) => update.mutate(value))}>
