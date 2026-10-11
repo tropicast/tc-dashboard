@@ -64,16 +64,28 @@ export async function publish(options: PublishOptions): Promise<Source> {
       `Content-Type: ${options.contentType}\r\nIce-Public: 0\r\nExpect: 100-continue\r\n${bitrate}\r\n`,
   );
   const status = await new Promise<string>((resolve) => {
-    const timer = setTimeout(() => resolve('timeout'), 10_000);
-    socket.once('data', (head) => {
+    // The status line can arrive split over several TCP chunks: read up to its end.
+    let head = '';
+    const finish = (result: string) => {
       clearTimeout(timer);
-      const line = head.toString('latin1');
-      resolve(line.startsWith('HTTP/') ? line.split(' ', 3)[1] : 'invalid');
-    });
-    socket.once('close', () => {
-      clearTimeout(timer);
-      resolve('closed');
-    });
+      socket.off('data', onData);
+      socket.off('close', onClose);
+      resolve(result);
+    };
+    const onData = (chunk: Buffer) => {
+      head += chunk.toString('latin1');
+      const end = head.indexOf('\r\n');
+      if (end >= 0) {
+        const line = head.slice(0, end);
+        finish(line.startsWith('HTTP/') ? (line.split(' ', 3)[1] ?? 'invalid') : 'invalid');
+      } else if (head.length > 1024) {
+        finish('invalid');
+      }
+    };
+    const onClose = () => finish('closed');
+    const timer = setTimeout(() => finish('timeout'), 10_000);
+    socket.on('data', onData);
+    socket.once('close', onClose);
     socket.once('error', () => undefined);
   });
   if (status !== '100' && status !== '200') {

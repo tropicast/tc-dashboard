@@ -65,8 +65,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      # Mailpit's own healthcheck (readyz): SMTP accepts mail before the first sign-up.
       mail:
-        condition: service_started
+        condition: service_healthy
 
   icecast:
     build: ${TC_STREAMING_DIR:-../../../tc-streaming}
