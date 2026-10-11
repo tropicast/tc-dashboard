@@ -21,6 +21,7 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="SSH.NET" />
+    <PackageReference Include="Stripe.net" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Tropicast.Dashboard.Infrastructure.Tests" />

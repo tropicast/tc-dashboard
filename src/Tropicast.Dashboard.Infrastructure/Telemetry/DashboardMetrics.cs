@@ -37,5 +37,9 @@ public static class DashboardMetrics
     public static readonly Counter<long> StatsSamples = Meter.CreateCounter<long>("tropicast.stats.samples",
         description: "Streaming-node stats samples, by result: ok, unreachable.");
 
+    /// <summary><c>tropicast_billing_webhooks_total{result="applied|duplicate|ignored|invalid|error"}</c>: payment webhooks.</summary>
+    public static readonly Counter<long> BillingWebhooks = Meter.CreateCounter<long>("tropicast.billing.webhooks",
+        description: "Payment-provider webhooks, by result: applied, duplicate, ignored, invalid (signature), error (retried).");
+
     public static KeyValuePair<string, object?> Result(string value) => new("result", value);
 }

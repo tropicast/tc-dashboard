@@ -102,3 +102,17 @@ tests:
             exp_annotations:
               summary: No successful database backup for 1d 3h 0m 0s.
               description: Check `journalctl -u tc-dashboard-backup` on tc-app-1 and the backup bucket.
+
+  - interval: 1m
+    input_series:
+      - series: 'tropicast_billing_webhooks_total{result="error"}'
+        values: '0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: BillingWebhookErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Stripe webhooks fail to apply.
+              description: Plan changes from payments are not applied. Check `deploy.sh compose logs api | grep -i billing` and the Stripe dashboard (Developers → Webhooks).

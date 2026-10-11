@@ -351,6 +351,48 @@
         }
       }
     },
+    "/api/v1/operator/usage": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Every tenant's use in a month (zero for idle ones), heaviest egress first, for fair-use true-up.",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantUsageResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/version": {
       "get": {
         "tags": [
@@ -1742,6 +1784,125 @@
         }
       }
     },
+    "/api/v1/billing": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "The tenant's plan, subscription and the plans on offer.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/checkout": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Starts a hosted checkout for a paid plan; redirect the browser to the returned URL.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/portal": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Opens the billing portal: payment methods, invoices, plan changes (applied at period end), cancellation.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/usage": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "The tenant's peak listeners, listener-hours and estimated egress in a month (UTC), per station.",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operator/streaming-nodes": {
       "get": {
         "tags": [
@@ -1858,6 +2019,94 @@
         },
         "description": "An audit log entry."
       },
+      "BillingResponse": {
+        "required": [
+          "planId",
+          "subscriptionPlanId",
+          "status",
+          "currentPeriodEnd",
+          "cancelAtPeriodEnd",
+          "trialEnd",
+          "graceEndsAt",
+          "trialAvailable",
+          "canManage",
+          "enabled",
+          "plans"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "description": "Current plan (what the tenant gets now)."
+          },
+          "subscriptionPlanId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Plan subscribed to, if any (differs from string BillingResponse.PlanId after a failed payment's grace period)."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Subscription status; null without a subscription.",
+                "$ref": "#/components/schemas/SubscriptionStatus"
+              }
+            ]
+          },
+          "currentPeriodEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "End of the paid period.",
+            "format": "date-time"
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean",
+            "description": "The subscription ends at the period end."
+          },
+          "trialEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "End of the trial.",
+            "format": "date-time"
+          },
+          "graceEndsAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "After a failed payment: when the tenant falls back to Free.",
+            "format": "date-time"
+          },
+          "trialAvailable": {
+            "type": "boolean",
+            "description": "The next checkout starts with a free trial."
+          },
+          "canManage": {
+            "type": "boolean",
+            "description": "A billing portal exists for this tenant (payment methods, invoices, plan changes, cancellation)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Billing is switched on for this deployment."
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanOfferResponse"
+            },
+            "description": "Plans on offer, cheapest first."
+          }
+        },
+        "description": "The tenant's plan and subscription."
+      },
       "BroadcastOutput": {
         "required": [
           "format",
@@ -1957,6 +2206,18 @@
             "type": "string"
           },
           "newPassword": {
+            "type": "string"
+          }
+        }
+      },
+      "CheckoutRequestBody": {
+        "required": [
+          "planId"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "maxLength": 32,
             "type": "string"
           }
         }
@@ -2869,6 +3130,77 @@
         },
         "description": "One page of results."
       },
+      "PlanOfferResponse": {
+        "required": [
+          "id",
+          "name",
+          "maxStations",
+          "maxListeners",
+          "maxBitrateKbps",
+          "directoryListing",
+          "embed",
+          "price",
+          "purchasable"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Plan ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "maxStations": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Stations.",
+            "format": "int32"
+          },
+          "maxListeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Concurrent listeners per station.",
+            "format": "int32"
+          },
+          "maxBitrateKbps": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Highest stream bitrate.",
+            "format": "int32"
+          },
+          "directoryListing": {
+            "type": "boolean",
+            "description": "RadioBrowser listing."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Embeddable player."
+          },
+          "price": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Price to show, e.g. \"€9 / month\"; null for Free."
+          },
+          "purchasable": {
+            "type": "boolean",
+            "description": "Can be bought with checkout."
+          }
+        },
+        "description": "A plan as offered."
+      },
       "PlanResponse": {
         "required": [
           "id",
@@ -3089,6 +3421,20 @@
           }
         },
         "description": "A stream listeners can play. Audio goes from the listener host to the player, never through the API."
+      },
+      "RedirectResponse": {
+        "required": [
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The payment provider's page.",
+            "format": "uri"
+          }
+        },
+        "description": "Where to send the browser."
       },
       "RefreshRequest": {
         "required": [
@@ -3399,6 +3745,54 @@
         },
         "description": "A station's live status, at most one collector interval (15 s) old."
       },
+      "StationUsageResponse": {
+        "required": [
+          "stationId",
+          "publicId",
+          "name",
+          "peakListeners",
+          "listenerHours",
+          "egressBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publicId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "peakListeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "listenerHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "egressBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "One station's use of a month."
+      },
       "StatsPointResponse": {
         "required": [
           "start",
@@ -3522,6 +3916,16 @@
         },
         "description": "A streaming node's provisioning state."
       },
+      "SubscriptionStatus": {
+        "enum": [
+          "Incomplete",
+          "Trialing",
+          "Active",
+          "PastDue",
+          "Canceled",
+          null
+        ]
+      },
       "TenantResponse": {
         "required": [
           "id",
@@ -3571,6 +3975,54 @@
           "Active",
           "Suspended"
         ]
+      },
+      "TenantUsageResponse": {
+        "required": [
+          "tenantId",
+          "tenantName",
+          "planId",
+          "peakListeners",
+          "listenerHours",
+          "egressBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "peakListeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "listenerHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "egressBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "One tenant's use of a month (operator report)."
       },
       "TokenRequest": {
         "required": [
@@ -3717,6 +4169,62 @@
         },
         "description": "Changes the tenant's name or slug; omitted fields keep their value."
       },
+      "UsageResponse": {
+        "required": [
+          "month",
+          "planId",
+          "peakListeners",
+          "listenerHours",
+          "egressBytes",
+          "stations"
+        ],
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "The month (`YYYY-MM`, UTC)."
+          },
+          "planId": {
+            "type": "string",
+            "description": "The tenant's current plan."
+          },
+          "peakListeners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Highest peak of any station on any day.",
+            "format": "int32"
+          },
+          "listenerHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Listening time of all stations.",
+            "format": "double"
+          },
+          "egressBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Estimated traffic of all stations.",
+            "format": "int64"
+          },
+          "stations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationUsageResponse"
+            },
+            "description": "Per station, including deleted ones that streamed that month."
+          }
+        },
+        "description": "A tenant's use of a month, for fair-use review: from the daily statistics."
+      },
       "UserCodeRequest": {
         "required": [
           "userCode"
@@ -3771,6 +4279,9 @@
     },
     {
       "name": "Credentials"
+    },
+    {
+      "name": "Billing"
     }
   ]
 }

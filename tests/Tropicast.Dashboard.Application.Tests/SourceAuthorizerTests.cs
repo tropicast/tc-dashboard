@@ -64,4 +64,15 @@ public sealed class SourceAuthorizerTests
     [InlineData(null, "bitrate=99999999999999999999999", false)]
     public void A_declared_bitrate_must_fit_the_plan(string? iceBitrate, string? audioInfo, bool allowed)
         => Assert.Equal(allowed, SourceAuthorizer.Decide(Request(bitrate: iceBitrate, audioInfo: audioInfo), Free()).Allowed);
+
+    [Fact]
+    public void Stations_beyond_the_plans_count_cannot_broadcast()
+    {
+        var allowed = Free() with { StationRank = 0 };
+        var beyond = Free() with { StationRank = 1 };
+        Assert.True(SourceAuthorizer.Decide(Request(), allowed).Allowed);
+        var decision = SourceAuthorizer.Decide(Request(), beyond);
+        Assert.False(decision.Allowed);
+        Assert.Contains("plan allows 1 station", decision.Reason, StringComparison.Ordinal);
+    }
 }

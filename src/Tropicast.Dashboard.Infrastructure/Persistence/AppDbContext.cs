@@ -36,6 +36,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
     public DbSet<DeviceAuthorization> DeviceAuthorizations => Set<DeviceAuthorization>();
     public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+    public DbSet<Billing.ProcessedWebhookEvent> ProcessedWebhookEvents => Set<Billing.ProcessedWebhookEvent>();
     /// <summary>ASP.NET Core Data Protection keys (cookies, bearer and refresh tokens): shared by every API instance.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<Directories.DirectoryListing> DirectoryListings => Set<Directories.DirectoryListing>();

@@ -54,6 +54,9 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
         builder.Property(e => e.ProviderCustomerId).HasMaxLength(255);
         builder.Property(e => e.ProviderSubscriptionId).HasMaxLength(255);
         builder.HasIndex(e => e.ProviderSubscriptionId).IsUnique();
+        builder.HasIndex(e => e.ProviderCustomerId);
+        // One subscription per tenant.
+        builder.HasIndex(e => e.TenantId).IsUnique();
     }
 }
 
@@ -191,6 +194,17 @@ internal sealed class SecurityEventConfiguration : IEntityTypeConfiguration<Secu
         builder.Property(e => e.Action).HasMaxLength(64);
         builder.Property(e => e.IpAddress).HasMaxLength(45);
         builder.Property(e => e.Detail).HasMaxLength(128);
+    }
+}
+
+internal sealed class ProcessedWebhookEventConfiguration : IEntityTypeConfiguration<Billing.ProcessedWebhookEvent>
+{
+    public void Configure(EntityTypeBuilder<Billing.ProcessedWebhookEvent> builder)
+    {
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasMaxLength(255);
+        builder.Property(e => e.Type).HasMaxLength(128);
+        builder.HasIndex(e => e.ProcessedAt);
     }
 }
 

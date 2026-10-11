@@ -1,3 +1,4 @@
+using Tropicast.Dashboard.Api.Billing;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -122,6 +123,7 @@ app.MapDesktop();
 app.MapStationStats();
 app.MapPublicStations();
 app.MapDirectory();
+app.MapBilling();
 app.MapSourceAuth();
 app.MapOperator();
 

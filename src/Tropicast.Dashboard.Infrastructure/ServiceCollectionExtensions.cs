@@ -50,6 +50,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IRadioDirectory, RadioBrowserDirectory>();
         services.AddScoped<DirectoryPublisher>();
         services.AddHostedService<DirectoryWorker>();
+        services.Configure<Billing.BillingOptions>(configuration.GetSection("Billing"));
+        services.TryAddSingleton<Application.Billing.IPaymentProvider, Billing.StripePaymentProvider>();
+        services.AddScoped<Billing.BillingService>();
+        services.AddHostedService<Billing.BillingWorker>();
         // Read when a context is created, so hosts without a database (e.g. OpenAPI generation) still start.
         services.AddDbContext<AppDbContext>(options => PersistenceSetup.Configure(options,
             configuration.GetConnectionString("Default")

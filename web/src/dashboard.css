@@ -215,3 +215,10 @@ code {
   margin: 0;
   opacity: 0.8;
 }
+
+.plans {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}

@@ -162,6 +162,8 @@ jobs:
 
       - name: NuGet packages (direct and transitive)
         run: |
+          # A failing `dotnet list` must fail the step, not hide behind tee's exit code.
+          set -o pipefail
           dotnet restore Tropicast.Dashboard.slnx
           dotnet list Tropicast.Dashboard.slnx package --vulnerable --include-transitive | tee vulnerable.txt
           if grep -q "has the following vulnerable packages" vulnerable.txt; then
