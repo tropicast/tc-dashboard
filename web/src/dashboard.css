@@ -210,3 +210,8 @@ code {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+.hint {
+  margin: 0;
+  opacity: 0.8;
+}

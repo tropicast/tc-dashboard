@@ -97,7 +97,7 @@ export function Onboarding() {
             <input {...station.register('website')} />
           </Field>
           <label className="checkbox">
-            <input type="checkbox" {...station.register('listInDirectory')} /> List in directory
+            <input type="checkbox" {...station.register('listInDirectory')} /> List on RadioBrowser
           </label>
           <Notice error={createStation.error} />
           <button>Create station</button>

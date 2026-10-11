@@ -813,6 +813,54 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.ToTable("tenants", (string)null);
                 });
 
+            modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Directories.DirectoryListing", b =>
+                {
+                    b.Property<Guid>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<DateTimeOffset?>("AddRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("add_requested_at");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_attempts");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("ListedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("listed_at");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("RadioBrowserUuid")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("radio_browser_uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("StationId")
+                        .HasName("pk_directory_listings");
+
+                    b.ToTable("directory_listings", (string)null);
+                });
+
             modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Identity.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1306,6 +1354,16 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenants_plans_plan_id");
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Directories.DirectoryListing", b =>
+                {
+                    b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", null)
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_directory_listings_stations_station_id");
                 });
 
             modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Identity.DeviceAuthorization", b =>

@@ -35,6 +35,8 @@ services:
       Operators__Emails__0: ${OPERATOR_EMAIL:-}
       # Streaming node's exporter on the private network (tc-streaming PRIVATE_IP); empty: no live status.
       Stats__Url: ${STATS_URL:-}
+      # RadioBrowser listing (#13): adds opted-in live stations to the public directory.
+      Directory__Enabled: ${DIRECTORY_ENABLED:-false}
     volumes:
       - dataprotection:/data/keys
     ports:

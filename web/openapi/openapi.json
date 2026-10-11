@@ -259,6 +259,40 @@
         }
       }
     },
+    "/api/v1/stations/{id}/directory": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "The station's RadioBrowser listing: off, waiting for live, listed, retrying, or what to fix.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/version": {
       "get": {
         "tags": [
@@ -2151,6 +2185,79 @@
           }
         }
       },
+      "DirectoryState": {
+        "enum": [
+          "Off",
+          "NotIncluded",
+          "NeedsAction",
+          "WaitingForLive",
+          "Retrying",
+          "Listed",
+          "Delisting"
+        ],
+        "description": "Where a station's RadioBrowser listing stands."
+      },
+      "DirectoryStatusResponse": {
+        "required": [
+          "state",
+          "message",
+          "radioBrowserUuid",
+          "listingUrl",
+          "listedAt",
+          "nextAttemptAt",
+          "submitting"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "description": "Where the listing stands.",
+            "$ref": "#/components/schemas/DirectoryState"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What to do, or the last failure."
+          },
+          "radioBrowserUuid": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "RadioBrowser station ID once listed."
+          },
+          "listingUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The listing on radio-browser.info.",
+            "format": "uri"
+          },
+          "listedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was added.",
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Next retry after a failure.",
+            "format": "date-time"
+          },
+          "submitting": {
+            "type": "boolean",
+            "description": "Listing is switched on for this deployment (off in development)."
+          }
+        },
+        "description": "A station's RadioBrowser listing."
+      },
       "EmailRequest": {
         "required": [
           "email"
@@ -3444,6 +3551,9 @@
       "name": "Public"
     },
     {
+      "name": "Stations"
+    },
+    {
       "name": "Tropicast.Dashboard.Api"
     },
     {
@@ -3451,9 +3561,6 @@
     },
     {
       "name": "Tenants"
-    },
-    {
-      "name": "Stations"
     },
     {
       "name": "Credentials"

@@ -317,6 +317,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stations/{id}/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The station's RadioBrowser listing: off, waiting for live, listed, retrying, or what to fix. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DirectoryStatusResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/version": {
         parameters: {
             query?: never;
@@ -2240,6 +2285,37 @@ export interface components {
         };
         DeviceTokenRequest: {
             deviceCode: string;
+        };
+        /**
+         * @description Where a station's RadioBrowser listing stands.
+         * @enum {unknown}
+         */
+        DirectoryState: "Off" | "NotIncluded" | "NeedsAction" | "WaitingForLive" | "Retrying" | "Listed" | "Delisting";
+        /** @description A station's RadioBrowser listing. */
+        DirectoryStatusResponse: {
+            /** @description Where the listing stands. */
+            state: components["schemas"]["DirectoryState"];
+            /** @description What to do, or the last failure. */
+            message: null | string;
+            /** @description RadioBrowser station ID once listed. */
+            radioBrowserUuid: null | string;
+            /**
+             * Format: uri
+             * @description The listing on radio-browser.info.
+             */
+            listingUrl: null | string;
+            /**
+             * Format: date-time
+             * @description When it was added.
+             */
+            listedAt: null | string;
+            /**
+             * Format: date-time
+             * @description Next retry after a failure.
+             */
+            nextAttemptAt: null | string;
+            /** @description Listing is switched on for this deployment (off in development). */
+            submitting: boolean;
         };
         EmailRequest: {
             email: string;

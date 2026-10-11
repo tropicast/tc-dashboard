@@ -8,6 +8,7 @@ import type { components } from '../../../api/schema';
 import { CopyButton } from '../../atoms/CopyButton';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
+import { DirectoryStatus } from './DirectoryStatus';
 import { SharePanel } from './SharePanel';
 import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
@@ -70,7 +71,10 @@ export function StationDetail() {
           },
         }),
       ),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['station', tenantId, id] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['station', tenantId, id] });
+      void queryClient.invalidateQueries({ queryKey: ['directory', tenantId, id] });
+    },
   });
   const credentialForm = useForm({ defaultValues: { deviceLabel: '' } });
   const issue = useMutation({
@@ -140,8 +144,9 @@ export function StationDetail() {
             <textarea {...form.register('description')} />
           </Field>
           <label className="checkbox">
-            <input type="checkbox" {...form.register('listInDirectory')} /> List in directory
+            <input type="checkbox" {...form.register('listInDirectory')} /> List on RadioBrowser
           </label>
+          <DirectoryStatus stationId={id} />
           <Notice error={update.error} />
           <button>Save settings</button>
         </form>

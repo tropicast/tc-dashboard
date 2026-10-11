@@ -12,6 +12,8 @@ using Tropicast.Dashboard.Application;
 using Tropicast.Dashboard.Infrastructure;
 using Tropicast.Dashboard.Infrastructure.Provisioning;
 using Tropicast.Dashboard.Infrastructure.Stats;
+using Tropicast.Dashboard.Infrastructure.Directories;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
@@ -37,6 +39,12 @@ if (builder.Configuration["Provisioning:Node"] is { } provisioningNode && provis
 }
 builder.Services.PostConfigure<ProvisioningOptions>(options => options.Node = streamingNode);
 builder.Services.PostConfigure<StatsOptions>(options => options.Node = streamingNode);
+// Directory entries carry the public listener and page URLs: same settings as the rest of the API.
+builder.Services.AddOptions<DirectoryOptions>().PostConfigure<IOptions<StreamingOptions>, IOptions<AppOptions>>((options, streaming, app) =>
+{
+    options.ListenerBaseUrl = streaming.Value.ListenerBaseUrl;
+    options.PublicBaseUrl = new Uri(app.Value.PublicBaseUrl);
+});
 builder.Services.Configure<OperatorOptions>(builder.Configuration.GetSection("Operators"));
 builder.Services.AddScoped<IAuthorizationHandler, OperatorHandler>();
 builder.Services.AddAuthorizationBuilder()
@@ -69,6 +77,7 @@ app.MapCredentials();
 app.MapDesktop();
 app.MapStationStats();
 app.MapPublicStations();
+app.MapDirectory();
 app.MapSourceAuth();
 app.MapOperator();
 
