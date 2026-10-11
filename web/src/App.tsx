@@ -8,6 +8,7 @@ import {
   Reset,
   Signup,
 } from './components/organisms/auth/AuthPages';
+import { DeviceApproval } from './components/organisms/device/DeviceApproval';
 import { Home } from './components/organisms/Home';
 import { ErrorBoundary } from './components/organisms/layout/ErrorBoundary';
 import { AuthGuard } from './components/organisms/layout/AuthGuard';
@@ -27,6 +28,7 @@ function ProtectedRoutes() {
           <Route path="stations" element={<Stations />} />
           <Route path="stations/:id" element={<StationDetail />} />
           <Route path="account" element={<Account />} />
+          <Route path="device" element={<DeviceApproval />} />
         </Routes>
       </AppShell>
     </AuthGuard>
