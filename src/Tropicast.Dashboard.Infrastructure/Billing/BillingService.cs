@@ -26,6 +26,9 @@ public enum WebhookOutcome
 /// </summary>
 public sealed partial class BillingService(AppDbContext db, IOptions<BillingOptions> options, TimeProvider time, ILogger<BillingService> logger)
 {
+    /// <summary>Primary key of processed_webhook_events (EF naming convention).</summary>
+    private const string ProcessedEventKey = "pk_processed_webhook_events";
+
     public async Task<WebhookOutcome> ApplyAsync(BillingEvent billingEvent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(billingEvent);
@@ -40,9 +43,13 @@ public sealed partial class BillingService(AppDbContext db, IOptions<BillingOpti
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
         {
-            // The same event delivered twice at once: the other delivery applied it.
+            SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: ProcessedEventKey,
+        })
+        {
+            // The same event delivered twice at once: the other delivery applied it. Any other conflict (two
+            // events creating the same subscription) is an error, so the provider retries the event.
             return WebhookOutcome.Duplicate;
         }
         await transaction.CommitAsync(cancellationToken);

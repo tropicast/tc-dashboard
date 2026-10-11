@@ -356,7 +356,7 @@
         "tags": [
           "Operator"
         ],
-        "summary": "Every tenant's use in a month, heaviest egress first, for fair-use true-up.",
+        "summary": "Every tenant's use in a month (zero for idle ones), heaviest egress first, for fair-use true-up.",
         "parameters": [
           {
             "name": "month",

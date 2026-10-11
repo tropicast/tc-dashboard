@@ -87,7 +87,7 @@ internal static partial class BillingEndpoints
         billing.MapPost("/webhook", WebhookAsync).AllowAnonymous().DisableAntiforgery().ExcludeFromDescription();
 
         app.MapGet("/api/v1/operator/usage", OperatorUsageAsync).WithTags("Operator").RequireAuthorization(Operator.OperatorEndpoints.Policy)
-            .WithSummary("Every tenant's use in a month, heaviest egress first, for fair-use true-up.");
+            .WithSummary("Every tenant's use in a month (zero for idle ones), heaviest egress first, for fair-use true-up.");
     }
 
     private static async Task<Ok<BillingResponse>> GetAsync(AppDbContext db, IPaymentProvider payments, IOptions<BillingOptions> options,
@@ -162,14 +162,10 @@ internal static partial class BillingEndpoints
         ILoggerFactory loggers, CancellationToken cancellationToken)
     {
         var logger = loggers.CreateLogger(typeof(BillingEndpoints));
-        if (context.Request.ContentLength is > 512 * 1024)
+        // Bounded whatever the Content-Length says (chunked bodies have none): Stripe events are a few kilobytes.
+        if (await ReadBoundedAsync(context.Request.Body, MaxWebhookBytes, cancellationToken) is not { } payload)
         {
             return Count("invalid", Results.StatusCode(StatusCodes.Status413PayloadTooLarge));
-        }
-        string payload;
-        using (var reader = new StreamReader(context.Request.Body))
-        {
-            payload = await reader.ReadToEndAsync(cancellationToken);
         }
         BillingEvent billingEvent;
         try
@@ -192,6 +188,25 @@ internal static partial class BillingEndpoints
             LogFailed(logger, billingEvent.Type, billingEvent.Id, ex.GetType().Name);
             return Count("error", Results.StatusCode(StatusCodes.Status500InternalServerError));
         }
+    }
+
+    private const int MaxWebhookBytes = 512 * 1024;
+
+    /// <summary>The body as UTF-8 text, or null as soon as it exceeds <paramref name="max"/> bytes.</summary>
+    internal static async Task<string?> ReadBoundedAsync(Stream body, int max, CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        var chunk = new byte[16 * 1024];
+        int read;
+        while ((read = await body.ReadAsync(chunk, cancellationToken)) > 0)
+        {
+            if (buffer.Length + read > max)
+            {
+                return null;
+            }
+            buffer.Write(chunk, 0, read);
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
     }
 
     private static IResult Count(string result, IResult response)
@@ -229,14 +244,17 @@ internal static partial class BillingEndpoints
         }
         var rollups = db.StationStatsRollups.IgnoreQueryFilters()
             .Where(r => r.Interval == RollupInterval.Day && r.PeriodStart >= range.Start && r.PeriodStart < range.End);
-        var rows = await rollups
+        var usage = await rollups
             .Join(db.Stations.IgnoreQueryFilters(), r => r.StationId, s => s.Id, (r, s) => new { r.PeakListeners, r.ListenerHours, r.EgressBytes, s.TenantId })
             .GroupBy(x => x.TenantId)
             .Select(g => new { TenantId = g.Key, Peak = g.Max(x => x.PeakListeners), Hours = g.Sum(x => x.ListenerHours), Egress = g.Sum(x => x.EgressBytes) })
-            .Join(db.Tenants.IgnoreQueryFilters(), u => u.TenantId, t => t.Id,
-                (u, t) => new TenantUsageResponse(t.Id, t.Name, t.PlanId, u.Peak, u.Hours, u.Egress))
-            .ToListAsync(cancellationToken);
-        return TypedResults.Ok(rows.OrderByDescending(r => r.EgressBytes).ToList());
+            .ToDictionaryAsync(u => u.TenantId, cancellationToken);
+        // Every tenant, idle ones with zero usage.
+        var tenants = await db.Tenants.IgnoreQueryFilters().Select(t => new { t.Id, t.Name, t.PlanId }).ToListAsync(cancellationToken);
+        var rows = tenants.Select(t => usage.TryGetValue(t.Id, out var u)
+            ? new TenantUsageResponse(t.Id, t.Name, t.PlanId, u.Peak, u.Hours, u.Egress)
+            : new TenantUsageResponse(t.Id, t.Name, t.PlanId, 0, 0, 0));
+        return TypedResults.Ok(rows.OrderByDescending(r => r.EgressBytes).ThenBy(r => r.TenantName, StringComparer.Ordinal).ToList());
     }
 
     private sealed record MonthRange(string Label, DateTimeOffset Start, DateTimeOffset End);

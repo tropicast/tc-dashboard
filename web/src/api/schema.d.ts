@@ -417,7 +417,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every tenant's use in a month, heaviest egress first, for fair-use true-up. */
+        /** Every tenant's use in a month (zero for idle ones), heaviest egress first, for fair-use true-up. */
         get: {
             parameters: {
                 query?: {

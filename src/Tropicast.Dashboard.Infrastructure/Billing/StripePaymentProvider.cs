@@ -20,13 +20,15 @@ internal sealed class StripePaymentProvider(IOptions<BillingOptions> options) : 
         ? new StripeClient(key)
         : throw new BillingException("Billing is not configured.");
 
-    public bool Sells(string planId) => options.Value.Prices.ContainsKey(planId);
+    /// <summary>Only plans with a non-blank price (an unset deploy variable gives an empty one).</summary>
+    public bool Sells(string planId) => !string.IsNullOrWhiteSpace(options.Value.Prices.GetValueOrDefault(planId));
 
     public async Task<Uri> CreateCheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var price = options.Value.Prices.GetValueOrDefault(request.PlanId)
-            ?? throw new BillingException($"The {request.PlanId} plan cannot be bought.");
+        var price = options.Value.Prices.GetValueOrDefault(request.PlanId) is { } configured && !string.IsNullOrWhiteSpace(configured)
+            ? configured
+            : throw new BillingException($"The {request.PlanId} plan cannot be bought.");
         var tenant = request.TenantId.ToString();
         var create = new Stripe.Checkout.SessionCreateOptions
         {
@@ -97,7 +99,7 @@ internal sealed class StripePaymentProvider(IOptions<BillingOptions> options) : 
             case Stripe.Subscription subscription when stripeEvent.Type.StartsWith("customer.subscription.", StringComparison.Ordinal):
                 var item = subscription.Items?.Data?.FirstOrDefault();
                 var plan = item?.Price?.Id is { } priceId
-                    ? options.Value.Prices.FirstOrDefault(p => p.Value == priceId).Key
+                    ? options.Value.Prices.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.Value) && p.Value == priceId).Key
                     : null;
                 if (plan is null)
                 {

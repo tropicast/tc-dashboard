@@ -96,4 +96,19 @@ public sealed class StripePaymentProviderTests
     [InlineData("paused", SubscriptionStatus.Canceled)]
     [InlineData("canceled", SubscriptionStatus.Canceled)]
     public void Stripe_statuses_map(string stripe, SubscriptionStatus status) => Assert.Equal(status, StripePaymentProvider.Status(stripe));
+
+    [Fact]
+    public async Task A_plan_with_a_blank_price_is_not_sold()
+    {
+        var provider = new StripePaymentProvider(Options.Create(new BillingOptions
+        {
+            SecretKey = "sk_test_unused",
+            Prices = new() { ["starter"] = "price_starter", ["growth"] = "", ["pro"] = "  " },
+        }));
+        Assert.True(provider.Sells("starter"));
+        Assert.False(provider.Sells("growth"));
+        Assert.False(provider.Sells("pro"));
+        await Assert.ThrowsAsync<BillingException>(() => provider.CreateCheckoutAsync(new CheckoutRequest(Guid.NewGuid(), "growth",
+            "owner@example.test", null, 0, new Uri("https://app.test/ok"), new Uri("https://app.test/no")), TestContext.Current.CancellationToken));
+    }
 }

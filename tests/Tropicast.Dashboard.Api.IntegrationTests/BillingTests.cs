@@ -204,4 +204,80 @@ public sealed class BillingTests(DashboardFactory factory) : IClassFixture<Dashb
         Assert.Equal(station.Id, Assert.Single(usage.Stations).StationId);
         (await owner.SendAsync(HttpMethod.Get, "/api/v1/billing/usage?month=September")).Status(HttpStatusCode.BadRequest);
     }
+
+    [Fact]
+    public async Task An_oversized_webhook_is_refused_even_without_a_content_length()
+    {
+        var huge = new MemoryStream(new byte[600 * 1024]);
+        // A non-seekable stream: sent chunked, with no Content-Length to check.
+        var content = new StreamContent(new NonSeekable(huge));
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/billing/webhook") { Content = content };
+        request.Headers.Add("Stripe-Signature", "valid");
+        (await factory.CreateClient().SendAsync(request, Token)).Status(HttpStatusCode.RequestEntityTooLarge);
+    }
+
+    private sealed class NonSeekable(Stream inner) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task The_operator_report_lists_idle_tenants_with_zero_usage()
+    {
+        var (_, tenantId) = await TenantAsync();
+        var operatorBrowser = new Browser(factory);
+        await operatorBrowser.SignUpAndLoginAsync("operator@example.test");
+        var report = await operatorBrowser.Http.GetFromJsonAsync<List<TenantUsageResponse>>("/api/v1/operator/usage?month=2026-01", Browser.Json, Token);
+        var idle = Assert.Single(report!, r => r.TenantId == tenantId);
+        Assert.Equal((0, 0.0, 0L), (idle.PeakListeners, idle.ListenerHours, idle.EgressBytes));
+    }
+
+    [Fact]
+    public async Task Stations_created_at_the_same_instant_still_respect_the_station_count()
+    {
+        var (owner, tenantId) = await TenantAsync();
+        await Browser.SetPlanAsync(factory, tenantId, "growth");
+        var ids = new List<Guid>();
+        foreach (var slug in new[] { "twin-a", "twin-b" })
+        {
+            ids.Add((await (await owner.SendAsync(HttpMethod.Post, "/api/v1/stations", new { name = slug, slug }))
+                .Content.ReadFromJsonAsync<StationResponse>(Browser.Json, Token))!.Id);
+        }
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var instant = DateTimeOffset.UtcNow.AddMinutes(-1);
+            await db.Stations.IgnoreQueryFilters().Where(s => ids.Contains(s.Id))
+                .ExecuteUpdateAsync(set => set.SetProperty(s => s.CreatedAt, instant), Token);
+        }
+        await Browser.SetPlanAsync(factory, tenantId, "free");
+
+        var allowed = 0;
+        foreach (var id in ids)
+        {
+            var station = (await (await owner.SendAsync(HttpMethod.Get, $"/api/v1/stations/{id}")).Content.ReadFromJsonAsync<StationResponse>(Browser.Json, Token))!;
+            var issued = await (await owner.SendAsync(HttpMethod.Post, $"/api/v1/stations/{id}/credentials", new { deviceLabel = "PC" }))
+                .Content.ReadFromJsonAsync<IssuedCredentialResponse>(Browser.Json, Token);
+            var icecast = factory.CreateClient(new() { BaseAddress = new Uri("http://localhost:8081") });
+            icecast.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic",
+                Convert.ToBase64String(Encoding.UTF8.GetBytes($"{SourceAuthNode.Username}:{SourceAuthNode.Password}")));
+            var response = await icecast.PostAsync("/internal/icecast/source-auth", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["action"] = "stream_auth", ["mount"] = $"/stations/{station.PublicId}/live.mp3", ["user"] = station.PublicId,
+                ["pass"] = issued!.Secret, ["header.ice-bitrate"] = "64",
+            }), Token);
+            allowed += response.Headers.Contains("icecast-auth-user") ? 1 : 0;
+        }
+        Assert.Equal(1, allowed);
+    }
 }

@@ -131,8 +131,14 @@ internal static partial class SourceAuthEndpoint
             .Join(db.Plans, x => x.PlanId, p => p.Id, (x, p) => new { x.Id, x.PublicId, x.TenantId, x.CreatedAt, x.Status, Plan = p })
             .SingleOrDefaultAsync(cancellationToken);
         // Older stations of the tenant go first: after a downgrade, the newest ones beyond the plan's count stop.
-        var rank = station is null ? 0
-            : await stations.CountAsync(s => s.TenantId == station.TenantId && s.CreatedAt < station.CreatedAt, cancellationToken);
+        // A total order (creation time, then ID), so tied timestamps never let extra stations through.
+        var rank = 0;
+        if (station is not null)
+        {
+            var siblings = await stations.Where(s => s.TenantId == station.TenantId).Select(s => new { s.Id, s.CreatedAt })
+                .ToListAsync(cancellationToken);
+            rank = siblings.Count(s => s.CreatedAt < station.CreatedAt || (s.CreatedAt == station.CreatedAt && s.Id.CompareTo(station.Id) < 0));
+        }
         var credentials = station is null ? [] : await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(c => c.StationId == station.Id && c.RevokedAt == null)
             // A desktop device's own credential ends with its device session: signed out, revoked or expired.
