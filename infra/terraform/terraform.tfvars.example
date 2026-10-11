@@ -7,6 +7,9 @@ server_type = "cx23"
 ssh_public_keys = {
   admin = "ssh-ed25519 AAAA... admin@example"
 }
+# A key already registered in the Hetzner project (e.g. by tc-streaming) cannot
+# be registered again: reference it by name and drop it from ssh_public_keys.
+# existing_ssh_key_names = ["tc-stream-1-admin"]
 
 admin_cidrs = ["203.0.113.10/32"]
 
