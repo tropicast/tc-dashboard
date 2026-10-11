@@ -16,7 +16,8 @@ skip_requesting_account_id  = true
 skip_metadata_api_check     = true
 skip_s3_checksum            = true
 
-# Lock file next to the state (S3 conditional writes). Every writer, local or
-# CI, must use it: .github/workflows/terraform-deploy.yml checks the store
-# supports conditional writes before each run.
-use_lockfile = true
+# No lock file: Hetzner Object Storage does not enforce S3 conditional writes,
+# so a lock file would not protect the state. Apply only through the
+# Terraform deploy workflow, which runs one at a time; use this file locally
+# for plan, output and import.
+# use_lockfile = true

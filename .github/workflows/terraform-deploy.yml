@@ -23,8 +23,8 @@ permissions:
   contents: read
   actions: read
 
-# The state is locked with a lock file in the bucket (use_lockfile); this
-# group also keeps two runs of this workflow from queuing against each other.
+# The state has no lock file (Hetzner Object Storage does not enforce
+# conditional writes): this group is the lock, so two runs never overlap.
 concurrency:
   group: terraform-production-dashboard
   cancel-in-progress: false
@@ -62,33 +62,6 @@ jobs:
           STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
           STATE_LOCATION: ${{ vars.TF_STATE_LOCATION }}
         run: ./ci-config.sh
-
-      # The lock file is only safe if the store rejects a second create of the
-      # same key (S3 conditional write). Fail closed if it does not.
-      - name: Check the state store supports locking
-        env:
-          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-          STATE_LOCATION: ${{ vars.TF_STATE_LOCATION }}
-          AWS_DEFAULT_REGION: ${{ vars.TF_STATE_LOCATION }}
-          # Recent AWS CLIs add checksums that S3-compatible stores may reject.
-          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
-          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
-        run: |
-          endpoint="https://$STATE_LOCATION.your-objectstorage.com"
-          key="tc-dashboard/.lock-probe-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          # The AWS CLI only uploads regular files, not /dev/null.
-          body=$(mktemp)
-          put() { aws s3api put-object --endpoint-url "$endpoint" --bucket "$STATE_BUCKET" --key "$key" --if-none-match '*' --body "$body"; }
-          put >/dev/null
-          status=0
-          out=$(put 2>&1) || status=$?
-          aws s3api delete-object --endpoint-url "$endpoint" --bucket "$STATE_BUCKET" --key "$key" >/dev/null
-          if [[ $status == 0 || $out != *PreconditionFailed* ]]; then
-            [[ $status == 0 ]] || echo "$out" >&2
-            echo "The state store accepted a second conditional create: Terraform's lock file would not protect the state." >&2
-            exit 1
-          fi
-          echo "Conditional writes are enforced: the state lock is safe."
 
       - run: terraform init -backend-config=backend.hcl
 
