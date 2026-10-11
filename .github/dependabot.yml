@@ -1,0 +1,55 @@
+# Dependency updates (#16 follow-up): weekly pull requests for the API's NuGet
+# packages (central versions in Directory.Packages.props), the SPA's npm
+# packages and the Dockerfile's base images. Minor and patch updates are grouped
+# per ecosystem; security updates come as soon as an advisory is published.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(nuget)"
+    groups:
+      # ASP.NET Core, EF Core and Microsoft.Extensions move together (AspNetCoreVersion/EfCoreVersion).
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+        update-types: [minor, patch]
+      opentelemetry:
+        patterns: ["OpenTelemetry*", "Npgsql.OpenTelemetry"]
+        update-types: [minor, patch]
+      nuget-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(npm)"
+    groups:
+      npm-production:
+        dependency-type: production
+        update-types: [minor, patch]
+      npm-development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # Base images: node (SPA build), and the .NET SDK, ASP.NET and runtime-deps images.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(docker)"
+    ignore:
+      # Major versions of the runtime and Node are a planned upgrade (global.json, package engines), not a bot PR.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
