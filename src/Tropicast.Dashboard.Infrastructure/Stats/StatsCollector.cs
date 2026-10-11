@@ -58,9 +58,11 @@ internal sealed partial class StatsCollector(IStreamingStatsClient client, LiveS
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             LogUnreachable(logger, settings.Node, ex.GetType().Name);
+            Telemetry.DashboardMetrics.StatsSamples.Add(1, Telemetry.DashboardMetrics.Result("unreachable"));
             return;
         }
         store.Set(sample);
+        Telemetry.DashboardMetrics.StatsSamples.Add(1, Telemetry.DashboardMetrics.Result("ok"));
         try
         {
             await using var scope = scopes.CreateAsyncScope();

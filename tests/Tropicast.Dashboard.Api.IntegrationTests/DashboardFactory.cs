@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 using Tropicast.Dashboard.Application.Email;
-using Tropicast.Dashboard.Infrastructure;
 
 [assembly: AssemblyFixture(typeof(Tropicast.Dashboard.Api.IntegrationTests.PostgresContainer))]
 
@@ -50,7 +49,14 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
     public async ValueTask InitializeAsync()
     {
         _connectionString = await postgres.CreateDatabaseAsync();
-        await Services.MigrateDatabaseAsync();
+        // Migrate before the host starts, as production does (migration bundle, then the API): Data Protection
+        // reads its key ring from the database at startup.
+        var options = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<Tropicast.Dashboard.Infrastructure.Persistence.AppDbContext>();
+        Tropicast.Dashboard.Infrastructure.Persistence.PersistenceSetup.ConfigureStandalone(options, _connectionString);
+        await using var db = new Tropicast.Dashboard.Infrastructure.Persistence.AppDbContext(options.Options, new NoTenant());
+        await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.MigrateAsync(db.Database);
+        // Then start the host, so startup errors surface here.
+        _ = Services;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -72,6 +78,10 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
         builder.UseSetting("SourceAuth:NodeUsername", SourceAuthNode.Username);
         builder.UseSetting("SourceAuth:NodePassword", SourceAuthNode.Password);
         builder.UseSetting("RateLimits:Auth:PermitLimit", AuthPermitLimit.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        foreach (var limit in new[] { "PublicPermitLimit", "DevicePollPermitLimit", "SourceAuthPermitLimit" })
+        {
+            builder.UseSetting($"RateLimits:{limit}", Settings.GetValueOrDefault($"RateLimits:{limit}") ?? "100000");
+        }
         builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(Logs));
         builder.ConfigureTestServices(services =>
         {
@@ -157,6 +167,11 @@ public sealed class FakeRadioDirectory : Tropicast.Dashboard.Application.Directo
         => Fail
             ? throw new Tropicast.Dashboard.Application.Directories.DirectoryException("RadioBrowser is unreachable. The listing is retried later.")
             : Task.FromResult(_entries.GetValueOrDefault(streamUrl));
+}
+
+internal sealed class NoTenant : Tropicast.Dashboard.Application.ICurrentTenant
+{
+    public Guid? TenantId => null;
 }
 
 /// <summary>Returns the sample a test sets, as the node's exporter would.</summary>

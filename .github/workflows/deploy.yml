@@ -127,6 +127,12 @@ jobs:
           OPERATOR_EMAIL: ${{ vars.OPERATOR_EMAIL }}
           STATS_URL: ${{ vars.STATS_URL }}
           DIRECTORY_ENABLED: ${{ vars.DIRECTORY_ENABLED || 'false' }}
+          # Monitoring (#16): COMPOSE_PROFILES=monitoring starts Alloy; the API then exports to it.
+          COMPOSE_PROFILES: ${{ vars.COMPOSE_PROFILES }}
+          NODE_NAME: ${{ vars.DEPLOY_SERVER || 'tc-app-1' }}
+          GRAFANA_CLOUD_OTLP_URL: ${{ vars.GRAFANA_CLOUD_OTLP_URL }}
+          GRAFANA_CLOUD_OTLP_USER: ${{ vars.GRAFANA_CLOUD_OTLP_USER }}
+          GRAFANA_CLOUD_TOKEN: ${{ secrets.GRAFANA_CLOUD_TOKEN }}
           BACKUP_S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
           BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
           BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
@@ -146,10 +152,20 @@ jobs:
           DATABASE_CONNECTION=$(python3 deploy/npgsql.py "$DATABASE_POOLED_URL")
           # shellcheck disable=SC2034
           DATABASE_MIGRATION_CONNECTION=$(python3 deploy/npgsql.py "$DATABASE_DIRECT_URL")
+          # shellcheck disable=SC2034 # read through ${!name} below
+          OTEL_EXPORTER_OTLP_ENDPOINT=""
+          if [[ ,$COMPOSE_PROFILES, == *,monitoring,* ]]; then
+            # shellcheck disable=SC2034
+            OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+            for name in GRAFANA_CLOUD_OTLP_URL GRAFANA_CLOUD_OTLP_USER GRAFANA_CLOUD_TOKEN; do
+              [[ -n ${!name} ]] || { echo "Missing secret or variable for monitoring: $name" >&2; exit 1; }
+            done
+          fi
           names=(APP_HOST ACME_EMAIL PRIVATE_IP DATABASE_CONNECTION DATABASE_MIGRATION_CONNECTION
                  DATABASE_DIRECT_URL EMAIL_FROM SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD
                  SOURCE_AUTH_USER SOURCE_AUTH_PASSWORD PROVISIONING_ENABLED PROVISIONING_SSH_HOST
-                 PROVISIONING_SSH_HOST_KEY PROVISIONING_SSH_KEY OPERATOR_EMAIL STATS_URL DIRECTORY_ENABLED BACKUP_S3_ENDPOINT
+                 PROVISIONING_SSH_HOST_KEY PROVISIONING_SSH_KEY OPERATOR_EMAIL STATS_URL DIRECTORY_ENABLED COMPOSE_PROFILES NODE_NAME
+                 OTEL_EXPORTER_OTLP_ENDPOINT GRAFANA_CLOUD_OTLP_URL GRAFANA_CLOUD_OTLP_USER GRAFANA_CLOUD_TOKEN BACKUP_S3_ENDPOINT
                  BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY BACKUP_AGE_RECIPIENT
                  BACKUP_PG_IMAGE)
           # Single quotes: Compose reads the values literally ($ stays $).
@@ -165,7 +181,7 @@ jobs:
           IMAGE_TAG: ${{ steps.release.outputs.image_tag }}
         run: |
           bundle=$(mktemp -d)
-          cp deploy/compose.yaml deploy/deploy.sh deploy/backup.sh deploy/caddy/Caddyfile "$bundle/"
+          cp deploy/compose.yaml deploy/deploy.sh deploy/backup.sh deploy/caddy/Caddyfile deploy/alloy/config.alloy "$bundle/"
           printf 'DASHBOARD_IMAGE_TAG=%s\n' "$IMAGE_TAG" > "$bundle/release.env"
           tar -C "$bundle" -cz . |
             ssh node "rm -rf $REMOTE_ROOT/incoming && install -d -m 0750 $REMOTE_ROOT/incoming && tar -xz -C $REMOTE_ROOT/incoming"
@@ -195,7 +211,7 @@ jobs:
             echo "FAIL $url -> $code (expected $expected)" >&2
             return 1
           }
-          check "https://$APP_HOST/health" 200
+          check "https://$APP_HOST/health/ready" 200
           check "https://$APP_HOST/" 200
           check "https://$APP_HOST/internal/icecast/source-auth" 404
           check "http://$APP_HOST/" 308

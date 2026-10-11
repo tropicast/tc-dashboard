@@ -35,6 +35,9 @@ internal sealed partial class DeviceAuthorizationCleanup(IServiceScopeFactory sc
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cutoff = now - SecurityEvent.Retention;
+        // Account security events past their retention go in the same hourly pass.
+        await db.SecurityEvents.Where(e => e.OccurredAt < cutoff).ExecuteDeleteAsync(cancellationToken);
         return await db.DeviceAuthorizations.Where(r => r.ExpiresAt < now).ExecuteDeleteAsync(cancellationToken);
     }
 

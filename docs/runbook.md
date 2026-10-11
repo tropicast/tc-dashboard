@@ -79,6 +79,9 @@ Secrets and variables → Actions**). Never commit them.
 | `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | secret | step 3 |
 | `BACKUP_S3_READ_ACCESS_KEY`, `BACKUP_S3_READ_SECRET_KEY` | secret | a **read-only** key on the backup bucket, for the daily backup check |
 | `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_AGE_RECIPIENT` | variable | `https://fsn1.your-objectstorage.com`, bucket, `age1…` |
+| `COMPOSE_PROFILES` | variable | `monitoring` to run Alloy and export metrics and traces (section 9) |
+| `GRAFANA_CLOUD_OTLP_URL`, `GRAFANA_CLOUD_OTLP_USER` | variable | Grafana Cloud stack → *OpenTelemetry*: the OTLP endpoint and instance ID |
+| `GRAFANA_CLOUD_TOKEN` | secret | Grafana Cloud access policy token with `metrics:write` and `traces:write` |
 | `STATS_URL` | variable | `http://10.20.1.2:9100/metrics` once tc-streaming sets `PRIVATE_IP` (section 4); empty: no live status |
 | `DIRECTORY_ENABLED` | variable | `true` to add opted-in stations to RadioBrowser (section 4, step 5); default `false` |
 | `ACME_EMAIL`, `OPERATOR_EMAIL` | variable | Let's Encrypt contact; your account email (operator pages) |
@@ -129,10 +132,10 @@ with `ref=main` (or a SHA on main). It:
 1. writes `/opt/tc-dashboard/.env` from the secrets and variables;
 2. uploads the bundle (compose file, Caddyfile, scripts, image tag);
 3. runs `deploy.sh activate`: pull, **migrate** (direct connection), start the
-   new API, wait for `/health`;
+   new API, wait for `/health/ready` (the API answers and reaches the database);
 4. if the new API is not healthy, starts the release that was running before
    and fails;
-5. checks `https://app.tropicastradio.com/health`, the SPA, the redirect to
+5. checks `https://app.tropicastradio.com/health/ready`, the SPA, the redirect to
    HTTPS, and that `/internal/*` is not public.
 
 The first deploy waits up to 2 minutes for the Let's Encrypt certificate.
@@ -262,12 +265,12 @@ API) unless noted.
 | Backup keys | New Object Storage keys: update them, deploy. New age key pair: update `BACKUP_AGE_RECIPIENT`, deploy; keep the old private key offline while old dumps exist (30 days). |
 | `CLOUDFLARE_API_TOKEN`, `HCLOUD_TOKEN` | Roll the token at the provider and update the secret (no deploy). |
 | Terraform state lock | A run that died can leave `tc-dashboard/mvp.tfstate.tflock` in the state bucket. Check no run is active, then `terraform force-unlock <id>` (the ID is in the error). |
-| Data Protection keys | On the node: `deploy.sh compose down api && docker volume rm tc-dashboard_dataprotection`, then deploy. Signs **everyone** out (browser sessions and desktop devices). |
+| Data Protection keys | They live in the database (`data_protection_keys`) and roll over every 90 days by themselves. To revoke them all at once (suspected leak of a database copy): `DELETE FROM data_protection_keys;` then restart the API (`deploy.sh compose restart api`). Signs **everyone** out (browser sessions and desktop devices). |
 
 ## 7. Rebuild the node from scratch
 
-The node holds no data that is not elsewhere, except the Data Protection keys
-(losing them signs everyone out) and Caddy's certificates (re-issued).
+The node holds no data that is not elsewhere: Data Protection keys are in the
+database, and Caddy's certificates are re-issued.
 
 1. Turn off delete and rebuild protection on `tc-app-1` in the Hetzner
    console, delete the server (the primary IPs stay), and run *Terraform
@@ -277,6 +280,11 @@ The node holds no data that is not elsewhere, except the Data Protection keys
 4. Run *Deploy*. Everything else (database, backups, DNS) is unchanged.
 
 ## 8. Troubleshooting
+
+- **API logs**: JSON lines, credentials masked (`deploy.sh compose logs api`).
+  Account security events (sign-ins, failed sign-ins, devices, password
+  changes) are in `security_events` and shown to each user; tenant actions in
+  the audit log (`GET /api/v1/tenants/current/audit`).
 
 - **Deploy fails at "Open SSH"**: `HCLOUD_TOKEN` lacks write access, or a
   leftover CI firewall exists (the next run removes it).
@@ -288,3 +296,36 @@ The node holds no data that is not elsewhere, except the Data Protection keys
   `curl http://10.20.1.10:8081/health`. If it fails, check the private network
   (section 2) and that the API publishes `10.20.1.10:8081`
   (`deploy.sh compose ps`).
+
+## 9. Monitoring and alerts
+
+With `COMPOSE_PROFILES=monitoring`, Alloy on the node receives the API's
+OpenTelemetry metrics and traces (OTLP, internal network) and adds host metrics
+and the backup age. It sends all of them to Grafana Cloud's OTLP gateway: the
+same stack as tc-streaming, with an access policy token that can write metrics
+and traces.
+
+1. Set `COMPOSE_PROFILES=monitoring`, `GRAFANA_CLOUD_OTLP_URL`,
+   `GRAFANA_CLOUD_OTLP_USER` and the `GRAFANA_CLOUD_TOKEN` secret, then deploy.
+   In Grafana *Explore*, `tropicast_up{job="tc-dashboard"}` shows 1 within a
+   minute.
+2. Load the alert rules (`monitoring/rules.yaml`, unit-tested in CI):
+
+   ```sh
+   mimirtool rules load monitoring/rules.yaml --address=<Prometheus URL without /api/prom> --id=<instance ID> --key=<token with rules:write>
+   ```
+
+3. Route the alerts in Grafana *Alerting → Contact points* (email).
+
+| Alert | Fires when |
+|---|---|
+| DashboardDown | no API metrics for 3 minutes |
+| SourceAuthErrors | any source-auth call failed closed in the last 5 minutes (alert within ~2 minutes) |
+| SourceAuthSlow | source-auth p99 above 500 ms for 5 minutes |
+| ProvisioningFailing | station limits failing to apply for 20 minutes |
+| StreamingStatsUnavailable | the streaming node's exporter unreadable for 10 minutes |
+| DirectoryListingFailing | more than 3 failed RadioBrowser attempts in 6 hours (info) |
+| BackupMissing, BackupNeverRecorded | no successful backup for 26 hours |
+
+Payment webhook alerts come with Stripe (#14).
+

@@ -23,6 +23,14 @@ internal sealed record TokenRequest([property: Required, MaxLength(256)] string 
 internal sealed record RefreshRequest([property: Required, MaxLength(256)] string RefreshToken);
 internal sealed record MembershipResponse(Guid TenantId, string TenantName, string TenantSlug, MembershipRole Role);
 internal sealed record MeResponse(Guid Id, string Email, IReadOnlyList<MembershipResponse> Memberships);
+/// <summary>An account security event.</summary>
+/// <param name="Action">What happened: <c>signin.succeeded</c>, <c>signin.failed</c>, <c>device.signed_in</c>, <c>device.approved</c>,
+/// <c>device.signed_out</c>, <c>device.token_reuse</c> (a copied refresh token: the device was signed out),
+/// <c>password.changed</c>, <c>password.reset</c>.</param>
+/// <param name="IpAddress">Client address.</param>
+/// <param name="Detail">Device name, sign-in channel or "locked out".</param>
+/// <param name="OccurredAt">When.</param>
+internal sealed record SecurityEventResponse(string Action, string? IpAddress, string? Detail, DateTimeOffset OccurredAt);
 internal sealed record DeviceResponse(Guid Id, string DeviceName, DateTimeOffset CreatedAt, DateTimeOffset LastUsedAt, bool Current);
 
 /// <summary>
@@ -59,6 +67,8 @@ internal static class AuthEndpoints
         signedIn.MapPost("/change-password", ChangePasswordAsync).WithSummary("Changes the password and signs out every desktop device.");
         signedIn.MapGet("/me", GetMeAsync).WithSummary("The signed-in account and its tenants.");
         signedIn.MapGet("/devices", ListDevicesAsync).WithSummary("Signed-in desktop devices.");
+        signedIn.MapGet("/activity", ListActivityAsync)
+            .WithSummary("The account's recent security events (sign-ins, failed sign-ins, devices, password changes), 90 days.");
         signedIn.MapDelete("/devices/{id:guid}", RevokeDeviceAsync)
             .WithSummary("Signs one desktop device out and revokes the broadcast credentials it got for itself.");
     }
@@ -119,8 +129,8 @@ internal static class AuthEndpoints
         return TypedResults.Accepted((string?)null);
     }
 
-    private static async Task<Results<NoContent, ProblemHttpResult>> LoginAsync(LoginRequest request,
-        UserManager<AppUser> users, SignInManager<AppUser> signIn)
+    private static async Task<Results<NoContent, ProblemHttpResult>> LoginAsync(LoginRequest request, HttpContext context,
+        UserManager<AppUser> users, SignInManager<AppUser> signIn, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
         var user = await users.FindByEmailAsync(request.Email);
         if (user is null)
@@ -128,6 +138,9 @@ internal static class AuthEndpoints
             return TypedResults.Problem(statusCode: StatusCodes.Status401Unauthorized, title: SignInFailed);
         }
         var result = await signIn.PasswordSignInAsync(user, request.Password, isPersistent: true, lockoutOnFailure: true);
+        SecurityLog.Record(db, user.Id, result.Succeeded ? SecurityLog.SignedIn : SecurityLog.SignInFailed, context,
+            result.IsLockedOut ? "locked out" : "web", time.GetUtcNow());
+        await db.SaveChangesAsync(cancellationToken);
         return result.Succeeded ? TypedResults.NoContent() : SignInProblem(result);
     }
 
@@ -149,7 +162,7 @@ internal static class AuthEndpoints
     }
 
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> ResetPasswordAsync(ResetPasswordRequest request,
-        UserManager<AppUser> users, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
+        HttpContext context, UserManager<AppUser> users, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
         var user = await users.FindByEmailAsync(request.Email);
         var code = AuthEmails.Decode(request.Code);
@@ -164,6 +177,7 @@ internal static class AuthEndpoints
                 ? TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The reset link is invalid or has expired.")
                 : Invalid(result);
         }
+        SecurityLog.Record(db, user.Id, SecurityLog.PasswordReset, context, null, time.GetUtcNow());
         await RevokeAllDevicesAsync(db, user.Id, time.GetUtcNow(), cancellationToken);
         return TypedResults.NoContent();
     }
@@ -178,6 +192,7 @@ internal static class AuthEndpoints
         {
             return Invalid(result);
         }
+        SecurityLog.Record(db, user.Id, SecurityLog.PasswordChanged, context, null, time.GetUtcNow());
         await RevokeAllDevicesAsync(db, user.Id, time.GetUtcNow(), cancellationToken);
         // The security stamp changed: renew this browser's cookie so only other sessions end.
         if (context.Request.Cookies.ContainsKey(cookieOptions.Value.SessionCookieName))
@@ -204,7 +219,7 @@ internal static class AuthEndpoints
     }
 
     private static async Task<Results<Ok<TokenResponse>, ProblemHttpResult, ValidationProblem>> IssueTokenAsync(TokenRequest request,
-        UserManager<AppUser> users, SignInManager<AppUser> signIn, AppDbContext db, TokenService tokens, TimeProvider time,
+        HttpContext context, UserManager<AppUser> users, SignInManager<AppUser> signIn, AppDbContext db, TokenService tokens, TimeProvider time,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.DeviceName) || request.DeviceName.Trim().Length > 64)
@@ -219,16 +234,20 @@ internal static class AuthEndpoints
         var result = await signIn.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (!result.Succeeded)
         {
+            SecurityLog.Record(db, user.Id, SecurityLog.SignInFailed, context, result.IsLockedOut ? "locked out" : request.DeviceName.Trim(),
+                time.GetUtcNow());
+            await db.SaveChangesAsync(cancellationToken);
             return SignInProblem(result);
         }
         var (session, refreshToken) = DeviceSession.Start(user.Id, request.DeviceName, time.GetUtcNow());
         db.DeviceSessions.Add(session);
+        SecurityLog.Record(db, user.Id, SecurityLog.DeviceSignedIn, context, session.DeviceName, time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         return TypedResults.Ok(await tokens.IssueAsync(user, session, refreshToken));
     }
 
     private static async Task<Results<Ok<TokenResponse>, ProblemHttpResult>> RefreshTokenAsync(RefreshRequest request,
-        UserManager<AppUser> users, SignInManager<AppUser> signIn, AppDbContext db, TokenService tokens, TimeProvider time,
+        HttpContext context, UserManager<AppUser> users, SignInManager<AppUser> signIn, AppDbContext db, TokenService tokens, TimeProvider time,
         CancellationToken cancellationToken)
     {
         var refused = TypedResults.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in again on this device.");
@@ -244,6 +263,7 @@ internal static class AuthEndpoints
         {
             // A token of this session that is no longer current was copied: end the session for every holder.
             session.Revoke(now);
+            SecurityLog.Record(db, session.UserId, SecurityLog.TokenReuse, context, session.DeviceName, now);
             await db.SaveChangesAsync(cancellationToken);
             await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.Id == session.Id), now, cancellationToken);
             return refused;
@@ -265,7 +285,7 @@ internal static class AuthEndpoints
         return TypedResults.Ok(await tokens.IssueAsync(user, session, refreshToken));
     }
 
-    private static async Task<NoContent> RevokeTokenAsync(RefreshRequest request, AppDbContext db, TimeProvider time,
+    private static async Task<NoContent> RevokeTokenAsync(RefreshRequest request, HttpContext context, AppDbContext db, TimeProvider time,
         CancellationToken cancellationToken)
     {
         if (DeviceSession.TryGetSessionId(request.RefreshToken, out var sessionId)
@@ -273,6 +293,7 @@ internal static class AuthEndpoints
             && session.IsCurrent(request.RefreshToken))
         {
             session.Revoke(time.GetUtcNow());
+            SecurityLog.Record(db, session.UserId, SecurityLog.DeviceSignedOut, context, session.DeviceName, time.GetUtcNow());
             await db.SaveChangesAsync(cancellationToken);
             await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.Id == sessionId), time.GetUtcNow(), cancellationToken);
         }
@@ -294,6 +315,16 @@ internal static class AuthEndpoints
             .ToList());
     }
 
+    private static async Task<Ok<List<SecurityEventResponse>>> ListActivityAsync(HttpContext context, UserManager<AppUser> users,
+        AppDbContext db, CancellationToken cancellationToken)
+    {
+        var userId = Guid.Parse(users.GetUserId(context.User)!);
+        var events = await db.SecurityEvents.Where(e => e.UserId == userId).OrderByDescending(e => e.OccurredAt).Take(50)
+            .Select(e => new SecurityEventResponse(e.Action, e.IpAddress, e.Detail, e.OccurredAt))
+            .ToListAsync(cancellationToken);
+        return TypedResults.Ok(events);
+    }
+
     private static async Task<Results<NoContent, NotFound>> RevokeDeviceAsync(Guid id, HttpContext context,
         UserManager<AppUser> users, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
@@ -304,6 +335,7 @@ internal static class AuthEndpoints
             return TypedResults.NotFound();
         }
         session.Revoke(time.GetUtcNow());
+        SecurityLog.Record(db, userId, SecurityLog.DeviceSignedOut, context, session.DeviceName, time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.Id == id), time.GetUtcNow(), cancellationToken);
         return TypedResults.NoContent();

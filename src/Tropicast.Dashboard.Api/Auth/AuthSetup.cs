@@ -22,6 +22,18 @@ internal sealed class AuthRateLimitOptions
     public TimeSpan Window { get; set; } = TimeSpan.FromMinutes(1);
 }
 
+/// <summary>Per-IP limits of the other unauthenticated endpoints (<c>RateLimits</c> section).</summary>
+internal sealed class RateLimitOptions
+{
+    /// <summary>Public station pages, embeds and their API (cacheable; a person or a crawler).</summary>
+    public int PublicPermitLimit { get; set; } = 120;
+    /// <summary>Desktop sign-in polling: one device every 5 s is 12 a minute; many share one address behind NAT.</summary>
+    public int DevicePollPermitLimit { get; set; } = 120;
+    /// <summary>Icecast source auth from a streaming node: one call per source connect.</summary>
+    public int SourceAuthPermitLimit { get; set; } = 1200;
+    public TimeSpan Window { get; set; } = TimeSpan.FromMinutes(1);
+}
+
 /// <summary>Cookie security settings (<c>Auth</c> section).</summary>
 internal sealed class AuthCookieOptions
 {
@@ -39,21 +51,26 @@ internal static class AuthSetup
     /// <summary>Readable by the SPA, which echoes it in <see cref="AntiforgeryHeader"/>.</summary>
     internal const string AntiforgeryRequestCookie = "XSRF-TOKEN";
     internal const string AuthRateLimit = "auth";
+    internal const string PublicRateLimit = "public";
+    internal const string DevicePollRateLimit = "device-poll";
+    internal const string SourceAuthRateLimit = "source-auth";
     private const string SessionOrBearer = "SessionOrBearer";
 
     internal static IServiceCollection AddDashboardAuth(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AppOptions>(configuration.GetSection("App"));
         services.Configure<AuthRateLimitOptions>(configuration.GetSection("RateLimits:Auth"));
+        services.Configure<RateLimitOptions>(configuration.GetSection("RateLimits"));
         services.Configure<AuthCookieOptions>(configuration.GetSection("Auth"));
         var cookieOptions = configuration.GetSection("Auth").Get<AuthCookieOptions>() ?? new();
 
-        // Cookies, bearer and refresh tokens are protected with these keys: keep them across container restarts.
-        // DataProtection:KeysDirectory is a volume in production (deploy/compose.yaml); in the database later (#16).
+        // Cookies, bearer and refresh tokens are protected with these keys: in the database, so they survive
+        // container replacement and every API instance shares them. Database access is key access.
         var dataProtection = services.AddDataProtection().SetApplicationName("tropicast-dashboard");
-        if (configuration["DataProtection:KeysDirectory"] is { Length: > 0 } keys)
+        // Without a database (build-time OpenAPI generation, the image smoke test) keys stay in memory.
+        if (!string.IsNullOrEmpty(configuration.GetConnectionString("Default")))
         {
-            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keys));
+            dataProtection.PersistKeysToDbContext<AppDbContext>();
         }
 
         services.AddIdentityCore<AppUser>(options =>
@@ -128,6 +145,9 @@ internal static class AuthSetup
                 return RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.PermitLimit, Window = limits.Window });
             });
+            PerAddress(options, PublicRateLimit, limits => limits.PublicPermitLimit);
+            PerAddress(options, DevicePollRateLimit, limits => limits.DevicePollPermitLimit);
+            PerAddress(options, SourceAuthRateLimit, limits => limits.SourceAuthPermitLimit);
         });
         return services;
     }
@@ -143,6 +163,16 @@ internal static class AuthSetup
         app.UseAuthorization();
         return app;
     }
+
+    /// <summary>A fixed window per client address (the real one: forwarded headers run first).</summary>
+    private static void PerAddress(Microsoft.AspNetCore.RateLimiting.RateLimiterOptions options, string policy,
+        Func<RateLimitOptions, int> permits)
+        => options.AddPolicy(policy, context =>
+        {
+            var limits = context.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value;
+            return RateLimitPartition.GetFixedWindowLimiter($"{policy}:{context.Connection.RemoteIpAddress}",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = permits(limits), Window = limits.Window });
+        });
 
     /// <summary>
     /// Unsafe API requests that carry the session cookie must echo the antiforgery token. Bearer requests carry no

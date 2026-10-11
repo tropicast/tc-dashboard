@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using System.Text.Json;
@@ -20,7 +21,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence;
 /// Use <c>IgnoreQueryFilters([...])</c> with the filter name only where crossing them is intended.
 /// </summary>
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant tenant)
-    : IdentityUserContext<AppUser, Guid>(options)
+    : IdentityUserContext<AppUser, Guid>(options), IDataProtectionKeyContext
 {
     public const string TenantFilter = "tenant";
     public const string DeletedFilter = "deleted";
@@ -34,6 +35,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
     public DbSet<DeviceAuthorization> DeviceAuthorizations => Set<DeviceAuthorization>();
+    public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+    /// <summary>ASP.NET Core Data Protection keys (cookies, bearer and refresh tokens): shared by every API instance.</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<Directories.DirectoryListing> DirectoryListings => Set<Directories.DirectoryListing>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
@@ -99,8 +103,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
         return saved;
     }
 
+    /// <summary>
+    /// Synchronous saves are only for changes that raise no domain event (Data Protection's key store saves this
+    /// way); anything with events must go through <see cref="SaveChangesAsync(bool, CancellationToken)"/> and the outbox.
+    /// </summary>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
-        => throw new NotSupportedException("Use SaveChangesAsync: it also writes the outbox.");
+        => ChangeTracker.Entries<IHasDomainEvents>().Any(e => e.Entity.DomainEvents.Count > 0)
+            ? throw new NotSupportedException("Use SaveChangesAsync: it also writes the outbox.")
+            : base.SaveChanges(acceptAllChangesOnSuccess);
 
     private static readonly JsonSerializerOptions OutboxJson = new(JsonSerializerDefaults.Web);
 

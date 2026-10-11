@@ -78,6 +78,7 @@ internal sealed partial class DirectoryPublisher(AppDbContext db, IRadioDirector
                 listing.Added(existing, time.GetUtcNow());
                 await db.SaveChangesAsync(cancellationToken);
                 LogAdopted(logger, stationId, existing);
+                Telemetry.DashboardMetrics.DirectorySubmissions.Add(1, Telemetry.DashboardMetrics.Result("adopted"));
                 return;
             }
             // Durable before the call: if the result is lost, the next pass looks the URL up instead of adding again.
@@ -86,11 +87,13 @@ internal sealed partial class DirectoryPublisher(AppDbContext db, IRadioDirector
             var uuid = await directory.AddAsync(entry, cancellationToken);
             listing.Added(uuid, time.GetUtcNow());
             LogAdded(logger, stationId, uuid);
+            Telemetry.DashboardMetrics.DirectorySubmissions.Add(1, Telemetry.DashboardMetrics.Result("added"));
         }
         catch (DirectoryException ex)
         {
             listing.Failed(ex.Message, time.GetUtcNow(), options.Value.RetryDelay, options.Value.MaxRetryDelay);
             LogFailed(logger, stationId, listing.FailedAttempts);
+            Telemetry.DashboardMetrics.DirectorySubmissions.Add(1, Telemetry.DashboardMetrics.Result("failed"));
         }
         await db.SaveChangesAsync(cancellationToken);
     }
