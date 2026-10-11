@@ -67,8 +67,11 @@ updates:
     commit-message:
       prefix: "deps(compose)"
     ignore:
-      # A new PostgreSQL major needs a dump and restore (and must match Neon); upgrade on purpose.
+      # A new PostgreSQL major needs a dump and restore (and must match Neon); Node majors follow the
+      # Dockerfile's. Upgrade both on purpose.
       - dependency-name: "*postgres*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "*node*"
         update-types: ["version-update:semver-major"]
 
   # Workflow actions: the deploy workflows hold production secrets.
