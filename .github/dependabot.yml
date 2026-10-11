@@ -1,7 +1,9 @@
 # Dependency updates (#16 follow-up): weekly pull requests for the API's NuGet
 # packages (central versions in Directory.Packages.props), the SPA's npm
-# packages and the Dockerfile's base images. Minor and patch updates are grouped
-# per ecosystem; security updates come as soon as an advisory is published.
+# packages, the Dockerfile's base images, the Compose files' images and the
+# workflow actions. Minor and patch updates are grouped per ecosystem; security
+# updates come as soon as an advisory is published. Images named inside scripts
+# and workflow steps (backup.sh, restore-test.sh, CI) are not covered: bump them by hand.
 version: 2
 updates:
   - package-ecosystem: nuget
@@ -53,3 +55,32 @@ updates:
       # Major versions of the runtime and Node are a planned upgrade (global.json, package engines), not a bot PR.
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+
+  # Images in the Compose files: Caddy (the public TLS entry point) and Alloy in
+  # production (deploy/compose.yaml); PostgreSQL and Mailpit for local runs (compose.yaml).
+  - package-ecosystem: docker-compose
+    directories: [/, /deploy]
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(compose)"
+    ignore:
+      # A new PostgreSQL major needs a dump and restore (and must match Neon); upgrade on purpose.
+      - dependency-name: "*postgres*"
+        update-types: ["version-update:semver-major"]
+
+  # Workflow actions: the deploy workflows hold production secrets.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
