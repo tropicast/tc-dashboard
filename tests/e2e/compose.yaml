@@ -1,0 +1,97 @@
+# End-to-end stack (#17): the API built from this checkout, PostgreSQL, Mailpit,
+# and the real tc-streaming Icecast image (no auth stub) calling the API's
+# source-auth endpoint, plus its exporter feeding live status.
+#
+#   TC_STREAMING_DIR=../tc-streaming tests/e2e/run.sh
+#
+# Caddy is left out: the TLS ingest and listener gateway in front of Icecast is
+# covered by tc-streaming's own e2e (tests/gateway.sh). Here sources publish to
+# Icecast directly, as Caddy forwards them.
+name: tc-dashboard-e2e
+
+services:
+  db:
+    image: mirror.gcr.io/library/postgres:17
+    environment:
+      POSTGRES_DB: tropicast
+      POSTGRES_USER: tropicast
+      POSTGRES_PASSWORD: ${E2E_DB_PASSWORD:?}
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tropicast -d tropicast"]
+      interval: 2s
+      retries: 30
+
+  mail:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - "127.0.0.1:${E2E_MAIL_PORT:-18025}:8025"
+
+  # The same migration bundle production runs before swapping the API.
+  migrate:
+    build:
+      context: ../..
+      target: migrations
+    environment:
+      ConnectionStrings__Default: Host=db;Database=tropicast;Username=tropicast;Password=${E2E_DB_PASSWORD:?}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: ../..
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=db;Database=tropicast;Username=tropicast;Password=${E2E_DB_PASSWORD:?}
+      # Plain HTTP on localhost, no gateway.
+      Auth__UseSecureCookies: "false"
+      App__PublicBaseUrl: http://localhost:${E2E_API_PORT:-18080}
+      Email__From: Tropicast <no-reply@tropicast.localhost>
+      Email__Smtp__Host: mail
+      Email__Smtp__Port: "1025"
+      Email__Smtp__Security: None
+      SourceAuth__NodeUsername: icecast
+      SourceAuth__NodePassword: ${E2E_SOURCE_AUTH_PASSWORD:?}
+      # No node to SSH to: Icecast runs with the default mount limits.
+      Provisioning__Enabled: "false"
+      Streaming__IngestBaseUrl: http://localhost:${E2E_ICECAST_PORT:-18000}
+      Streaming__ListenerBaseUrl: http://localhost:${E2E_ICECAST_PORT:-18000}
+      Stats__Url: http://exporter:9100/metrics
+      # Live within seconds of a source connecting.
+      Stats__Interval: "00:00:02"
+    ports:
+      - "127.0.0.1:${E2E_API_PORT:-18080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      # Mailpit's own healthcheck (readyz): SMTP accepts mail before the first sign-up.
+      mail:
+        condition: service_healthy
+
+  icecast:
+    build: ${TC_STREAMING_DIR:-../../../tc-streaming}
+    environment:
+      ICECAST_SOURCE_PASSWORD: ${E2E_ICECAST_SOURCE_PASSWORD:?}
+      ICECAST_ADMIN_PASSWORD: ${E2E_ICECAST_ADMIN_PASSWORD:?}
+      ICECAST_SOURCE_AUTH_URL: http://api:8081/internal/icecast/source-auth
+      ICECAST_SOURCE_AUTH_USER: icecast
+      ICECAST_SOURCE_AUTH_PASSWORD: ${E2E_SOURCE_AUTH_PASSWORD:?}
+    ports:
+      - "127.0.0.1:${E2E_ICECAST_PORT:-18000}:8000"
+    volumes:
+      - ./stations.json:/etc/icecast/stations.json:ro
+    depends_on:
+      api:
+        condition: service_started
+
+  exporter:
+    image: mirror.gcr.io/library/python:3.12-slim
+    command: ["python3", "-u", "/srv/icecast_exporter.py"]
+    volumes:
+      - ${TC_STREAMING_DIR:-../../../tc-streaming}/exporter/icecast_exporter.py:/srv/icecast_exporter.py:ro
+    environment:
+      ICECAST_ADMIN_PASSWORD: ${E2E_ICECAST_ADMIN_PASSWORD:?}
+    depends_on:
+      icecast:
+        condition: service_healthy

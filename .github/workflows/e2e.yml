@@ -1,0 +1,79 @@
+name: E2E
+
+# Sign-up to live broadcast (#17): this API, PostgreSQL and the real tc-streaming
+# Icecast image (no stub) in Compose, driven by Playwright and FFmpeg
+# (tests/e2e/run.sh). Runs on changes to the API, the SPA or the stack; nightly
+# and on demand against tc-streaming's main, to catch contract changes made there.
+on:
+  pull_request:
+    paths: &paths
+      - src/**
+      - web/**
+      - Dockerfile
+      - .dockerignore
+      - Directory.*.props
+      - global.json
+      - tests/e2e/**
+      - .github/workflows/e2e.yml
+  push:
+    branches: [main]
+    paths: *paths
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      streaming_ref:
+        description: tc-streaming branch, tag or SHA
+        default: main
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on pull requests only; every run on main finishes.
+concurrency:
+  group: e2e-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    name: Sign-up to live broadcast
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Side by side, as in a local checkout: run.sh finds ../tc-streaming.
+      - uses: actions/checkout@v7
+        with:
+          path: tc-dashboard
+
+      - uses: actions/checkout@v7
+        with:
+          repository: tropicast/tc-streaming
+          ref: ${{ inputs.streaming_ref || 'main' }}
+          path: tc-streaming
+
+      - name: Install ffmpeg
+        run: command -v ffmpeg || { sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg; }
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tc-dashboard/web/package-lock.json
+
+      - name: Install Playwright
+        working-directory: tc-dashboard/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the scenario
+        run: tc-dashboard/tests/e2e/run.sh
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e2e-playwright
+          path: |
+            tc-dashboard/web/test-results
+            tc-dashboard/web/playwright-report
+          retention-days: 7
