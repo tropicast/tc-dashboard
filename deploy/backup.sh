@@ -10,7 +10,7 @@
 #   DATABASE_DIRECT_URL  postgresql://... (not the pooler)
 #   BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY
 #   BACKUP_AGE_RECIPIENT
-#   BACKUP_PG_IMAGE (default postgres:17-alpine: match the server's major version)
+#   BACKUP_PG_IMAGE (default postgres:18-alpine: match the server's major version)
 set -euo pipefail
 
 root=${DEPLOY_ROOT:-/opt/tc-dashboard}
@@ -33,14 +33,17 @@ PGURL=$(setting DATABASE_DIRECT_URL)
 recipient=$(setting BACKUP_AGE_RECIPIENT)
 bucket=$(setting BACKUP_S3_BUCKET)
 retention=$(setting BACKUP_RETENTION_DAYS 30)
-pg_image=$(setting BACKUP_PG_IMAGE postgres:17-alpine)
+pg_image=$(setting BACKUP_PG_IMAGE postgres:18-alpine)
 RCLONE_CONFIG_S3_TYPE=s3
 RCLONE_CONFIG_S3_PROVIDER=Other
 RCLONE_CONFIG_S3_ENDPOINT=$(setting BACKUP_S3_ENDPOINT)
 RCLONE_CONFIG_S3_ACCESS_KEY_ID=$(setting BACKUP_S3_ACCESS_KEY)
 RCLONE_CONFIG_S3_SECRET_ACCESS_KEY=$(setting BACKUP_S3_SECRET_KEY)
+# The bucket exists. Without this, rclone tries to create it on upload, and
+# Hetzner refuses with LocationConstraintConflict (rclone's default region).
+RCLONE_CONFIG_S3_NO_CHECK_BUCKET=true
 export PGURL RCLONE_CONFIG_S3_TYPE RCLONE_CONFIG_S3_PROVIDER RCLONE_CONFIG_S3_ENDPOINT \
-    RCLONE_CONFIG_S3_ACCESS_KEY_ID RCLONE_CONFIG_S3_SECRET_ACCESS_KEY
+    RCLONE_CONFIG_S3_ACCESS_KEY_ID RCLONE_CONFIG_S3_SECRET_ACCESS_KEY RCLONE_CONFIG_S3_NO_CHECK_BUCKET
 [[ $retention =~ ^[0-9]+$ ]] || { log "BACKUP_RETENTION_DAYS must be a number"; exit 1; }
 
 # Under the deploy root, not /tmp: the dump can be larger than a tmpfs.
@@ -57,7 +60,7 @@ size=$(stat -c %s "$work/$name")
 
 rclone() {
     docker run --rm -e RCLONE_CONFIG_S3_TYPE -e RCLONE_CONFIG_S3_PROVIDER -e RCLONE_CONFIG_S3_ENDPOINT \
-        -e RCLONE_CONFIG_S3_ACCESS_KEY_ID -e RCLONE_CONFIG_S3_SECRET_ACCESS_KEY \
+        -e RCLONE_CONFIG_S3_ACCESS_KEY_ID -e RCLONE_CONFIG_S3_SECRET_ACCESS_KEY -e RCLONE_CONFIG_S3_NO_CHECK_BUCKET \
         -v "$work:/backup:ro" "$rclone_image" "$@"
 }
 
