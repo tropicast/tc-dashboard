@@ -50,7 +50,7 @@ cd web && npm ci && npm run dev                      # proxies /api to :5080
 
 ```sh
 dotnet build Tropicast.Dashboard.slnx   # also writes web/openapi/openapi.json
-dotnet test Tropicast.Dashboard.slnx
+dotnet test --solution Tropicast.Dashboard.slnx
 cd web
 npm run generate:api   # regenerate src/api/schema.d.ts from openapi/openapi.json
 npm run lint && npm run format:check && npm test && npm run build
