@@ -66,7 +66,7 @@ internal static class DeviceAuthorizationEndpoints
         device.MapPost("/code", StartAsync).RequireRateLimiting(AuthSetup.AuthRateLimit)
             .WithSummary("Starts a desktop sign-in: a secret device code to poll with and a short user code to show.");
         // Polled every few seconds: the poll interval limits it, not the per-IP sign-in limit.
-        device.MapPost("/token", PollAsync)
+        device.MapPost("/token", PollAsync).RequireRateLimiting(AuthSetup.DevicePollRateLimit)
             .WithSummary("Polls a desktop sign-in; returns the device's tokens once the user approved it.")
             .Produces<DevicePollProblem>(StatusCodes.Status400BadRequest, "application/problem+json");
 
@@ -141,6 +141,7 @@ internal static class DeviceAuthorizationEndpoints
             {
                 (session, refreshToken) = DeviceSession.Start(user.Id, pending.DeviceName, now);
                 db.DeviceSessions.Add(session);
+                SecurityLog.Record(db, user.Id, SecurityLog.DeviceSignedIn, context, session.DeviceName, now);
             }
         }
         try
@@ -179,7 +180,11 @@ internal static class DeviceAuthorizationEndpoints
         UserManager<AppUser> users, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
         var userId = Guid.Parse(users.GetUserId(context.User)!);
-        return await DecideAsync(db, request.UserCode, time.GetUtcNow(), (r, now) => r.Approve(userId, now), cancellationToken);
+        return await DecideAsync(db, request.UserCode, time.GetUtcNow(), (r, now) =>
+        {
+            r.Approve(userId, now);
+            SecurityLog.Record(db, userId, SecurityLog.DeviceApproved, context, r.DeviceName, now);
+        }, cancellationToken);
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> DenyAsync(UserCodeRequest request, AppDbContext db,

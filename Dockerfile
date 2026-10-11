@@ -33,8 +33,6 @@ ENTRYPOINT ["/efbundle"]
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
-# Data Protection keys (DataProtection:KeysDirectory): a volume in production, owned by the app user.
-RUN mkdir -p /data/keys && chown $APP_UID /data/keys
 COPY --from=api /out ./
 COPY --from=web /out/wwwroot ./wwwroot
 # 8080: public API and SPA (behind the gateway). 8081: internal source-auth for the streaming node only.

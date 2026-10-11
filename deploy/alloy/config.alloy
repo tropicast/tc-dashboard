@@ -1,0 +1,82 @@
+// Grafana Alloy on the control-plane node (#16): the API's OpenTelemetry
+// metrics and traces, host metrics and the backup age, sent to Grafana Cloud
+// over its OTLP gateway.
+// Environment: GRAFANA_CLOUD_OTLP_URL, GRAFANA_CLOUD_OTLP_USER,
+// GRAFANA_CLOUD_TOKEN, NODE_NAME.
+
+// From the API (OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318). The port is
+// on the internal Docker network only.
+otelcol.receiver.otlp "api" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.cloud.input]
+    traces  = [otelcol.processor.batch.cloud.input]
+  }
+}
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  // Keep the series count inside the Grafana Cloud free tier.
+  set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "textfile", "time", "uname"]
+
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|run|sys|var/lib/docker/.+)($|/)"
+  }
+
+  // backup.sh writes tropicast_backup_last_success_timestamp_seconds here.
+  textfile {
+    directory = "/host/metrics"
+  }
+}
+
+discovery.relabel "host" {
+  targets = prometheus.exporter.unix.host.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "node"
+  }
+
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("NODE_NAME")
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = discovery.relabel.host.output
+  job_name        = "node"
+  scrape_interval = "30s"
+  forward_to      = [otelcol.receiver.prometheus.host.receiver]
+}
+
+otelcol.receiver.prometheus "host" {
+  output {
+    metrics = [otelcol.processor.batch.cloud.input]
+  }
+}
+
+otelcol.processor.batch "cloud" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.cloud.input]
+    traces  = [otelcol.exporter.otlphttp.cloud.input]
+  }
+}
+
+otelcol.auth.basic "cloud" {
+  username = sys.env("GRAFANA_CLOUD_OTLP_USER")
+  password = sys.env("GRAFANA_CLOUD_TOKEN")
+}
+
+otelcol.exporter.otlphttp "cloud" {
+  client {
+    endpoint = sys.env("GRAFANA_CLOUD_OTLP_URL")
+    auth     = otelcol.auth.basic.cloud.handler
+  }
+}

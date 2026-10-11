@@ -1,3 +1,5 @@
+using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Infrastructure.Telemetry;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http.Features;
@@ -38,7 +40,8 @@ internal static partial class SourceAuthEndpoint
         var port = app.Services.GetRequiredService<IOptions<SourceAuthOptions>>().Value.Port;
         app.MapPost(Path, HandleAsync)
             .ExcludeFromDescription()
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .RequireRateLimiting(AuthSetup.SourceAuthRateLimit);
         // Other internal paths: not found, never the SPA.
         app.Map("/internal/{**path}", () => Results.NotFound()).ExcludeFromDescription();
     }
@@ -60,6 +63,8 @@ internal static partial class SourceAuthEndpoint
         }
         string? mount = null;
         SourceAuthDecision decision;
+        var started = time.GetTimestamp();
+        var result = "deny";
         try
         {
             // One budget for reading the form and deciding; anything going wrong denies.
@@ -77,7 +82,14 @@ internal static partial class SourceAuthEndpoint
             // Fail closed: malformed input, a timeout or an outage must never let a source in.
             LogError(logger, ex.GetType().Name, mount);
             decision = SourceAuthDecision.Deny("temporary error, try again");
+            result = "error";
         }
+        if (decision.Allowed)
+        {
+            result = "allow";
+        }
+        DashboardMetrics.SourceAuthDecisions.Add(1, DashboardMetrics.Result(result));
+        DashboardMetrics.SourceAuthDuration.Record(time.GetElapsedTime(started).TotalSeconds, DashboardMetrics.Result(result));
 
         LogDecision(logger, decision.Allowed ? "allow" : "deny", mount, decision.Reason);
         context.Response.StatusCode = StatusCodes.Status200OK;

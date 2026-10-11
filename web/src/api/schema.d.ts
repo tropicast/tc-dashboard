@@ -127,6 +127,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/current/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Security-relevant actions in the tenant, newest first. */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number | string;
+                    pageSize?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PagedListOfAuditEntryResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/stations": {
         parameters: {
             query?: never;
@@ -927,6 +975,42 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["DeviceResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The account's recent security events (sign-ins, failed sign-ins, devices, password changes), 90 days. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SecurityEventResponse"][];
                     };
                 };
             };
@@ -2062,6 +2146,24 @@ export interface components {
          * @enum {unknown}
          */
         AudioFormat: "Mp3" | "Opus";
+        /** @description An audit log entry. */
+        AuditEntryResponse: {
+            /** @description What happened, e.g. `credential.created`, `member.removed`, `plan.changed`. */
+            action: string;
+            /** @description Who did it; null for the system (billing, a background job) or a deleted account. */
+            actorEmail: null | string;
+            /** @description Kind of object. */
+            targetType: string;
+            /** @description Its ID. */
+            targetId: string;
+            /** @description Short context, never a secret. */
+            summary: null | string;
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            occurredAt: string;
+        };
         /** @description One stream to publish. */
         BroadcastOutput: {
             /** @description Stream format. */
@@ -2475,6 +2577,26 @@ export interface components {
             updatedAt: string;
         };
         /** @description One page of results. */
+        PagedListOfAuditEntryResponse: {
+            /** @description The items on this page. */
+            items: components["schemas"]["AuditEntryResponse"][];
+            /**
+             * Format: int32
+             * @description 1-based page number.
+             */
+            page: number | string;
+            /**
+             * Format: int32
+             * @description Items per page (1-100).
+             */
+            pageSize: number | string;
+            /**
+             * Format: int32
+             * @description Items on all pages.
+             */
+            totalCount: number | string;
+        };
+        /** @description One page of results. */
         PagedListOfStationResponse: {
             /** @description The items on this page. */
             items: components["schemas"]["StationResponse"][];
@@ -2595,6 +2717,24 @@ export interface components {
         };
         /** @enum {unknown} */
         RollupInterval: "FiveMinutes" | "Day";
+        /** @description An account security event. */
+        SecurityEventResponse: {
+            /**
+             * @description What happened: `signin.succeeded`, `signin.failed`, `device.signed_in`, `device.approved`,
+             *         `device.signed_out`, `device.token_reuse` (a copied refresh token: the device was signed out),
+             *         `password.changed`, `password.reset`.
+             */
+            action: string;
+            /** @description Client address. */
+            ipAddress: null | string;
+            /** @description Device name, sign-in channel or "locked out". */
+            detail: null | string;
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            occurredAt: string;
+        };
         /**
          * @description A station.
          * @example {

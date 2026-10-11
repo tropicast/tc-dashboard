@@ -181,6 +181,19 @@ internal sealed class DirectoryListingConfiguration : IEntityTypeConfiguration<D
     }
 }
 
+internal sealed class SecurityEventConfiguration : IEntityTypeConfiguration<SecurityEvent>
+{
+    public void Configure(EntityTypeBuilder<SecurityEvent> builder)
+    {
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(e => new { e.UserId, e.OccurredAt });
+        builder.HasIndex(e => e.OccurredAt);
+        builder.Property(e => e.Action).HasMaxLength(64);
+        builder.Property(e => e.IpAddress).HasMaxLength(45);
+        builder.Property(e => e.Detail).HasMaxLength(128);
+    }
+}
+
 internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage>
 {
     public void Configure(EntityTypeBuilder<OutboxMessage> builder)

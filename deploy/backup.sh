@@ -65,4 +65,10 @@ log "uploading $name ($size bytes)"
 rclone copyto "/backup/$name" "s3:$bucket/db/$name"
 log "deleting dumps older than $retention days"
 rclone delete --min-age "${retention}d" "s3:$bucket/db/"
+# For the BackupMissing alert (#16): Alloy reads this file (node exporter textfile format).
+if [[ -d $root/metrics ]]; then
+    printf '# TYPE tropicast_backup_last_success_timestamp_seconds gauge\ntropicast_backup_last_success_timestamp_seconds %s\n' \
+        "$(date -u +%s)" > "$root/metrics/backup.prom.tmp"
+    mv "$root/metrics/backup.prom.tmp" "$root/metrics/backup.prom"
+fi
 log "done"

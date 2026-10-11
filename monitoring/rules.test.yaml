@@ -1,0 +1,104 @@
+# promtool test rules rules.test.yaml
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # Acceptance (#16): a failing source-auth call raises an alert within 5 minutes.
+  - interval: 1m
+    input_series:
+      - series: 'tropicast_source_auth_decisions_total{job="tc-dashboard",result="error"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1'
+      - series: 'tropicast_up{job="tc-dashboard"}'
+        values: '1x14'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: SourceAuthErrors
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: SourceAuthErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Source-auth calls are failing (1 in 5 minutes).
+              description: Icecast refuses sources while source auth errors. Check the API logs (`deploy.sh compose logs api | grep -i source`) and the database.
+      # Quiet again once errors stop.
+      - eval_time: 13m
+        alertname: SourceAuthErrors
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      # As exported through the OTLP gateway: whatever labels it adds.
+      - series: 'tropicast_up{service_name="tc-dashboard",job="any"}'
+        values: '1 1 1 _ _ _ _ _'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: DashboardDown
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: DashboardDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: No metrics from the control-plane API for 3 minutes.
+              description: The API, the tc-app-1 node or Alloy is down. Check https://app.tropicastradio.com/health/ready, then `deploy.sh status` on the node.
+
+  # p99 above 500 ms for 5 minutes: every call in the 1 s bucket.
+  - interval: 1m
+    input_series:
+      - series: 'tropicast_source_auth_duration_seconds_bucket{job="tc-dashboard",le="0.5"}'
+        values: '0x20'
+      - series: 'tropicast_source_auth_duration_seconds_bucket{job="tc-dashboard",le="1"}'
+        values: '0+10x20'
+      - series: 'tropicast_source_auth_duration_seconds_bucket{job="tc-dashboard",le="+Inf"}'
+        values: '0+10x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: SourceAuthSlow
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: SourceAuthSlow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Source auth p99 is 995ms (limit 500 ms).
+              description: Broadcasters wait to go live; above 2 s the call times out and denies. Check database latency (Neon).
+
+  - interval: 1m
+    input_series:
+      - series: 'tropicast_provisioning_applies_total{job="tc-dashboard",result="failed"}'
+        values: '0+1x30'
+      - series: 'tropicast_provisioning_applies_total{job="tc-dashboard",result="ok"}'
+        values: '5x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ProvisioningFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Station limits cannot be applied to the streaming node.
+              description: New stations and plan changes do not reach Icecast. See GET /api/v1/operator/streaming-nodes (lastError) and the runbook.
+
+  # A backup 27 hours old.
+  - interval: 1h
+    input_series:
+      - series: 'tropicast_backup_last_success_timestamp_seconds{job="node"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: BackupMissing
+        exp_alerts: []
+      - eval_time: 27h
+        alertname: BackupMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: No successful database backup for 1d 3h 0m 0s.
+              description: Check `journalctl -u tc-dashboard-backup` on tc-app-1 and the backup bucket.

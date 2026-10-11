@@ -52,6 +52,8 @@ internal static class InvitationEndpoints
         var invitation = Invitation.Create(tenant.Id, request.Email, role, Secrets.Hash(token),
             Guid.Parse(users.GetUserId(context.User)!), time.GetUtcNow());
         db.Invitations.Add(invitation);
+        Audit.Record(db, access, context.User, "member.invited", nameof(Invitation), invitation.Id.ToString(), role.ToString(),
+            time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         await email.SendAsync(AuthEmails.Invitation(invitation.Email, app.Value.PublicBaseUrl, tenant.Name, role.ToString(), token),
             cancellationToken);
@@ -82,6 +84,9 @@ internal static class InvitationEndpoints
             return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "You are already a member of this tenant.");
         }
         db.Memberships.Add(invitation.Accept(user.Id, now));
+        // Not a member until now, so no tenant access: the entry names the invitation's tenant directly.
+        db.AuditEntries.Add(Domain.Audit.AuditEntry.Record(invitation.TenantId, user.Id, "member.joined", "Membership", user.Id.ToString(),
+            invitation.Role.ToString(), now));
         await db.SaveChangesAsync(cancellationToken);
         return TypedResults.NoContent();
     }

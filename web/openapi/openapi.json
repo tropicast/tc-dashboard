@@ -108,6 +108,64 @@
         }
       }
     },
+    "/api/v1/tenants/current/audit": {
+      "get": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "Security-relevant actions in the tenant, newest first.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedListOfAuditEntryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/stations": {
       "get": {
         "tags": [
@@ -659,6 +717,29 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/DeviceResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/activity": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "The account's recent security events (sign-ins, failed sign-ins, devices, password changes), 90 days.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SecurityEventResponse"
                   }
                 }
               }
@@ -1732,6 +1813,51 @@
         ],
         "description": "A stream format, as in the mount `/stations/{id}/live.{mp3,opus}`."
       },
+      "AuditEntryResponse": {
+        "required": [
+          "action",
+          "actorEmail",
+          "targetType",
+          "targetId",
+          "summary",
+          "occurredAt"
+        ],
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "What happened, e.g. `credential.created`, `member.removed`, `plan.changed`."
+          },
+          "actorEmail": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who did it; null for the system (billing, a background job) or a deleted account."
+          },
+          "targetType": {
+            "type": "string",
+            "description": "Kind of object."
+          },
+          "targetId": {
+            "type": "string",
+            "description": "Its ID."
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Short context, never a secret."
+          },
+          "occurredAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "An audit log entry."
+      },
       "BroadcastOutput": {
         "required": [
           "format",
@@ -2651,6 +2777,52 @@
         },
         "description": "A streaming node's traffic in the current billing period, against what the server price includes."
       },
+      "PagedListOfAuditEntryResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntryResponse"
+            },
+            "description": "The items on this page."
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1-based page number.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Items per page (1-100).",
+            "format": "int32"
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Items on all pages.",
+            "format": "int32"
+          }
+        },
+        "description": "One page of results."
+      },
       "PagedListOfStationResponse": {
         "required": [
           "items",
@@ -2971,6 +3143,41 @@
           "FiveMinutes",
           "Day"
         ]
+      },
+      "SecurityEventResponse": {
+        "required": [
+          "action",
+          "ipAddress",
+          "detail",
+          "occurredAt"
+        ],
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "What happened: `signin.succeeded`, `signin.failed`, `device.signed_in`, `device.approved`,\n    `device.signed_out`, `device.token_reuse` (a copied refresh token: the device was signed out),\n    `password.changed`, `password.reset`."
+          },
+          "ipAddress": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Client address."
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Device name, sign-in channel or \"locked out\"."
+          },
+          "occurredAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "An account security event."
       },
       "StationResponse": {
         "examples": [
@@ -3542,6 +3749,9 @@
       "name": "Members"
     },
     {
+      "name": "Tenants"
+    },
+    {
       "name": "Desktop"
     },
     {
@@ -3558,9 +3768,6 @@
     },
     {
       "name": "Auth"
-    },
-    {
-      "name": "Tenants"
     },
     {
       "name": "Credentials"

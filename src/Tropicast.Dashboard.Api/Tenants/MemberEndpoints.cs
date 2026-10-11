@@ -36,8 +36,8 @@ internal static class MemberEndpoints
         return TypedResults.Ok(members.Select(m => new MemberResponse(m.UserId, m.Email!, m.Role, m.CreatedAt)).ToList());
     }
 
-    private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> RemoveAsync(Guid userId, TenantAccess access,
-        AppDbContext db, CancellationToken cancellationToken)
+    private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> RemoveAsync(Guid userId, HttpContext context, TenantAccess access,
+        AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         // Locks the tenant row: two concurrent removals cannot both see a second Owner and leave none.
@@ -60,6 +60,7 @@ internal static class MemberEndpoints
             }
         }
         db.Memberships.Remove(membership);
+        Audit.Record(db, access, context.User, "member.removed", "Membership", userId.ToString(), membership.Role.ToString(), time.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return TypedResults.NoContent();

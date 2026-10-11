@@ -1,0 +1,83 @@
+# Alert rules for the control plane (#16), Prometheus format.
+# Metrics arrive over OTLP (deploy/alloy/config.alloy). The selectors use the
+# metric names only (all tropicast_* names are unique to the API or backup), so
+# they do not depend on how the OTLP gateway maps service.name to labels.
+# Load into Grafana Cloud with mimirtool (docs/runbook.md, Monitoring).
+# Unit tests: monitoring/rules.test.yaml (promtool test rules), run in CI.
+groups:
+  - name: tropicast-control-plane
+    rules:
+      # tropicast_up is always 1 while the API exports; nothing for 3 minutes
+      # means the API, its node or Alloy is down.
+      - alert: DashboardDown
+        expr: absent_over_time(tropicast_up[3m])
+        labels:
+          severity: critical
+        annotations:
+          summary: No metrics from the control-plane API for 3 minutes.
+          description: The API, the tc-app-1 node or Alloy is down. Check https://app.tropicastradio.com/health/ready, then `deploy.sh status` on the node.
+
+      # A source-auth call that failed closed (database or code error): every
+      # broadcaster is refused while it lasts. Fires on the first one.
+      - alert: SourceAuthErrors
+        expr: sum(increase(tropicast_source_auth_decisions_total{result="error"}[5m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: Source-auth calls are failing ({{ $value | humanize }} in 5 minutes).
+          description: Icecast refuses sources while source auth errors. Check the API logs (`deploy.sh compose logs api | grep -i source`) and the database.
+
+      - alert: SourceAuthSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(tropicast_source_auth_duration_seconds_bucket[10m]))) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Source auth p99 is {{ $value | humanizeDuration }} (limit 500 ms).
+          description: Broadcasters wait to go live; above 2 s the call times out and denies. Check database latency (Neon).
+
+      - alert: ProvisioningFailing
+        expr: |
+          sum(increase(tropicast_provisioning_applies_total{result="failed"}[15m])) > 0
+            unless sum(increase(tropicast_provisioning_applies_total{result="ok"}[15m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Station limits cannot be applied to the streaming node.
+          description: New stations and plan changes do not reach Icecast. See GET /api/v1/operator/streaming-nodes (lastError) and the runbook.
+
+      - alert: StreamingStatsUnavailable
+        expr: |
+          sum(increase(tropicast_stats_samples_total{result="unreachable"}[10m])) > 5
+            unless sum(increase(tropicast_stats_samples_total{result="ok"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: The streaming node's exporter cannot be read.
+          description: Live status and statistics are stale. Check the private network and tc-streaming's exporter (STATS_URL).
+
+      - alert: DirectoryListingFailing
+        expr: sum(increase(tropicast_directory_submissions_total{result="failed"}[6h])) > 3
+        labels:
+          severity: info
+        annotations:
+          summary: RadioBrowser listings keep failing.
+          description: Opted-in stations are not listed yet; nothing else is affected. The station page shows the last error.
+
+      # backup.sh records each successful nightly backup.
+      - alert: BackupMissing
+        expr: time() - max(tropicast_backup_last_success_timestamp_seconds) > 26 * 3600
+        labels:
+          severity: critical
+        annotations:
+          summary: No successful database backup for {{ $value | humanizeDuration }}.
+          description: Check `journalctl -u tc-dashboard-backup` on tc-app-1 and the backup bucket.
+
+      - alert: BackupNeverRecorded
+        expr: absent_over_time(tropicast_backup_last_success_timestamp_seconds[30h])
+        labels:
+          severity: warning
+        annotations:
+          summary: The node has never reported a successful backup.
+          description: The backup timer or its metrics file is missing (Ansible site.yml, deploy.sh metrics directory).

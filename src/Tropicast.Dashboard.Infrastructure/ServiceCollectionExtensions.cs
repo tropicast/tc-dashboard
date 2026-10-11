@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ProvisioningSignal>();
         services.AddScoped<Reconciler>();
         services.AddSingleton<IOutboxConsumer, ProvisioningOutboxConsumer>();
+        services.AddSingleton<IOutboxConsumer, Audit.PlanChangeAudit>();
         services.AddHostedService<ProvisioningWorker>();
         services.AddHostedService<DeviceAuthorizationCleanup>();
         services.Configure<StatsOptions>(configuration.GetSection("Stats"));

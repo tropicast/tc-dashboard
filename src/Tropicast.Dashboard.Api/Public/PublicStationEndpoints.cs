@@ -48,9 +48,12 @@ internal static class PublicStationEndpoints
     internal static void MapPublicStations(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/v1/public/stations/{tenantSlug}/{stationSlug}", GetAsync).WithTags("Public").AllowAnonymous()
+            .RequireRateLimiting(AuthSetup.PublicRateLimit)
             .WithSummary("A station's public information, live state and listener streams. Cacheable; no tenant data.");
-        app.MapGet("/listen/{tenantSlug}/{stationSlug}", PageAsync).AllowAnonymous().ExcludeFromDescription();
-        app.MapGet("/embed/{tenantSlug}/{stationSlug}", EmbedAsync).AllowAnonymous().ExcludeFromDescription();
+        app.MapGet("/listen/{tenantSlug}/{stationSlug}", PageAsync).AllowAnonymous().ExcludeFromDescription()
+            .RequireRateLimiting(AuthSetup.PublicRateLimit);
+        app.MapGet("/embed/{tenantSlug}/{stationSlug}", EmbedAsync).AllowAnonymous().ExcludeFromDescription()
+            .RequireRateLimiting(AuthSetup.PublicRateLimit);
         app.MapGet("/embed.js", EmbedScript).AllowAnonymous().ExcludeFromDescription();
     }
 

@@ -20,7 +20,6 @@ services:
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ConnectionStrings__Default: ${DATABASE_CONNECTION:?}
       App__PublicBaseUrl: https://${APP_HOST:?}
-      DataProtection__KeysDirectory: /data/keys
       Email__From: ${EMAIL_FROM:?}
       Email__Smtp__Host: ${SMTP_HOST:?}
       Email__Smtp__Port: ${SMTP_PORT:-587}
@@ -37,8 +36,11 @@ services:
       Stats__Url: ${STATS_URL:-}
       # RadioBrowser listing (#13): adds opted-in live stations to the public directory.
       Directory__Enabled: ${DIRECTORY_ENABLED:-false}
-    volumes:
-      - dataprotection:/data/keys
+      # Metrics and traces to Alloy (profile "monitoring"); empty: not exported.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production,service.instance.id=${NODE_NAME:-tc-app-1}
     ports:
       # Source auth for Icecast on the streaming nodes (private network).
       - "${PRIVATE_IP:?}:8081:8081"
@@ -64,6 +66,27 @@ services:
       - caddy-config:/config
     depends_on: [api]
 
+  # Monitoring (#16), with COMPOSE_PROFILES=monitoring: the API's metrics and
+  # traces (OTLP), host metrics and the backup age, to Grafana Cloud.
+  alloy:
+    profiles: [monitoring]
+    image: grafana/alloy:v1.20.1
+    restart: unless-stopped
+    command: ["run", "/etc/alloy/config.alloy", "--storage.path=/var/lib/alloy/data"]
+    pid: host
+    volumes:
+      - ./alloy:/etc/alloy:ro
+      - ./metrics:/host/metrics:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - alloy-data:/var/lib/alloy/data
+    environment:
+      GRAFANA_CLOUD_OTLP_URL: ${GRAFANA_CLOUD_OTLP_URL:-}
+      GRAFANA_CLOUD_OTLP_USER: ${GRAFANA_CLOUD_OTLP_USER:-}
+      GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN:-}
+      NODE_NAME: ${NODE_NAME:-tc-app-1}
+
   # One-off: `deploy.sh` runs it before swapping the API. Direct (non-pooled)
   # connection: migrations need session features the pooler lacks.
   migrate:
@@ -75,6 +98,6 @@ services:
       ConnectionStrings__Default: ${DATABASE_MIGRATION_CONNECTION:?}
 
 volumes:
-  dataprotection:
   caddy-data:
   caddy-config:
+  alloy-data:

@@ -108,6 +108,7 @@ internal static partial class StationEndpoints
         var assignment = StreamAssignment.Create(station, streaming.Value.Node, now);
         db.Stations.Add(station);
         db.StreamAssignments.Add(assignment);
+        Audit.Record(db, access, context.User, "station.created", nameof(Station), station.Id.ToString(), null, now);
         if (await SaveAsync(db, cancellationToken) is { } conflict)
         {
             return conflict;
@@ -130,8 +131,8 @@ internal static partial class StationEndpoints
     }
 
     private static async Task<Results<Ok<StationResponse>, NotFound, ValidationProblem, ProblemHttpResult>> UpdateAsync(Guid id,
-        UpdateStationCommand command, HttpContext context, AppDbContext db, IOptions<StreamingOptions> streaming, TimeProvider time,
-        CancellationToken cancellationToken)
+        UpdateStationCommand command, HttpContext context, AppDbContext db, TenantAccess access, IOptions<StreamingOptions> streaming,
+        TimeProvider time, CancellationToken cancellationToken)
     {
         var station = await db.Stations.SingleOrDefaultAsync(s => s.Id == id, cancellationToken);
         if (station is null)
@@ -158,6 +159,7 @@ internal static partial class StationEndpoints
         {
             station.SetDirectoryListing(listed, await CurrentPlanAsync(db, cancellationToken), now);
         }
+        Audit.Record(db, access, context.User, "station.updated", nameof(Station), station.Id.ToString(), Changed(command), now);
         if (await SaveAsync(db, cancellationToken) is { } failed)
         {
             return failed;
@@ -167,7 +169,7 @@ internal static partial class StationEndpoints
     }
 
     private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> DeleteAsync(Guid id, HttpContext context,
-        AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
+        AppDbContext db, TenantAccess access, TimeProvider time, CancellationToken cancellationToken)
     {
         var station = await db.Stations.SingleOrDefaultAsync(s => s.Id == id, cancellationToken);
         if (station is null)
@@ -179,8 +181,18 @@ internal static partial class StationEndpoints
             return precondition;
         }
         station.Delete(time.GetUtcNow());
+        Audit.Record(db, access, context.User, "station.deleted", nameof(Station), station.Id.ToString(), null, time.GetUtcNow());
         return await Concurrency.SaveAsync(db, cancellationToken) is { } stale ? stale : TypedResults.NoContent();
     }
+
+    /// <summary>Names of the settings an update changed, for the audit log (never their values).</summary>
+    private static string Changed(UpdateStationCommand command) => string.Join(", ", new (string Name, bool Set)[]
+    {
+        ("name", command.Name is not null), ("slug", command.Slug is not null), ("description", command.Description is not null),
+        ("genre", command.Genre is not null), ("country", command.Country is not null), ("language", command.Language is not null),
+        ("logo", command.LogoUrl is not null), ("website", command.Website is not null),
+        ("directory listing", command.ListInDirectory is not null),
+    }.Where(c => c.Set).Select(c => c.Name));
 
     /// <summary>
     /// Whether one more station on this plan would overload the node. Locks the node for the transaction, so

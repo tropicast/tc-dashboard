@@ -54,11 +54,13 @@ internal sealed partial class Reconciler(AppDbContext db, IStreamingNodeClient c
             {
                 await client.ApplyStationsAsync(node, desired.Json, cancellationToken);
                 state.Applied(desired.Version, time.GetUtcNow());
+                Telemetry.DashboardMetrics.ProvisioningApplies.Add(1, Telemetry.DashboardMetrics.Result("ok"));
                 LogApplied(logger, node, desired.Version, stations.Count);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 state.Failed($"{ex.GetType().Name}: {ex.Message}", time.GetUtcNow(), options.Value.RetryDelay);
+                Telemetry.DashboardMetrics.ProvisioningApplies.Add(1, Telemetry.DashboardMetrics.Result("failed"));
                 LogFailed(logger, node, ex.GetType().Name, state.FailedAttempts);
             }
         }

@@ -1,3 +1,11 @@
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Npgsql;
+using Tropicast.Dashboard.Infrastructure.Telemetry;
+using Tropicast.Dashboard.Api.Logging;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Tropicast.Dashboard.Infrastructure.Persistence;
 using System.Text.Json.Serialization;
 using Tropicast.Dashboard.Api;
 using Scalar.AspNetCore;
@@ -16,6 +24,13 @@ using Tropicast.Dashboard.Infrastructure.Directories;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+if (!builder.Environment.IsDevelopment())
+{
+    // JSON lines with credentials masked (Logging/Redaction.cs); development keeps the readable console.
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole(options => options.FormatterName = RedactingJsonFormatter.Name)
+        .AddConsoleFormatter<RedactingJsonFormatter, Microsoft.Extensions.Logging.Console.ConsoleFormatterOptions>();
+}
 builder.Services.AddProblemDetails();
 // Malformed request bodies are the client's fault: 400, not 500.
 builder.Services.AddExceptionHandler(options =>
@@ -24,9 +39,34 @@ builder.Services.AddExceptionHandler(options =>
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
 builder.Services.AddOpenApi(options => options.AddExamples().AddConcurrencyHeaders());
-builder.Services.AddHealthChecks();
+// /health/live: the process answers (no dependencies). /health/ready: it can serve, i.e. the database answers.
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+// OpenTelemetry traces and metrics, exported over OTLP to the node's Alloy (then Grafana Cloud) when
+// OTEL_EXPORTER_OTLP_ENDPOINT is set; otherwise collected but not sent.
+var otlp = !string.IsNullOrEmpty(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+var telemetry = builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("tc-dashboard", serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString()))
+    .WithTracing(tracing =>
+    {
+        tracing.AddAspNetCoreInstrumentation(options => options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))
+            .AddHttpClientInstrumentation()
+            .AddNpgsql();
+        if (otlp)
+        {
+            tracing.AddOtlpExporter();
+        }
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddRuntimeInstrumentation()
+            .AddMeter(DashboardMetrics.MeterName);
+        if (otlp)
+        {
+            metrics.AddOtlpExporter();
+        }
+    });
 builder.Services.AddDashboardAuth(builder.Configuration);
 builder.Services.Configure<StreamingOptions>(builder.Configuration.GetSection("Streaming"));
 builder.Services.Configure<SourceAuthOptions>(builder.Configuration.GetSection("SourceAuth"));
@@ -65,13 +105,17 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 app.UseDashboardAuth();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+// Kept for existing checks (image smoke test, uptime monitors): the same as /health/live.
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
 app.MapApi();
 app.MapAuth();
 app.MapDeviceAuthorization();
 app.MapInvitations();
 app.MapTenants();
 app.MapMembers();
+app.MapAudit();
 app.MapStations();
 app.MapCredentials();
 app.MapDesktop();

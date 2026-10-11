@@ -19,7 +19,8 @@ set -euo pipefail
 
 root=${DEPLOY_ROOT:-/opt/tc-dashboard}
 keep_releases=5
-health_url=${HEALTH_URL:-http://127.0.0.1:8080/health}
+# Ready: the API answers and reaches the database.
+health_url=${HEALTH_URL:-http://127.0.0.1:8080/health/ready}
 cd "$root"
 
 compose() {
@@ -37,6 +38,12 @@ install_bundle() {
     cat "$bundle/Caddyfile" > caddy/Caddyfile
     chmod 0644 caddy/Caddyfile
     install -m 0750 "$bundle/backup.sh" backup.sh
+    # Monitoring files (#16); older bundles do not have them.
+    if [[ -f $bundle/config.alloy ]]; then
+        install -d -m 0750 alloy
+        install -d -m 0755 metrics
+        install -m 0644 "$bundle/config.alloy" alloy/config.alloy
+    fi
     install -m 0750 "$bundle/deploy.sh" deploy.sh.new
     mv deploy.sh.new deploy.sh
 }
@@ -73,7 +80,8 @@ start() {
     local caddy_before
     caddy_before=$(caddy_started_at)
     log "starting services (image $DASHBOARD_IMAGE_TAG)"
-    compose up -d --remove-orphans api caddy
+    # Every service of the active profiles (COMPOSE_PROFILES in .env); the migrate profile stays off.
+    compose up -d --remove-orphans
     healthy || { log "the API is not healthy"; return 1; }
     # A Caddy container started by this deploy already runs the new config.
     if [[ -n $caddy_before && $caddy_before == "$(caddy_started_at)" ]]; then
