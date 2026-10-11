@@ -12,7 +12,8 @@ const labels: Record<Directory['state'], string> = {
   WaitingForLive: 'Waiting for the station to go live.',
   Retrying: 'RadioBrowser did not accept it yet; retrying.',
   Listed: 'Listed on RadioBrowser.',
-  Delisting: 'Removed: RadioBrowser drops the entry at its next check of the stream.',
+  Delisting:
+    'Opted out: at its next check of the stream, RadioBrowser marks the entry broken, which hides it from most apps.',
 };
 
 /** Where the station's RadioBrowser listing stands, next to the "List on RadioBrowser" setting. */

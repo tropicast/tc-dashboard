@@ -193,8 +193,8 @@ Run in this order; each step can be undone by reverting its variable.
      entries, so later changes reach the listing through the stream: the node
      sends the station's metadata as `icy-*` headers with
      `icy-index-metadata: 1`, which RadioBrowser applies at its next check.
-   - Opting out sends `icy-do-not-index: 1`; RadioBrowser drops the entry at
-     a later check.
+   - Opting out sends `icy-do-not-index: 1`; at its next check RadioBrowser
+     marks the entry broken, which hides it from most apps.
    - Check: the station page shows *Listed on RadioBrowser* with a link, and
      `curl -sI https://listen.tropicastradio.com/stations/<id>/live.mp3 | grep -i icy-`
      shows the headers. An outage only delays a listing (retried with

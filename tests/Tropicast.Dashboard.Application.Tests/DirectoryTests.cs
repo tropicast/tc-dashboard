@@ -15,7 +15,7 @@ public sealed class DirectoryTests
     private static Station Station(bool listed = true, string? country = "mg", string? language = "fr-MG", Uri? website = null)
     {
         var station = Domain.Stations.Station.Create(Guid.NewGuid(), "Radio Mada", "radio-mada", Now);
-        station.Describe("Salegy\nall day.", "Salegy / Hira Gasy; Salegy", country, language, new Uri("https://cdn.example.test/logo.png"),
+        station.Describe("Salegy\nall\u0085day\u2028.", "Salegy / Hira Gasy; Salegy", country, language, new Uri("https://cdn.example.test/logo.png"),
             website, Now);
         station.SetDirectoryListing(listed, Plan.Starter, Now);
         return station;
@@ -47,9 +47,11 @@ public sealed class DirectoryTests
     [Fact]
     public void A_station_without_country_cannot_be_submitted()
     {
-        var entry = DirectoryEntry.For(Station(country: null, language: "not a language"), Plan.Starter, false, Stream, Page)!;
+        var entry = DirectoryEntry.For(Station(country: null, language: "zz"), Plan.Starter, false, Stream, Page)!;
         Assert.Contains("country", entry.Problem, StringComparison.Ordinal);
+        // Not an ISO 639-1 code: left out rather than refused by the node.
         Assert.Null(entry.LanguageCodes);
+        Assert.Null(DirectoryEntry.For(Station(language: "haw"), Plan.Starter, false, Stream, Page)!.LanguageCodes);
     }
 
     [Fact]
@@ -65,7 +67,7 @@ public sealed class DirectoryTests
         var stations = document.RootElement.GetProperty("stations");
         var directory = stations.GetProperty("aaa").GetProperty("directory");
         Assert.True(directory.GetProperty("listed").GetBoolean());
-        Assert.Equal("Salegy all day.", directory.GetProperty("description").GetString());
+        Assert.Equal("Salegy all day .", directory.GetProperty("description").GetString());
         Assert.Equal("MG", directory.GetProperty("country_code").GetString());
         Assert.Equal(Stream.AbsoluteUri, directory.GetProperty("main_stream_url").GetString());
         Assert.Equal("""{"listed":false}""", stations.GetProperty("bbb").GetProperty("directory").GetRawText().Replace(" ", "", StringComparison.Ordinal)

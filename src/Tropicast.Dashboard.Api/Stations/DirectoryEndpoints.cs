@@ -22,7 +22,7 @@ internal enum DirectoryState
     Retrying,
     /// <summary>Listed; changes reach RadioBrowser from the stream, at its next check.</summary>
     Listed,
-    /// <summary>Opted out after listing: RadioBrowser drops the entry at its next check of the stream.</summary>
+    /// <summary>Opted out after listing: at its next check of the stream RadioBrowser skips it and marks the entry broken.</summary>
     Delisting,
 }
 

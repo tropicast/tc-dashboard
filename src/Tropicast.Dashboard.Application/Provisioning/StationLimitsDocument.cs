@@ -103,7 +103,8 @@ public static class StationLimitsDocument
         {
             return null;
         }
-        var value = new string([.. text.Select(c => char.IsControl(c) ? ' ' : c)]).Trim();
+        // Control characters (C0, DEL, C1) and line/paragraph separators: the node refuses them all.
+        var value = new string([.. text.Select(c => char.IsControl(c) || c is '\u2028' or '\u2029' ? ' ' : c)]).Trim();
         return value.Length <= max ? value : value[..max];
     }
 }
