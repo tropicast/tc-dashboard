@@ -1,6 +1,7 @@
 # Alert rules for the control plane (#16), Prometheus format.
-# Metrics arrive over OTLP (deploy/alloy/config.alloy): the API's service name
-# becomes job="tc-dashboard"; host and backup metrics have job="node".
+# Metrics arrive over OTLP (deploy/alloy/config.alloy). The selectors use the
+# metric names only (all tropicast_* names are unique to the API or backup), so
+# they do not depend on how the OTLP gateway maps service.name to labels.
 # Load into Grafana Cloud with mimirtool (docs/runbook.md, Monitoring).
 # Unit tests: monitoring/rules.test.yaml (promtool test rules), run in CI.
 groups:
@@ -9,7 +10,7 @@ groups:
       # tropicast_up is always 1 while the API exports; nothing for 3 minutes
       # means the API, its node or Alloy is down.
       - alert: DashboardDown
-        expr: absent_over_time(tropicast_up{job="tc-dashboard"}[3m])
+        expr: absent_over_time(tropicast_up[3m])
         labels:
           severity: critical
         annotations:

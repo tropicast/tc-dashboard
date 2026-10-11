@@ -32,6 +32,10 @@ public sealed class HardeningTests(DashboardFactory factory) : IClassFixture<Das
     [Theory]
     [InlineData("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature", "eyJhbGci")]
     [InlineData("Host=db;Password=s3cret-pass;Database=x", "s3cret-pass")]
+    [InlineData("Host=db;Password=\"known;secret=x\";Database=x", "known;secret")]
+    [InlineData("Host=db;Password='known secret';Database=x", "known secret")]
+    [InlineData("Host=db;Password=\"known\"\"secret\";Database=x", "secret")]
+    [InlineData("""{"password":"known\"secret","name":"x"}""", "secret")]
     [InlineData("GET /confirm-email?userId=1&code=Q2ZESjhBTmNsZGtz", "Q2ZESjhBTmNsZGtz")]
     [InlineData("""{"refreshToken":"abc.def","name":"x"}""", "abc.def")]
     [InlineData("postgresql://owner:pa55word@ep-x.neon.tech/db", "pa55word")]
@@ -115,6 +119,8 @@ public sealed class HardeningTests(DashboardFactory factory) : IClassFixture<Das
         Assert.Null(log.Items.Single(e => e.Action == "plan.changed").ActorEmail);
         Assert.Equal("starter", log.Items.Single(e => e.Action == "plan.changed").Summary);
         Assert.NotNull(log.Items.Single(e => e.Action == "station.created").ActorEmail);
+        // No station values (name, description…) in the log: only IDs and names of changed settings.
+        Assert.DoesNotContain(log.Items, e => e.Summary?.Contains("Radio", StringComparison.Ordinal) == true);
 
         // Broadcasters do not read it.
         var broadcaster = new Browser(factory);

@@ -31,7 +31,8 @@ tests:
 
   - interval: 1m
     input_series:
-      - series: 'tropicast_up{job="tc-dashboard"}'
+      # As exported through the OTLP gateway: whatever labels it adds.
+      - series: 'tropicast_up{service_name="tc-dashboard",job="any"}'
         values: '1 1 1 _ _ _ _ _'
     alert_rule_test:
       - eval_time: 3m
@@ -42,7 +43,6 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              job: tc-dashboard
             exp_annotations:
               summary: No metrics from the control-plane API for 3 minutes.
               description: The API, the tc-app-1 node or Alloy is down. Check https://app.tropicastradio.com/health/ready, then `deploy.sh status` on the node.

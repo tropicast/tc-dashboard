@@ -33,13 +33,16 @@ public static partial class Redaction
     [GeneratedRegex(@"://[^/\s:@]+:[^/\s@]+@")]
     private static partial Regex UrlCredentials();
 
-    /// <summary><c>password=…</c>, <c>Password: …</c>, <c>?code=…</c>, <c>token=…</c> (query strings, connection strings).</summary>
-    [GeneratedRegex(@"(?<key>\b(?:password|passwd|pwd|secret|token|refresh_?token|access_?token|code|pass|api[_-]?key)\b)(?<sep>\s*[=:]\s*)(?!\[redacted\])[^&\s;,""']+",
+    /// <summary>
+    /// <c>password=…</c>, <c>Password: …</c>, <c>?code=…</c>, <c>token=…</c> (query strings, connection strings), with
+    /// the value bare or quoted (<c>Password="a;b"</c>, <c>'…'</c>, with <c>""</c> or backslash escapes).
+    /// </summary>
+    [GeneratedRegex(@"(?<key>\b(?:password|passwd|pwd|secret|token|refresh_?token|access_?token|code|pass|api[_-]?key)\b)(?<sep>\s*[=:]\s*)(?!\[redacted\])(?:""(?:[^""\\]|\\.|"""")*""?|'(?:[^'\\]|\\.|'')*'?|[^&\s;,""']+)",
         RegexOptions.IgnoreCase)]
     private static partial Regex KeyValueSecret();
 
     /// <summary><c>"password":"…"</c> and similar JSON members.</summary>
-    [GeneratedRegex(@"(?<key>""(?:password|newPassword|currentPassword|secret|refreshToken|accessToken|deviceCode|code)""\s*:\s*"")[^""]*""",
+    [GeneratedRegex(@"(?<key>""(?:password|newPassword|currentPassword|secret|refreshToken|accessToken|deviceCode|code)""\s*:\s*"")(?:[^""\\]|\\.)*""",
         RegexOptions.IgnoreCase)]
     private static partial Regex JsonSecret();
 

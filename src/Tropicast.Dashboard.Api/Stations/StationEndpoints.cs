@@ -108,7 +108,7 @@ internal static partial class StationEndpoints
         var assignment = StreamAssignment.Create(station, streaming.Value.Node, now);
         db.Stations.Add(station);
         db.StreamAssignments.Add(assignment);
-        Audit.Record(db, access, context.User, "station.created", nameof(Station), station.Id.ToString(), station.Name, now);
+        Audit.Record(db, access, context.User, "station.created", nameof(Station), station.Id.ToString(), null, now);
         if (await SaveAsync(db, cancellationToken) is { } conflict)
         {
             return conflict;
@@ -181,7 +181,7 @@ internal static partial class StationEndpoints
             return precondition;
         }
         station.Delete(time.GetUtcNow());
-        Audit.Record(db, access, context.User, "station.deleted", nameof(Station), station.Id.ToString(), station.Name, time.GetUtcNow());
+        Audit.Record(db, access, context.User, "station.deleted", nameof(Station), station.Id.ToString(), null, time.GetUtcNow());
         return await Concurrency.SaveAsync(db, cancellationToken) is { } stale ? stale : TypedResults.NoContent();
     }
 
