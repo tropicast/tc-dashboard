@@ -31,7 +31,11 @@ log() { printf '[deploy] %s\n' "$*"; }
 
 install_bundle() {
     local bundle=$1
-    install -d -m 0750 caddy
+    # Config folders mounted into containers must be world-readable: the
+    # containers run without capabilities (cap_drop: ALL), so their root user
+    # cannot read a folder owned by deploy. They hold no secrets (.env does).
+    install -d -m 0755 caddy
+    chmod 0755 caddy
     install -m 0640 "$bundle/compose.yaml" compose.yaml
     # Overwrite in place: some bind-mount setups do not show a file that was
     # replaced by rename to the running container.
@@ -40,7 +44,8 @@ install_bundle() {
     install -m 0750 "$bundle/backup.sh" backup.sh
     # Monitoring files (#16); older bundles do not have them.
     if [[ -f $bundle/config.alloy ]]; then
-        install -d -m 0750 alloy
+        install -d -m 0755 alloy
+        chmod 0755 alloy
         install -d -m 0755 metrics
         install -m 0644 "$bundle/config.alloy" alloy/config.alloy
     fi
