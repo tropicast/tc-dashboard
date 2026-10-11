@@ -1,10 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App';
 import { queryClient } from './lib/query-client';
 
 afterEach(() => {
+  // Vitest runs without globals, so Testing Library does not unmount between tests by itself.
+  cleanup();
   vi.unstubAllGlobals();
   localStorage.clear();
   queryClient.clear();
@@ -89,4 +91,85 @@ test('restores antiforgery before loading tenant state', async () => {
     '/api/v1/auth/antiforgery',
     '/api/v1/stations',
   ]);
+});
+
+const signedIn = {
+  id: 'u1',
+  email: 'owner@example.com',
+  memberships: [{ tenantId: 't1', tenantName: 'Radio', tenantSlug: 'radio', role: 'Owner' }],
+};
+
+test('approves a desktop sign-in from the link the app opens', async () => {
+  const approved: unknown[] = [];
+  renderAt('/device?code=BCDF-GHJK', async (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/auth/device/BCDF-GHJK') {
+      return Response.json({
+        userCode: 'BCDF-GHJK',
+        deviceName: 'Studio PC',
+        createdAt: '2026-10-11T20:00:00Z',
+        expiresAt: '2026-10-11T20:10:00Z',
+      });
+    }
+    if (path === '/api/v1/auth/device/approve') {
+      approved.push(await request.json());
+      return new Response(null, { status: 204 });
+    }
+    return new Response(null, { status: 204 });
+  });
+
+  expect(await screen.findByText('Studio PC')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+  expect(await screen.findByRole('status')).toHaveTextContent('it is signed in');
+  expect(approved).toEqual([{ userCode: 'BCDF-GHJK' }]);
+});
+
+test('explains an unknown or expired desktop code', async () => {
+  renderAt('/device?code=ZZZZ-ZZZZ', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/auth/device/ZZZZ-ZZZZ') {
+      return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+    }
+    return new Response(null, { status: 204 });
+  });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('unknown, expired or already used');
+});
+
+test('comes back to the desktop sign-in page after signing in', async () => {
+  let session = false;
+  renderAt('/device?code=BCDF-GHJK', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/login') {
+      session = true;
+      return new Response(null, { status: 200 });
+    }
+    if (path === '/api/v1/auth/me') {
+      return session
+        ? Response.json(signedIn)
+        : Response.json({ title: 'Unauthorized' }, { status: 401 });
+    }
+    if (path === '/api/v1/auth/device/BCDF-GHJK') {
+      return Response.json({
+        userCode: 'BCDF-GHJK',
+        deviceName: 'Studio PC',
+        createdAt: '2026-10-11T20:00:00Z',
+        expiresAt: '2026-10-11T20:10:00Z',
+      });
+    }
+    return new Response(null, { status: 204 });
+  });
+
+  await screen.findByRole('heading', { name: 'Sign in' });
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'owner@example.com' } });
+  fireEvent.change(screen.getByLabelText('Password (12 or more characters)'), {
+    target: { value: 'correct horse battery' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+  expect(await screen.findByRole('heading', { name: 'Sign in a desktop app' })).toBeInTheDocument();
+  expect(await screen.findByText('Studio PC')).toBeInTheDocument();
 });

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { api, refreshAntiforgery } from '../../../api/client';
 import { Field } from '../../atoms/Field';
@@ -12,8 +12,15 @@ import { data } from '../../../lib/request';
 
 const loginSchema = z.object({ email: z.email(), password: z.string().min(12) });
 
+/** The in-app page the guard sent the visitor from; never another site. */
+function returnPath(state: unknown) {
+  const from = (state as { from?: unknown } | null)?.from;
+  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/';
+}
+
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const form = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
@@ -24,7 +31,7 @@ export function Login() {
     onSuccess: async () => {
       await refreshAntiforgery();
       await queryClient.invalidateQueries({ queryKey: ['me'] });
-      navigate('/');
+      navigate(returnPath(location.state));
     },
   });
   return (
