@@ -25,6 +25,7 @@ skip_requesting_account_id  = true
 skip_metadata_api_check     = true
 skip_s3_checksum            = true
 
-# Lock file next to the state (S3 conditional writes); see terraform-deploy.yml.
-use_lockfile = true
+# No lock file: Hetzner Object Storage does not enforce S3 conditional writes,
+# so it would not protect the state. terraform-deploy.yml runs one at a time
+# (concurrency group); do not run apply anywhere else.
 HCL

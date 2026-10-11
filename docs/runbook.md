@@ -98,11 +98,10 @@ Values must not contain a single quote (`'`): the workflow writes them quoted.
 
 ## 2. Provision the node
 
-1. **Terraform**: run the *Terraform deploy* workflow with `action=plan`. It
-   first checks that the state bucket enforces conditional writes (the state
-   lock depends on them) and stops if not. Run it only through this workflow,
-   or locally with the same backend settings (`use_lockfile = true`). Read
-   the plan in the run summary, then run it with `action=apply` and that
+1. **Terraform**: run the *Terraform deploy* workflow with `action=plan`.
+   The state has no lock file (Hetzner Object Storage does not enforce
+   conditional writes); the workflow runs one at a time instead, so apply
+   only through it. Read the plan in the run summary, then run it with `action=apply` and that
    run's ID. It creates `tc-app-1`, its firewall and primary IPs, the private
    network, attaches **tc-stream-1 at 10.20.1.2** (live, no restart), and the
    `app` A/AAAA records (DNS only).
@@ -269,7 +268,6 @@ API) unless noted.
 | `STRIPE_SECRET_KEY` | Roll the key in Stripe (*Developers → API keys*), update the secret, deploy. |
 | `STRIPE_WEBHOOK_SECRET` | Roll the signing secret of the endpoint in Stripe, update the secret, deploy within Stripe's overlap window. |
 | `CLOUDFLARE_API_TOKEN`, `HCLOUD_TOKEN` | Roll the token at the provider and update the secret (no deploy). |
-| Terraform state lock | A run that died can leave `tc-dashboard/mvp.tfstate.tflock` in the state bucket. Check no run is active, then `terraform force-unlock <id>` (the ID is in the error). |
 | Data Protection keys | They live in the database (`data_protection_keys`) and roll over every 90 days by themselves. To revoke them all at once (suspected leak of a database copy): `DELETE FROM data_protection_keys;` then restart the API (`deploy.sh compose restart api`). Signs **everyone** out (browser sessions and desktop devices). |
 
 ## 7. Rebuild the node from scratch
