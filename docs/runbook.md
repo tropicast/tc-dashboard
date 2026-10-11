@@ -80,6 +80,7 @@ Secrets and variables → Actions**). Never commit them.
 | `BACKUP_S3_READ_ACCESS_KEY`, `BACKUP_S3_READ_SECRET_KEY` | secret | a **read-only** key on the backup bucket, for the daily backup check |
 | `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_AGE_RECIPIENT` | variable | `https://fsn1.your-objectstorage.com`, bucket, `age1…` |
 | `STATS_URL` | variable | `http://10.20.1.2:9100/metrics` once tc-streaming sets `PRIVATE_IP` (section 4); empty: no live status |
+| `DIRECTORY_ENABLED` | variable | `true` to add opted-in stations to RadioBrowser (section 4, step 5); default `false` |
 | `ACME_EMAIL`, `OPERATOR_EMAIL` | variable | Let's Encrypt contact; your account email (operator pages) |
 
 Optional variables: `APP_HOST` (default `app.tropicastradio.com`),
@@ -184,6 +185,20 @@ Run in this order; each step can be undone by reverting its variable.
    Then set `STATS_URL=http://10.20.1.2:9100/metrics` here and deploy. A
    station shows live within 15 s of Go Live; *Stats of node … unavailable*
    in the API logs means the exporter cannot be reached.
+
+5. **RadioBrowser listing** (#13), after tc-streaming's directory headers
+   (tc-streaming#45) are deployed: set `DIRECTORY_ENABLED=true` and deploy.
+   - An opted-in station (Starter plan and above, with a country) is added
+     once, the first time it is live. RadioBrowser's API cannot edit or delete
+     entries, so later changes reach the listing through the stream: the node
+     sends the station's metadata as `icy-*` headers with
+     `icy-index-metadata: 1`, which RadioBrowser applies at its next check.
+   - Opting out sends `icy-do-not-index: 1`; RadioBrowser drops the entry at
+     a later check.
+   - Check: the station page shows *Listed on RadioBrowser* with a link, and
+     `curl -sI https://listen.tropicastradio.com/stations/<id>/live.mp3 | grep -i icy-`
+     shows the headers. An outage only delays a listing (retried with
+     backoff up to every 6 hours); nothing else waits for it.
 
 ## 5. Backups and restore
 

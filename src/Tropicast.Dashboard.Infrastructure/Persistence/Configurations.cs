@@ -169,6 +169,18 @@ internal sealed class DeviceAuthorizationConfiguration : IEntityTypeConfiguratio
     }
 }
 
+internal sealed class DirectoryListingConfiguration : IEntityTypeConfiguration<Directories.DirectoryListing>
+{
+    public void Configure(EntityTypeBuilder<Directories.DirectoryListing> builder)
+    {
+        builder.HasKey(e => e.StationId);
+        builder.HasOne<Station>().WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.Property(e => e.RadioBrowserUuid).HasMaxLength(64);
+        builder.Property(e => e.LastError).HasMaxLength(300);
+        builder.Ignore(e => e.Submitted);
+    }
+}
+
 internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage>
 {
     public void Configure(EntityTypeBuilder<OutboxMessage> builder)

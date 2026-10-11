@@ -32,7 +32,8 @@ public sealed class ProvisioningSignal
 /// <summary>Station and plan events from the outbox wake provisioning.</summary>
 internal sealed class ProvisioningOutboxConsumer(ProvisioningSignal signal) : IOutboxConsumer
 {
-    public IReadOnlyCollection<string> EventTypes { get; } = ["StationCreated", "StationDeleted", "TenantPlanChanged"];
+    // StationChanged: directory metadata (name, genre, listing...) is part of stations.json.
+    public IReadOnlyCollection<string> EventTypes { get; } = ["StationCreated", "StationChanged", "StationDeleted", "TenantPlanChanged"];
 
     public Task HandleAsync(OutboxEnvelope message, CancellationToken cancellationToken)
     {

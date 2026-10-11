@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tropicast.Dashboard.Application.Outbox;
@@ -61,17 +60,23 @@ public sealed class OutboxTests(PostgresContainer postgres) : IAsyncLifetime
         var owner = new Browser(_factory);
         await owner.SignUpAndLoginAsync(Browser.Unique("owner"));
         await owner.CreateTenantAsync();
-        var created = await owner.SendAsync(HttpMethod.Post, "/api/v1/stations", new { name = "Radio", slug = "pending" });
-        var id = (await created.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Token)).GetProperty("id").GetGuid();
-        await owner.SendIfMatchAsync(HttpMethod.Patch, $"/api/v1/stations/{id}", created.Headers.ETag!.ToString(), new { genre = "Talk" });
+        await owner.SendAsync(HttpMethod.Post, "/api/v1/stations", new { name = "Radio", slug = "pending" });
+        // Every domain event has a consumer today; a future event type must wait for its consumer, not be dropped.
+        Guid futureId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var future = Tropicast.Dashboard.Infrastructure.Outbox.OutboxMessage.From("FutureEvent", "{}", DateTimeOffset.UtcNow);
+            db.OutboxMessages.Add(future);
+            await db.SaveChangesAsync(Token);
+            futureId = future.Id;
+        }
 
-        // StationCreated has a consumer (provisioning); StationChanged has none until RadioBrowser (#13).
         await _factory.Services.GetRequiredService<OutboxDispatcher>().DispatchBatchAsync(Token);
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var messages = await db.OutboxMessages.ToListAsync(Token);
+        await using var check = _factory.Services.CreateAsyncScope();
+        var messages = await check.ServiceProvider.GetRequiredService<AppDbContext>().OutboxMessages.ToListAsync(Token);
         Assert.NotNull(Assert.Single(messages, m => m.Type == "StationCreated").ProcessedAt);
-        Assert.Null(Assert.Single(messages, m => m.Type == "StationChanged").ProcessedAt);
+        Assert.Null(Assert.Single(messages, m => m.Id == futureId).ProcessedAt);
     }
 
     private sealed class RecordingConsumer : IOutboxConsumer

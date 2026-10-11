@@ -40,6 +40,7 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
     public CapturingEmailSender Emails { get; } = new();
     public FakeNodeClient Node { get; } = new();
     public FakeStatsClient Stats { get; } = new();
+    public FakeRadioDirectory Directory { get; } = new();
     /// <summary>Extra configuration for one factory (e.g. enabling the background loops).</summary>
     public IReadOnlyDictionary<string, string> Settings { get; init; } = new Dictionary<string, string>();
     public CapturingLoggerProvider Logs { get; } = new();
@@ -81,6 +82,8 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
             services.AddSingleton<Tropicast.Dashboard.Application.Provisioning.IStreamingNodeClient>(Node);
             services.RemoveAll<Tropicast.Dashboard.Application.Stats.IStreamingStatsClient>();
             services.AddSingleton<Tropicast.Dashboard.Application.Stats.IStreamingStatsClient>(Stats);
+            services.RemoveAll<Tropicast.Dashboard.Application.Directories.IRadioDirectory>();
+            services.AddSingleton<Tropicast.Dashboard.Application.Directories.IRadioDirectory>(Directory);
         });
     }
 
@@ -122,6 +125,25 @@ public sealed class FakeNodeClient : Tropicast.Dashboard.Application.Provisionin
         }
         _applied.Enqueue(stationsJson);
         return Task.CompletedTask;
+    }
+}
+
+/// <summary>RadioBrowser stand-in: records additions, or fails like an outage.</summary>
+public sealed class FakeRadioDirectory : Tropicast.Dashboard.Application.Directories.IRadioDirectory
+{
+    private readonly ConcurrentQueue<Tropicast.Dashboard.Application.Directories.DirectoryEntry> _added = new();
+
+    public IReadOnlyList<Tropicast.Dashboard.Application.Directories.DirectoryEntry> Added => [.. _added];
+    public bool Fail { get; set; }
+
+    public Task<string> AddAsync(Tropicast.Dashboard.Application.Directories.DirectoryEntry entry, CancellationToken cancellationToken = default)
+    {
+        if (Fail)
+        {
+            throw new Tropicast.Dashboard.Application.Directories.DirectoryException("RadioBrowser is unreachable. The listing is retried later.");
+        }
+        _added.Enqueue(entry);
+        return Task.FromResult(Guid.NewGuid().ToString());
     }
 }
 

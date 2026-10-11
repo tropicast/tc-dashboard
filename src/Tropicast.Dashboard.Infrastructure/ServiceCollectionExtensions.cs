@@ -11,6 +11,8 @@ using Tropicast.Dashboard.Infrastructure.Identity;
 using Tropicast.Dashboard.Infrastructure.Outbox;
 using Tropicast.Dashboard.Infrastructure.Provisioning;
 using Tropicast.Dashboard.Infrastructure.Stats;
+using Tropicast.Dashboard.Infrastructure.Directories;
+using Tropicast.Dashboard.Application.Directories;
 using Tropicast.Dashboard.Application.Stats;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
@@ -43,6 +45,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<StatsRecorder>();
         services.AddSingleton<StatsCollector>();
         services.AddHostedService(sp => sp.GetRequiredService<StatsCollector>());
+        services.Configure<DirectoryOptions>(configuration.GetSection("Directory"));
+        services.TryAddSingleton<IRadioDirectory, RadioBrowserDirectory>();
+        services.AddScoped<DirectoryPublisher>();
+        services.AddHostedService<DirectoryWorker>();
         // Read when a context is created, so hosts without a database (e.g. OpenAPI generation) still start.
         services.AddDbContext<AppDbContext>(options => PersistenceSetup.Configure(options,
             configuration.GetConnectionString("Default")

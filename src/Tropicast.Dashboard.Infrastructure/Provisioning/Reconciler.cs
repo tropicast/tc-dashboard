@@ -13,7 +13,7 @@ namespace Tropicast.Dashboard.Infrastructure.Provisioning;
 /// failures are recorded on <see cref="StreamingNodeState"/> and retried with backoff.
 /// </summary>
 internal sealed partial class Reconciler(AppDbContext db, IStreamingNodeClient client, IOptions<ProvisioningOptions> options,
-    TimeProvider time, ILogger<Reconciler> logger)
+    IOptions<Directories.DirectoryOptions> directory, TimeProvider time, ILogger<Reconciler> logger)
 {
     private const long LockKey = 0x7472_6F70_6963_6173; // "tropicas"
 
@@ -28,12 +28,15 @@ internal sealed partial class Reconciler(AppDbContext db, IStreamingNodeClient c
         }
 
         var onNode = db.StreamAssignments.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(a => a.Node == node);
-        var stations = await db.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter])
+        var rows = await db.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(s => onNode.Any(a => a.StationId == s.Id))
             .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.Status == TenantStatus.Active),
-                s => s.TenantId, t => t.Id, (s, t) => new { s.PublicId, t.PlanId })
-            .Join(db.Plans, x => x.PlanId, p => p.Id, (x, p) => new StationLimits(x.PublicId, p))
+                s => s.TenantId, t => t.Id, (s, t) => new { s.Id, s.PublicId, t.PlanId })
+            .Join(db.Plans, x => x.PlanId, p => p.Id, (x, p) => new { x.Id, x.PublicId, Plan = p })
             .ToListAsync(cancellationToken);
+        // Directory metadata travels to the node too: RadioBrowser updates a listing from the stream's headers.
+        var entries = await Directories.DirectoryEntries.ForAsync(db, directory.Value, [.. rows.Select(r => r.Id)], cancellationToken);
+        var stations = rows.Select(r => new StationLimits(r.PublicId, r.Plan, entries.GetValueOrDefault(r.Id))).ToList();
         var defaultCap = (await db.Plans.SingleAsync(p => p.Id == Domain.Plans.Plan.Free.Id, cancellationToken)).MaxListeners;
         var desired = StationLimitsDocument.Render(stations, defaultCap);
 

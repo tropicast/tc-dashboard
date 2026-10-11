@@ -121,7 +121,7 @@ test('signs up then creates a workspace and first station', async ({ page }) => 
   await page.getByLabel('Country').fill('MG');
   await page.locator('.onboarding').getByLabel('Language').fill('mg');
   await page.getByLabel('Website').fill('https://radiomada.example');
-  await page.getByLabel('List in directory').check();
+  await page.getByLabel('List on RadioBrowser').check();
   const station = page.waitForRequest(
     (request) => request.url().endsWith('/api/v1/stations') && request.method() === 'POST',
   );
