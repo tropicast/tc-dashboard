@@ -46,7 +46,7 @@ jobs:
       # The build also regenerates web/openapi/openapi.json.
       - run: dotnet build Tropicast.Dashboard.slnx -c Release
 
-      - run: dotnet test Tropicast.Dashboard.slnx -c Release --no-build
+      - run: dotnet test --solution Tropicast.Dashboard.slnx -c Release --no-build
 
       - name: Fail when the model changed without a migration
         run: |
