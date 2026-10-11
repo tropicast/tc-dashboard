@@ -59,7 +59,7 @@ updates:
   # Images in the Compose files: Caddy (the public TLS entry point) and Alloy in
   # production (deploy/compose.yaml); PostgreSQL and Mailpit for local runs (compose.yaml).
   - package-ecosystem: docker-compose
-    directories: [/, /deploy]
+    directories: [/, /deploy, /tests/e2e]
     schedule:
       interval: weekly
       day: monday

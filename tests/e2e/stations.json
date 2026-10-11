@@ -1,0 +1,6 @@
+{
+  "default": {
+    "max_listeners": 100
+  },
+  "stations": {}
+}
