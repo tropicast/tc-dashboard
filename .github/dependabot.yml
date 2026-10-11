@@ -35,12 +35,23 @@ updates:
     commit-message:
       prefix: "deps(npm)"
     groups:
+      # react-i18next majors require the matching i18next major (peer dependency): one PR for both.
+      i18next:
+        patterns: [i18next, react-i18next]
       npm-production:
         dependency-type: production
         update-types: [minor, patch]
       npm-development:
         dependency-type: development
         update-types: [minor, patch]
+    ignore:
+      # TypeScript 7 (native compiler): openapi-typescript and typescript-eslint peer on TypeScript 5.
+      # Upgrade on purpose once they support it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Node types follow the Node runtime (24, as in the Dockerfile and CI), not the latest Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   # Base images: node (SPA build), and the .NET SDK, ASP.NET and runtime-deps images.
   - package-ecosystem: docker
