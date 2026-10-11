@@ -36,6 +36,15 @@ services:
       Stats__Url: ${STATS_URL:-}
       # RadioBrowser listing (#13): adds opted-in live stations to the public directory.
       Directory__Enabled: ${DIRECTORY_ENABLED:-false}
+      # Stripe (#14); without a secret key billing is off.
+      Billing__SecretKey: ${STRIPE_SECRET_KEY:-}
+      Billing__WebhookSecret: ${STRIPE_WEBHOOK_SECRET:-}
+      Billing__Prices__starter: ${STRIPE_PRICE_STARTER:-}
+      Billing__Prices__growth: ${STRIPE_PRICE_GROWTH:-}
+      Billing__Prices__pro: ${STRIPE_PRICE_PRO:-}
+      Billing__DisplayPrices__starter: ${PRICE_LABEL_STARTER:-}
+      Billing__DisplayPrices__growth: ${PRICE_LABEL_GROWTH:-}
+      Billing__DisplayPrices__pro: ${PRICE_LABEL_PRO:-}
       # Metrics and traces to Alloy (profile "monitoring"); empty: not exported.
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf

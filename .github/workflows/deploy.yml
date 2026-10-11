@@ -129,6 +129,15 @@ jobs:
           DIRECTORY_ENABLED: ${{ vars.DIRECTORY_ENABLED || 'false' }}
           # Monitoring (#16): COMPOSE_PROFILES=monitoring starts Alloy; the API then exports to it.
           COMPOSE_PROFILES: ${{ vars.COMPOSE_PROFILES }}
+          # Stripe (#14): secret key and webhook signing secret; price IDs and labels per plan.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_STARTER: ${{ vars.STRIPE_PRICE_STARTER }}
+          STRIPE_PRICE_GROWTH: ${{ vars.STRIPE_PRICE_GROWTH }}
+          STRIPE_PRICE_PRO: ${{ vars.STRIPE_PRICE_PRO }}
+          PRICE_LABEL_STARTER: ${{ vars.PRICE_LABEL_STARTER }}
+          PRICE_LABEL_GROWTH: ${{ vars.PRICE_LABEL_GROWTH }}
+          PRICE_LABEL_PRO: ${{ vars.PRICE_LABEL_PRO }}
           NODE_NAME: ${{ vars.DEPLOY_SERVER || 'tc-app-1' }}
           GRAFANA_CLOUD_OTLP_URL: ${{ vars.GRAFANA_CLOUD_OTLP_URL }}
           GRAFANA_CLOUD_OTLP_USER: ${{ vars.GRAFANA_CLOUD_OTLP_USER }}
@@ -154,6 +163,9 @@ jobs:
           DATABASE_MIGRATION_CONNECTION=$(python3 deploy/npgsql.py "$DATABASE_DIRECT_URL")
           # shellcheck disable=SC2034 # read through ${!name} below
           OTEL_EXPORTER_OTLP_ENDPOINT=""
+          if [[ -n $STRIPE_SECRET_KEY && -z $STRIPE_WEBHOOK_SECRET ]]; then
+            echo "Billing needs both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET" >&2; exit 1
+          fi
           if [[ ,$COMPOSE_PROFILES, == *,monitoring,* ]]; then
             # shellcheck disable=SC2034
             OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
@@ -165,7 +177,9 @@ jobs:
                  DATABASE_DIRECT_URL EMAIL_FROM SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD
                  SOURCE_AUTH_USER SOURCE_AUTH_PASSWORD PROVISIONING_ENABLED PROVISIONING_SSH_HOST
                  PROVISIONING_SSH_HOST_KEY PROVISIONING_SSH_KEY OPERATOR_EMAIL STATS_URL DIRECTORY_ENABLED COMPOSE_PROFILES NODE_NAME
-                 OTEL_EXPORTER_OTLP_ENDPOINT GRAFANA_CLOUD_OTLP_URL GRAFANA_CLOUD_OTLP_USER GRAFANA_CLOUD_TOKEN BACKUP_S3_ENDPOINT
+                 OTEL_EXPORTER_OTLP_ENDPOINT GRAFANA_CLOUD_OTLP_URL GRAFANA_CLOUD_OTLP_USER GRAFANA_CLOUD_TOKEN
+                 STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_STARTER STRIPE_PRICE_GROWTH STRIPE_PRICE_PRO
+                 PRICE_LABEL_STARTER PRICE_LABEL_GROWTH PRICE_LABEL_PRO BACKUP_S3_ENDPOINT
                  BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY BACKUP_AGE_RECIPIENT
                  BACKUP_PG_IMAGE)
           # Single quotes: Compose reads the values literally ($ stays $).

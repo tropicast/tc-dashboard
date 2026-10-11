@@ -4,6 +4,7 @@ import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
+import { BillingPanel } from './BillingPanel';
 import { data } from '../../../lib/request';
 import type { Tenant } from '../../../lib/types';
 
@@ -34,7 +35,7 @@ export function Account() {
       <h1>Account</h1>
       <div className="grid">
         <article className="panel">
-          <h2>Plan and usage</h2>
+          <h2>Usage</h2>
           <p>
             <strong>{tenant.data?.plan.name ?? 'Loading…'}</strong>
           </p>
@@ -44,6 +45,7 @@ export function Account() {
               : ''}
           </p>
         </article>
+        <BillingPanel />
         <article className="panel">
           <h2>Invite member</h2>
           <form onSubmit={invite.handleSubmit((value) => inviteMutation.mutate(value))}>

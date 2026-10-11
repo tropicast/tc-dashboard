@@ -124,11 +124,15 @@ internal static partial class SourceAuthEndpoint
     {
         // Icecast calls without a tenant: the lookup crosses the tenant filter on purpose; deleted stations stay hidden.
         var publicId = SourceAuthorizer.StationOf(request.Mount);
-        var station = publicId is null ? null : await db.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter])
+        var stations = db.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter]);
+        var station = publicId is null ? null : await stations
             .Where(s => s.PublicId == publicId)
-            .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]), s => s.TenantId, t => t.Id, (s, t) => new { s.Id, s.PublicId, t.Status, t.PlanId })
-            .Join(db.Plans, x => x.PlanId, p => p.Id, (x, p) => new { x.Id, x.PublicId, x.Status, Plan = p })
+            .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]), s => s.TenantId, t => t.Id, (s, t) => new { s.Id, s.PublicId, s.TenantId, s.CreatedAt, t.Status, t.PlanId })
+            .Join(db.Plans, x => x.PlanId, p => p.Id, (x, p) => new { x.Id, x.PublicId, x.TenantId, x.CreatedAt, x.Status, Plan = p })
             .SingleOrDefaultAsync(cancellationToken);
+        // Older stations of the tenant go first: after a downgrade, the newest ones beyond the plan's count stop.
+        var rank = station is null ? 0
+            : await stations.CountAsync(s => s.TenantId == station.TenantId && s.CreatedAt < station.CreatedAt, cancellationToken);
         var credentials = station is null ? [] : await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(c => c.StationId == station.Id && c.RevokedAt == null)
             // A desktop device's own credential ends with its device session: signed out, revoked or expired.
@@ -137,7 +141,7 @@ internal static partial class SourceAuthEndpoint
             .Select(c => new { c.Id, c.SecretHash })
             .ToListAsync(cancellationToken);
         var decision = SourceAuthorizer.Decide(request, station is null ? null : new SourceAuthStation(station.PublicId,
-            station.Status == TenantStatus.Active, station.Plan, [.. credentials.Select(c => (c.Id, c.SecretHash))]));
+            station.Status == TenantStatus.Active, station.Plan, [.. credentials.Select(c => (c.Id, c.SecretHash))], rank));
         if (!decision.Allowed)
         {
             return decision;

@@ -84,6 +84,9 @@ Secrets and variables → Actions**). Never commit them.
 | `GRAFANA_CLOUD_TOKEN` | secret | Grafana Cloud access policy token with `metrics:write` and `traces:write` |
 | `STATS_URL` | variable | `http://10.20.1.2:9100/metrics` once tc-streaming sets `PRIVATE_IP` (section 4); empty: no live status |
 | `DIRECTORY_ENABLED` | variable | `true` to add opted-in stations to RadioBrowser (section 4, step 5); default `false` |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | secret | Stripe secret key and the webhook signing secret (section 10); empty: billing off |
+| `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_GROWTH`, `STRIPE_PRICE_PRO` | variable | Stripe price IDs (`price_…`) of the monthly prices |
+| `PRICE_LABEL_STARTER`, `PRICE_LABEL_GROWTH`, `PRICE_LABEL_PRO` | variable | Prices shown in the app, e.g. `€9 / month` |
 | `ACME_EMAIL`, `OPERATOR_EMAIL` | variable | Let's Encrypt contact; your account email (operator pages) |
 
 Optional variables: `APP_HOST` (default `app.tropicastradio.com`),
@@ -263,6 +266,8 @@ API) unless noted.
 | `PROVISIONING_SSH_KEY` | Add the new public key to tc-streaming `provisioning_ssh_keys`, run its playbook, update the secret, deploy, then remove the old key there. |
 | `DEPLOY_SSH_KEY` | Add the new key to `deploy_ssh_keys`, run `site.yml`, update the secret, remove the old key and run again. |
 | Backup keys | New Object Storage keys: update them, deploy. New age key pair: update `BACKUP_AGE_RECIPIENT`, deploy; keep the old private key offline while old dumps exist (30 days). |
+| `STRIPE_SECRET_KEY` | Roll the key in Stripe (*Developers → API keys*), update the secret, deploy. |
+| `STRIPE_WEBHOOK_SECRET` | Roll the signing secret of the endpoint in Stripe, update the secret, deploy within Stripe's overlap window. |
 | `CLOUDFLARE_API_TOKEN`, `HCLOUD_TOKEN` | Roll the token at the provider and update the secret (no deploy). |
 | Terraform state lock | A run that died can leave `tc-dashboard/mvp.tfstate.tflock` in the state bucket. Check no run is active, then `terraform force-unlock <id>` (the ID is in the error). |
 | Data Protection keys | They live in the database (`data_protection_keys`) and roll over every 90 days by themselves. To revoke them all at once (suspected leak of a database copy): `DELETE FROM data_protection_keys;` then restart the API (`deploy.sh compose restart api`). Signs **everyone** out (browser sessions and desktop devices). |
@@ -327,5 +332,42 @@ and traces.
 | DirectoryListingFailing | more than 3 failed RadioBrowser attempts in 6 hours (info) |
 | BackupMissing, BackupNeverRecorded | no successful backup for 26 hours |
 
-Payment webhook alerts come with Stripe (#14).
+| BillingWebhookErrors | a Stripe webhook failed to apply (Stripe retries) |
+| BillingWebhookSignatures | more than 10 webhook calls with a bad signature in an hour |
+
+## 10. Billing (Stripe)
+
+Design: [ADR 0002](adr/0002-payments-stripe.md). Do it in **test mode** first
+(`sk_test_…`), then repeat in live mode.
+
+1. **Products and prices**: in Stripe *Product catalog*, one product per paid
+   plan (Starter, Growth, Pro) with a **recurring monthly** price. Set the
+   price IDs in `STRIPE_PRICE_*` and the labels in `PRICE_LABEL_*`.
+2. **Customer portal** (*Settings → Billing → Customer portal*):
+   - allow updating payment methods, viewing invoices and canceling (**at the
+     end of the billing period**);
+   - allow switching between the three prices, with **downgrades applied at
+     period end**.
+3. **Webhook endpoint** (*Developers → Webhooks*):
+   - URL `https://app.tropicastradio.com/api/v1/billing/webhook`;
+   - events: `checkout.session.completed`, `customer.subscription.created`,
+     `customer.subscription.updated`, `customer.subscription.deleted`;
+   - copy its signing secret (`whsec_…`) into `STRIPE_WEBHOOK_SECRET`, and the
+     secret key into `STRIPE_SECRET_KEY`. Deploy.
+4. **Check** (test mode):
+   - as a workspace Owner, *Account → Plan and billing → Start free trial* on
+     Starter;
+   - pay with card `4242 4242 4242 4242`;
+   - back in the app the plan shows Starter, and within a minute the node's
+     `stations.json` has `max_listeners: 500` for the workspace's stations
+     (`GET /api/v1/operator/streaming-nodes` shows `inSync: true`);
+   - in Stripe, *Webhooks → the endpoint* shows deliveries with `200`;
+     resending one changes nothing (`Billing webhook … Duplicate` in the API
+     logs).
+5. **Failed payments**: Stripe's *Smart retries* and emails handle dunning.
+   The app keeps the paid plan for 7 days after the subscription becomes past
+   due, then moves the workspace to Free. Paying later restores the plan.
+
+**Fair use**: `GET /api/v1/operator/usage?month=2026-10` lists every tenant's
+peak listeners, listener-hours and estimated egress, heaviest first.
 

@@ -331,6 +331,10 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_at_period_end");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -338,6 +342,14 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("CurrentPeriodEnd")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("current_period_end");
+
+                    b.Property<DateTimeOffset?>("LastEventAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_event_at");
+
+                    b.Property<DateTimeOffset?>("PastDueSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("past_due_since");
 
                     b.Property<string>("PlanId")
                         .IsRequired()
@@ -364,6 +376,14 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<DateTimeOffset?>("TrialEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_end");
+
+                    b.Property<bool>("TrialUsed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("trial_used");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -376,11 +396,15 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasIndex("PlanId")
                         .HasDatabaseName("ix_subscriptions_plan_id");
 
+                    b.HasIndex("ProviderCustomerId")
+                        .HasDatabaseName("ix_subscriptions_provider_customer_id");
+
                     b.HasIndex("ProviderSubscriptionId")
                         .IsUnique()
                         .HasDatabaseName("ix_subscriptions_provider_subscription_id");
 
                     b.HasIndex("TenantId")
+                        .IsUnique()
                         .HasDatabaseName("ix_subscriptions_tenant_id");
 
                     b.ToTable("subscriptions", (string)null);
@@ -840,6 +864,38 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_tenants_slug");
 
                     b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Billing.ProcessedWebhookEvent", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("type");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_processed_webhook_events");
+
+                    b.HasIndex("ProcessedAt")
+                        .HasDatabaseName("ix_processed_webhook_events_processed_at");
+
+                    b.ToTable("processed_webhook_events", (string)null);
                 });
 
             modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Directories.DirectoryListing", b =>

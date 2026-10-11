@@ -19,8 +19,12 @@ public sealed record SourceAuthRequest(string? Mount, string? User, string? Pass
 /// <param name="TenantActive">False when the tenant is suspended.</param>
 /// <param name="Plan">The tenant's plan.</param>
 /// <param name="ActiveCredentials">Active (unrevoked) credentials: ID and SHA-256 hash of the secret.</param>
+/// <param name="StationRank">
+/// Position of the station among its tenant's stations, oldest first (0-based). After a downgrade, only the first
+/// <see cref="Plan.MaxStations"/> may broadcast.
+/// </param>
 public sealed record SourceAuthStation(string PublicId, bool TenantActive, Plan Plan,
-    IReadOnlyList<(Guid Id, string SecretHash)> ActiveCredentials);
+    IReadOnlyList<(Guid Id, string SecretHash)> ActiveCredentials, int StationRank = 0);
 
 /// <summary>Allow with the matching credential, or deny with a reason safe to log (never the password).</summary>
 public sealed record SourceAuthDecision(bool Allowed, string Reason, Guid? CredentialId = null, AudioFormat? Format = null)
@@ -61,6 +65,10 @@ public static partial class SourceAuthorizer
         if (!station.TenantActive)
         {
             return SourceAuthDecision.Deny("tenant suspended");
+        }
+        if (station.StationRank >= station.Plan.MaxStations)
+        {
+            return SourceAuthDecision.Deny($"the plan allows {station.Plan.MaxStations} station(s); upgrade or delete a station");
         }
         // Check every active credential, so timing does not reveal which one (or whether any) matched.
         Guid? credential = null;

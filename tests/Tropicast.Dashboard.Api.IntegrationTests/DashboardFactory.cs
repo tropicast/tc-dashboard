@@ -40,6 +40,7 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
     public FakeNodeClient Node { get; } = new();
     public FakeStatsClient Stats { get; } = new();
     public FakeRadioDirectory Directory { get; } = new();
+    public FakePaymentProvider Payments { get; } = new();
     /// <summary>Extra configuration for one factory (e.g. enabling the background loops).</summary>
     public IReadOnlyDictionary<string, string> Settings { get; init; } = new Dictionary<string, string>();
     public CapturingLoggerProvider Logs { get; } = new();
@@ -71,6 +72,11 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
         builder.UseSetting("Streaming:MaxSources", "100000");
         builder.UseSetting("Streaming:MaxListenerCaps", "100000000");
         builder.UseSetting("Operators:Emails:0", "operator@example.test");
+        // Billing on, with a stand-in provider (FakePaymentProvider); prices for the paid plans.
+        builder.UseSetting("Billing:SecretKey", "sk_test_fake");
+        builder.UseSetting("Billing:Prices:starter", "price_starter");
+        builder.UseSetting("Billing:Prices:growth", "price_growth");
+        builder.UseSetting("Billing:DisplayPrices:starter", "€9 / month");
         foreach (var (key, value) in Settings)
         {
             builder.UseSetting(key, value);
@@ -94,6 +100,8 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
             services.AddSingleton<Tropicast.Dashboard.Application.Stats.IStreamingStatsClient>(Stats);
             services.RemoveAll<Tropicast.Dashboard.Application.Directories.IRadioDirectory>();
             services.AddSingleton<Tropicast.Dashboard.Application.Directories.IRadioDirectory>(Directory);
+            services.RemoveAll<Tropicast.Dashboard.Application.Billing.IPaymentProvider>();
+            services.AddSingleton<Tropicast.Dashboard.Application.Billing.IPaymentProvider>(Payments);
         });
     }
 
@@ -136,6 +144,36 @@ public sealed class FakeNodeClient : Tropicast.Dashboard.Application.Provisionin
         _applied.Enqueue(stationsJson);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>
+/// Payment provider stand-in: checkout and portal URLs it records; webhooks are a JSON <see cref="Application.Billing.BillingEvent"/>
+/// signed "valid" (Stripe's own parsing and signatures are covered in Infrastructure tests).
+/// </summary>
+public sealed class FakePaymentProvider : Tropicast.Dashboard.Application.Billing.IPaymentProvider
+{
+    public static readonly System.Text.Json.JsonSerializerOptions Json = new(System.Text.Json.JsonSerializerDefaults.Web)
+    {
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+    };
+
+    public ConcurrentQueue<Tropicast.Dashboard.Application.Billing.CheckoutRequest> Checkouts { get; } = new();
+
+    public bool Sells(string planId) => planId is "starter" or "growth";
+
+    public Task<Uri> CreateCheckoutAsync(Tropicast.Dashboard.Application.Billing.CheckoutRequest request, CancellationToken cancellationToken = default)
+    {
+        Checkouts.Enqueue(request);
+        return Task.FromResult(new Uri($"https://checkout.stripe.test/c/{request.TenantId}"));
+    }
+
+    public Task<Uri> CreatePortalAsync(string customerId, Uri returnUrl, CancellationToken cancellationToken = default)
+        => Task.FromResult(new Uri($"https://billing.stripe.test/p/{customerId}"));
+
+    public Tropicast.Dashboard.Application.Billing.BillingEvent ParseWebhook(string payload, string signature)
+        => signature == "valid"
+            ? System.Text.Json.JsonSerializer.Deserialize<Tropicast.Dashboard.Application.Billing.BillingEvent>(payload, Json)!
+            : throw new Tropicast.Dashboard.Application.Billing.BillingException("The webhook signature is invalid or too old.");
 }
 
 /// <summary>RadioBrowser stand-in: records additions, or fails like an outage.</summary>

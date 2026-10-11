@@ -410,6 +410,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operator/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every tenant's use in a month, heaviest egress first, for fair-use true-up. */
+        get: {
+            parameters: {
+                query?: {
+                    month?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TenantUsageResponse"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/version": {
         parameters: {
             query?: never;
@@ -2055,6 +2102,174 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The tenant's plan, subscription and the plans on offer. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Starts a hosted checkout for a paid plan; redirect the browser to the returned URL. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CheckoutRequestBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RedirectResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/portal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Opens the billing portal: payment methods, invoices, plan changes (applied at period end), cancellation. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RedirectResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The tenant's peak listeners, listener-hours and estimated egress in a month (UTC), per station. */
+        get: {
+            parameters: {
+                query?: {
+                    month?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UsageResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/operator/streaming-nodes": {
         parameters: {
             query?: never;
@@ -2164,6 +2379,39 @@ export interface components {
              */
             occurredAt: string;
         };
+        /** @description The tenant's plan and subscription. */
+        BillingResponse: {
+            /** @description Current plan (what the tenant gets now). */
+            planId: string;
+            /** @description Plan subscribed to, if any (differs from string BillingResponse.PlanId after a failed payment's grace period). */
+            subscriptionPlanId: null | string;
+            status: null | components["schemas"]["SubscriptionStatus"];
+            /**
+             * Format: date-time
+             * @description End of the paid period.
+             */
+            currentPeriodEnd: null | string;
+            /** @description The subscription ends at the period end. */
+            cancelAtPeriodEnd: boolean;
+            /**
+             * Format: date-time
+             * @description End of the trial.
+             */
+            trialEnd: null | string;
+            /**
+             * Format: date-time
+             * @description After a failed payment: when the tenant falls back to Free.
+             */
+            graceEndsAt: null | string;
+            /** @description The next checkout starts with a free trial. */
+            trialAvailable: boolean;
+            /** @description A billing portal exists for this tenant (payment methods, invoices, plan changes, cancellation). */
+            canManage: boolean;
+            /** @description Billing is switched on for this deployment. */
+            enabled: boolean;
+            /** @description Plans on offer, cheapest first. */
+            plans: components["schemas"]["PlanOfferResponse"][];
+        };
         /** @description One stream to publish. */
         BroadcastOutput: {
             /** @description Stream format. */
@@ -2215,6 +2463,9 @@ export interface components {
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
+        };
+        CheckoutRequestBody: {
+            planId: string;
         };
         ConfirmEmailRequest: {
             /** Format: uuid */
@@ -2616,6 +2867,36 @@ export interface components {
              */
             totalCount: number | string;
         };
+        /** @description A plan as offered. */
+        PlanOfferResponse: {
+            /** @description Plan ID. */
+            id: string;
+            /** @description Display name. */
+            name: string;
+            /**
+             * Format: int32
+             * @description Stations.
+             */
+            maxStations: number | string;
+            /**
+             * Format: int32
+             * @description Concurrent listeners per station.
+             */
+            maxListeners: number | string;
+            /**
+             * Format: int32
+             * @description Highest stream bitrate.
+             */
+            maxBitrateKbps: number | string;
+            /** @description RadioBrowser listing. */
+            directoryListing: boolean;
+            /** @description Embeddable player. */
+            embed: boolean;
+            /** @description Price to show, e.g. "€9 / month"; null for Free. */
+            price: null | string;
+            /** @description Can be bought with checkout. */
+            purchasable: boolean;
+        };
         /** @description A plan's limits and features. */
         PlanResponse: {
             /** @description Plan ID, e.g. "starter". */
@@ -2700,6 +2981,14 @@ export interface components {
             /**
              * Format: uri
              * @description HTTPS listener URL.
+             */
+            url: string;
+        };
+        /** @description Where to send the browser. */
+        RedirectResponse: {
+            /**
+             * Format: uri
+             * @description The payment provider's page.
              */
             url: string;
         };
@@ -2847,6 +3136,19 @@ export interface components {
             /** @description No recent sample: the node or the collector is down. */
             stale: boolean;
         };
+        /** @description One station's use of a month. */
+        StationUsageResponse: {
+            /** Format: uuid */
+            stationId: string;
+            publicId: string;
+            name: string;
+            /** Format: int32 */
+            peakListeners: number | string;
+            /** Format: double */
+            listenerHours: number | string;
+            /** Format: int64 */
+            egressBytes: number | string;
+        };
         /** @description One period of statistics. */
         StatsPointResponse: {
             /**
@@ -2903,6 +3205,8 @@ export interface components {
             /** @description Last failure. */
             lastError: null | string;
         };
+        /** @enum {unknown} */
+        SubscriptionStatus: "Incomplete" | "Trialing" | "Active" | "PastDue" | "Canceled" | null;
         /** @description A tenant (customer account). */
         TenantResponse: {
             /**
@@ -2926,6 +3230,19 @@ export interface components {
         };
         /** @enum {unknown} */
         TenantStatus: "Active" | "Suspended";
+        /** @description One tenant's use of a month (operator report). */
+        TenantUsageResponse: {
+            /** Format: uuid */
+            tenantId: string;
+            tenantName: string;
+            planId: string;
+            /** Format: int32 */
+            peakListeners: number | string;
+            /** Format: double */
+            listenerHours: number | string;
+            /** Format: int64 */
+            egressBytes: number | string;
+        };
         TokenRequest: {
             email: string;
             password: string;
@@ -2974,6 +3291,30 @@ export interface components {
         UpdateTenantCommand: {
             name?: null | string;
             slug?: null | string;
+        };
+        /** @description A tenant's use of a month, for fair-use review: from the daily statistics. */
+        UsageResponse: {
+            /** @description The month (`YYYY-MM`, UTC). */
+            month: string;
+            /** @description The tenant's current plan. */
+            planId: string;
+            /**
+             * Format: int32
+             * @description Highest peak of any station on any day.
+             */
+            peakListeners: number | string;
+            /**
+             * Format: double
+             * @description Listening time of all stations.
+             */
+            listenerHours: number | string;
+            /**
+             * Format: int64
+             * @description Estimated traffic of all stations.
+             */
+            egressBytes: number | string;
+            /** @description Per station, including deleted ones that streamed that month. */
+            stations: components["schemas"]["StationUsageResponse"][];
         };
         UserCodeRequest: {
             userCode: string;
