@@ -55,6 +55,14 @@ test('the page weighs under 100 KB before audio and plays Opus', async ({ page }
   // The label says what the button does next (#74): no aria-pressed, which contradicted it.
   await expect(page.locator('#play')).toHaveText('Stop');
   await expect(page.locator('#play')).not.toHaveAttribute('aria-pressed');
+  // Icon-only controls (#86): the mute button names what it does next.
+  await page.locator('#mute').click();
+  await expect(page.locator('#mute')).toHaveAttribute('aria-label', 'Unmute');
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { media: HTMLMediaElement[] }).media.at(-1)!.muted,
+    ),
+  ).toBe(true);
 });
 
 test('a browser without Opus plays MP3', async ({ page }) => {
