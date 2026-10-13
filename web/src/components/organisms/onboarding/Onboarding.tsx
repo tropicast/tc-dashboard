@@ -2,11 +2,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { ArrowRight, Building07, CheckCircle, Signal01 } from '@untitledui/icons';
+import type { FC, ReactNode } from 'react';
+import { Button } from '@/components/base/buttons/button';
+import { FeaturedIcon } from '@/components/foundations/featured-icon/featured-icon';
 import { z } from 'zod';
 import { api } from '../../../api/client';
 import { selectedTenantId } from '../../../api/client';
-import { Field } from '../../atoms/Field';
+import { CheckboxField, TextAreaField, TextField } from '../../atoms/FormFields';
 import { Notice } from '../../atoms/Notice';
 import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
@@ -57,69 +60,131 @@ export function Onboarding() {
   });
   if (!createTenant.isSuccess)
     return (
-      <section className="onboarding">
-        <h1>{t('onboarding.workspaceTitle')}</h1>
-        <p>{t('onboarding.workspaceIntro')}</p>
-        <form onSubmit={tenant.handleSubmit((value) => createTenant.mutate(value))}>
-          <Field
+      <Step
+        step={1}
+        icon={Building07}
+        title={t('onboarding.workspaceTitle')}
+        description={t('onboarding.workspaceIntro')}
+      >
+        <form
+          className="flex flex-col gap-5"
+          onSubmit={tenant.handleSubmit((value) => createTenant.mutate(value))}
+        >
+          <TextField
+            control={tenant.control}
+            name="name"
             label={t('onboarding.organizationName')}
-            error={tenant.formState.errors.name?.message}
-          >
-            <input {...tenant.register('name')} />
-          </Field>
-          <Field
-            label={t('onboarding.workspaceSlug')}
-            error={tenant.formState.errors.slug?.message}
-          >
-            <input {...tenant.register('slug')} />
-          </Field>
+          />
+          <TextField control={tenant.control} name="slug" label={t('onboarding.workspaceSlug')} />
           <Notice error={createTenant.error} />
-          <button>{t('onboarding.createWorkspace')}</button>
+          <Button type="submit" size="lg" isLoading={createTenant.isPending} showTextWhileLoading>
+            {t('onboarding.createWorkspace')}
+          </Button>
         </form>
-      </section>
+      </Step>
     );
   if (!createStation.isSuccess)
     return (
-      <section className="onboarding">
-        <h1>{t('onboarding.stationTitle')}</h1>
-        <form onSubmit={station.handleSubmit((value) => createStation.mutate(value))}>
-          <Field label={t('onboarding.stationName')}>
-            <input {...station.register('name')} />
-          </Field>
-          <Field label={t('onboarding.stationSlug')}>
-            <input {...station.register('slug')} />
-          </Field>
-          <Field label={t('common.description')}>
-            <textarea {...station.register('description')} />
-          </Field>
-          <Field label={t('common.genre')}>
-            <input {...station.register('genre')} />
-          </Field>
-          <Field label={t('common.country')}>
-            <input {...station.register('country')} />
-          </Field>
-          <Field label={t('common.language')}>
-            <input {...station.register('language')} />
-          </Field>
-          <Field label={t('common.website')}>
-            <input {...station.register('website')} />
-          </Field>
-          <label className="checkbox">
-            <input type="checkbox" {...station.register('listInDirectory')} />{' '}
-            {t('common.listInDirectory')}
-          </label>
-          <Notice error={createStation.error} />
-          <button>{t('onboarding.createStation')}</button>
+      <Step step={2} icon={Signal01} title={t('onboarding.stationTitle')}>
+        <form
+          className="grid gap-5 sm:grid-cols-2"
+          onSubmit={station.handleSubmit((value) => createStation.mutate(value))}
+        >
+          <TextField control={station.control} name="name" label={t('onboarding.stationName')} />
+          <TextField control={station.control} name="slug" label={t('onboarding.stationSlug')} />
+          <div className="sm:col-span-2">
+            <TextAreaField
+              control={station.control}
+              name="description"
+              label={t('common.description')}
+            />
+          </div>
+          <TextField control={station.control} name="genre" label={t('common.genre')} />
+          <TextField control={station.control} name="country" label={t('common.country')} />
+          <TextField control={station.control} name="language" label={t('common.language')} />
+          <TextField control={station.control} name="website" label={t('common.website')} />
+          <div className="sm:col-span-2">
+            <CheckboxField
+              control={station.control}
+              name="listInDirectory"
+              label={t('common.listInDirectory')}
+            />
+          </div>
+          <div className="flex flex-col gap-5 sm:col-span-2">
+            <Notice error={createStation.error} />
+            <Button
+              type="submit"
+              size="lg"
+              isLoading={createStation.isPending}
+              showTextWhileLoading
+            >
+              {t('onboarding.createStation')}
+            </Button>
+          </div>
         </form>
-      </section>
+      </Step>
     );
   return (
-    <section className="onboarding">
-      <h1>{t('onboarding.readyTitle')}</h1>
-      <p>{t('onboarding.readyText')}</p>
-      <Link className="button" to="/stations">
+    <Step
+      step={3}
+      icon={CheckCircle}
+      color="success"
+      title={t('onboarding.readyTitle')}
+      description={t('onboarding.readyText')}
+    >
+      <Button href="/stations" size="lg" iconTrailing={ArrowRight}>
         {t('onboarding.openStations')}
-      </Link>
+      </Button>
+    </Step>
+  );
+}
+
+/** One onboarding step: progress, featured icon, heading and the step's content. */
+function Step({
+  step,
+  icon,
+  color = 'brand',
+  title,
+  description,
+  children,
+}: {
+  step: number;
+  icon: FC<{ className?: string }>;
+  color?: 'brand' | 'success';
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section className="mx-auto flex max-w-xl flex-col gap-8">
+      <div className="flex flex-col gap-4">
+        <ol aria-label={t('onboarding.step', { current: step, total: 3 })} className="flex gap-2">
+          {[1, 2, 3].map((index) => (
+            <li
+              key={index}
+              className={
+                index <= step
+                  ? 'h-1.5 flex-1 rounded-full bg-brand-solid'
+                  : 'h-1.5 flex-1 rounded-full bg-quaternary'
+              }
+            />
+          ))}
+        </ol>
+        <p className="text-sm font-medium text-tertiary">
+          {t('onboarding.step', { current: step, total: 3 })}
+        </p>
+      </div>
+      <div className="flex flex-col gap-4">
+        <FeaturedIcon icon={icon} color={color} theme="modern" size="lg" />
+        <div className="flex flex-col gap-1">
+          <h1 className="text-display-xs font-semibold text-primary">{title}</h1>
+          {description && <p className="text-md text-tertiary">{description}</p>}
+        </div>
+      </div>
+      <div className="rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary md:p-6">
+        {children}
+      </div>
     </section>
   );
 }

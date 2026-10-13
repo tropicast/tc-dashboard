@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useMe } from '../../../hooks/use-me';
 import { selectTenant } from '../../../lib/tenant';
+import { Loading } from '../../molecules/Loading';
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -11,7 +12,13 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (me.data) selectTenant(me.data.memberships);
   }, [me.data]);
-  if (me.isPending) return <main className="loading">{t('guard.loading')}</main>;
+  if (me.isPending) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-primary">
+        <Loading label={t('guard.loading')} />
+      </main>
+    );
+  }
   // Come back to the same page after signing in (e.g. /device?code=… opened by the desktop app).
   if (me.isError) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;

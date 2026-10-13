@@ -335,7 +335,7 @@ test('translates the page content, not only the header, when French is chosen', 
         : Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0 }),
     );
     expect(await screen.findByText('Les stations de cet espace de travail.')).toBeInTheDocument();
-    expect(screen.getByText('Aucune station pour l’instant.')).toBeInTheDocument();
+    expect(await screen.findByText('Aucune station pour l’instant.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Compte' })).toBeInTheDocument();
   } finally {
     await i18n.changeLanguage('en');

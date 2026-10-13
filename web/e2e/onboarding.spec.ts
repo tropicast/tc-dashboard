@@ -119,9 +119,11 @@ test('signs up then creates a workspace and first station', async ({ page }) => 
   await page.getByLabel('Description').fill('News and salegy from Antananarivo');
   await page.getByLabel('Genre').fill('Talk');
   await page.getByLabel('Country').fill('MG');
-  await page.locator('.onboarding').getByLabel('Language').fill('mg');
+  await page.getByRole('main').getByLabel('Language').fill('mg');
   await page.getByLabel('Website').fill('https://radiomada.example');
-  await page.getByLabel('List on RadioBrowser').check();
+  // React Aria keeps the native checkbox visually hidden under its label: click the label.
+  await page.getByText('List on RadioBrowser').click();
+  await expect(page.getByLabel('List on RadioBrowser')).toBeChecked();
   const station = page.waitForRequest(
     (request) => request.url().endsWith('/api/v1/stations') && request.method() === 'POST',
   );

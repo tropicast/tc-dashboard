@@ -12,6 +12,10 @@ export const en = {
     lightTheme: 'Light theme',
     darkTheme: 'Dark theme',
     mainNavigation: 'Main navigation',
+    systemTheme: 'System theme',
+    theme: 'Theme',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
   },
   common: {
     copy: 'Copy',
@@ -62,6 +66,7 @@ export const en = {
     joinTeam: 'Join team',
     invitationToken: 'Invitation token',
     acceptInvitation: 'Accept invitation',
+    showCharacters: 'Show or hide the characters',
   },
   onboarding: {
     workspaceTitle: 'Create your workspace',
@@ -77,6 +82,7 @@ export const en = {
     readyText:
       'Install Tropicast Station, sign in with your account and choose this station to go live.',
     openStations: 'Open stations',
+    step: 'Step {{current}} of {{total}}',
   },
   stations: {
     title: 'Stations',
@@ -87,7 +93,7 @@ export const en = {
   },
   station: {
     loading: 'Loading station…',
-    back: '← Stations',
+    back: 'Stations',
     statusUnavailable: 'Status unavailable',
     live: 'Live',
     offline: 'Offline',
@@ -164,7 +170,8 @@ export const en = {
     sendInvite: 'Send invite',
     members: 'Members',
     devices: 'Desktop devices',
-    thisDevice: '(this device)',
+    thisDevice: 'This device',
+    lastUsedColumn: 'Last used',
     lastUsed: 'last used {{date}}',
   },
   billing: {

@@ -4,7 +4,12 @@ import { Trans, useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
-import { Field } from '../../atoms/Field';
+import { CheckCircle, Laptop01, XCircle } from '@untitledui/icons';
+import { Button } from '@/components/base/buttons/button';
+import { FeaturedIcon } from '@/components/foundations/featured-icon/featured-icon';
+import { Alert } from '../../atoms/Alert';
+import { TextField } from '../../atoms/FormFields';
+import { Loading } from '../../molecules/Loading';
 import { Notice } from '../../atoms/Notice';
 import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
@@ -18,13 +23,18 @@ export function DeviceApproval() {
   const [params, setParams] = useSearchParams();
   const code = params.get('code')?.trim() ?? '';
   return (
-    <section>
-      <h1>{t('device.title')}</h1>
-      {code ? (
-        <Decision code={code} />
-      ) : (
-        <CodeForm onCode={(value) => setParams({ code: value })} />
-      )}
+    <section className="mx-auto flex max-w-lg flex-col gap-6">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <FeaturedIcon icon={Laptop01} color="brand" theme="modern" size="xl" />
+        <h1 className="text-display-xs font-semibold text-primary">{t('device.title')}</h1>
+      </div>
+      <div className="flex flex-col gap-5 rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary md:p-6">
+        {code ? (
+          <Decision code={code} />
+        ) : (
+          <CodeForm onCode={(value) => setParams({ code: value })} />
+        )}
+      </div>
     </section>
   );
 }
@@ -33,16 +43,22 @@ function CodeForm({ onCode }: { onCode: (code: string) => void }) {
   const { t } = useTranslation();
   const form = useForm({ defaultValues: { code: '' } });
   return (
-    <form onSubmit={form.handleSubmit((value) => onCode(value.code.trim()))}>
-      <Field label={t('device.codeLabel')}>
-        <input
-          autoComplete="off"
-          autoCapitalize="characters"
-          placeholder="BCDF-GHJK"
-          {...form.register('code', { required: true })}
-        />
-      </Field>
-      <button>{t('common.continue')}</button>
+    <form
+      className="flex flex-col gap-5"
+      onSubmit={form.handleSubmit((value) => onCode(value.code.trim()))}
+    >
+      <TextField
+        control={form.control}
+        name="code"
+        rules={{ required: true }}
+        label={t('device.codeLabel')}
+        autoComplete="off"
+        placeholder="BCDF-GHJK"
+        inputClassName="font-mono text-lg tracking-widest uppercase"
+      />
+      <Button type="submit" size="lg">
+        {t('common.continue')}
+      </Button>
     </form>
   );
 }
@@ -68,17 +84,16 @@ function Decision({ code }: { code: string }) {
 
   if (decide.isSuccess) {
     return (
-      <p role="status">
-        {decide.variables === 'approve' ? t('device.approved') : t('device.denied')}
-      </p>
+      <Alert
+        color={decide.variables === 'approve' ? 'success' : 'gray'}
+        title={decide.variables === 'approve' ? t('device.approved') : t('device.denied')}
+      />
     );
   }
-  if (request.isPending) return <p>{t('device.checking')}</p>;
+  if (request.isPending) return <Loading label={t('device.checking')} />;
   if (request.isError) {
     return (request.error as Problem | undefined)?.status === 404 ? (
-      <p role="alert" className="notice toast error">
-        {t('device.unknown', { code })}
-      </p>
+      <Alert color="error" title={t('device.unknown', { code })} />
     ) : (
       <Notice error={request.error} />
     );
@@ -86,28 +101,39 @@ function Decision({ code }: { code: string }) {
   const device = request.data;
   return (
     <>
-      <p>
+      <p className="text-md text-secondary">
         <Trans
           i18nKey="device.asks"
           values={{ name: device.deviceName, code: device.userCode }}
           components={{ b: <strong /> }}
         />
       </p>
-      <p>
+      <p className="text-sm text-tertiary">
         {t('device.times', {
           created: formatDateTime(device.createdAt),
           expires: formatDateTime(device.expiresAt),
         })}
       </p>
       <Notice error={decide.error} />
-      <p>
-        <button disabled={decide.isPending} onClick={() => decide.mutate('approve')}>
-          {t('device.approve')}
-        </button>{' '}
-        <button disabled={decide.isPending} onClick={() => decide.mutate('deny')}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button
+          color="secondary-destructive"
+          size="lg"
+          iconLeading={XCircle}
+          isDisabled={decide.isPending}
+          onPress={() => decide.mutate('deny')}
+        >
           {t('device.deny')}
-        </button>
-      </p>
+        </Button>
+        <Button
+          size="lg"
+          iconLeading={CheckCircle}
+          isDisabled={decide.isPending}
+          onPress={() => decide.mutate('approve')}
+        >
+          {t('device.approve')}
+        </Button>
+      </div>
     </>
   );
 }

@@ -15,7 +15,9 @@ import { AuthGuard } from './components/organisms/layout/AuthGuard';
 import { AppShell } from './components/organisms/layout/AppShell';
 import { StationDetail } from './components/organisms/stations/StationDetail';
 import { Stations } from './components/organisms/stations/Stations';
-import './dashboard.css';
+import '@/styles/globals.css';
+import { RouteProvider } from '@/providers/route-provider';
+import { ThemeProvider } from '@/providers/theme-provider';
 import './lib/i18n';
 import { queryClient } from './lib/query-client';
 
@@ -38,17 +40,21 @@ function ProtectedRoutes() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/confirm-email" element={<EmailAction kind="confirm" />} />
-          <Route path="/forgot-password" element={<EmailAction kind="forgot" />} />
-          <Route path="/reset-password" element={<Reset />} />
-          <Route path="/invitations/accept" element={<AcceptInvite />} />
-          <Route path="*" element={<ProtectedRoutes />} />
-        </Routes>
-      </ErrorBoundary>
+      <ThemeProvider>
+        <RouteProvider>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/confirm-email" element={<EmailAction kind="confirm" />} />
+              <Route path="/forgot-password" element={<EmailAction kind="forgot" />} />
+              <Route path="/reset-password" element={<Reset />} />
+              <Route path="/invitations/accept" element={<AcceptInvite />} />
+              <Route path="*" element={<ProtectedRoutes />} />
+            </Routes>
+          </ErrorBoundary>
+        </RouteProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
