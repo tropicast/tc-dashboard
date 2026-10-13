@@ -10,9 +10,11 @@ import { Loading } from '../../molecules/Loading';
 import { PageHeader } from '../../molecules/PageHeader';
 import { data } from '../../../lib/request';
 import type { components } from '../../../api/schema';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export function Stations() {
   const { t } = useTranslation();
+  useDocumentTitle(t('stations.title'));
   const stations = useQuery({
     queryKey: ['stations', localStorage.getItem('tenant-id')],
     queryFn: () =>

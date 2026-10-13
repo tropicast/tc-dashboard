@@ -27,6 +27,7 @@ import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
 import type { Credential, Station, Status } from '../../../lib/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 const StationStats = lazy(() => import('../../../StationStats'));
 
@@ -43,6 +44,7 @@ export function StationDetail() {
       return { station: result.data as Station, etag: result.response.headers.get('ETag') ?? '' };
     },
   });
+  useDocumentTitle(station.data?.station.name, t('stations.title'));
   const status = useQuery({
     queryKey: ['status', tenantId, id],
     queryFn: () =>

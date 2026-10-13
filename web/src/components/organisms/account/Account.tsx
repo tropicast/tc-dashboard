@@ -17,9 +17,11 @@ import { BillingPanel } from './BillingPanel';
 import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import type { Tenant } from '../../../lib/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export function Account() {
   const { t } = useTranslation();
+  useDocumentTitle(t('account.title'));
   const tenantId = localStorage.getItem('tenant-id');
   const tenant = useQuery({
     queryKey: ['tenant', tenantId],
