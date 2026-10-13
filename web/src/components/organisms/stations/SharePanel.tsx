@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { LinkExternal01 } from '@untitledui/icons';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
@@ -6,6 +7,8 @@ import { useMe } from '../../../hooks/use-me';
 import { embedSnippets } from '../../../lib/embed';
 import { data } from '../../../lib/request';
 import { CopyButton } from '../../atoms/CopyButton';
+import { Card } from '../../molecules/Card';
+import { CopyField } from '../../molecules/CopyField';
 
 type PublicStation = components['schemas']['PublicStationResponse'];
 
@@ -29,29 +32,30 @@ export function SharePanel({ stationSlug }: { stationSlug: string }) {
   const { pageUrl, embedUrl, name } = station.data;
   const snippets = embedUrl ? embedSnippets(embedUrl, name) : undefined;
   return (
-    <article className="panel">
-      <h2>{t('share.title')}</h2>
-      <p>
-        <strong>{t('share.publicPage')}</strong>{' '}
-        <a href={pageUrl} target="_blank" rel="noopener">
-          {pageUrl}
-        </a>{' '}
-        <CopyButton value={pageUrl} />
-      </p>
+    <Card title={t('share.title')}>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-secondary">{t('share.publicPage')}</span>
+        <div className="flex items-center gap-2">
+          <a
+            href={pageUrl}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex min-w-0 items-center gap-1 text-sm font-semibold break-all text-brand-secondary hover:text-brand-secondary_hover"
+          >
+            {pageUrl}
+            <LinkExternal01 aria-hidden="true" className="size-4 shrink-0" />
+          </a>
+          <CopyButton value={pageUrl} />
+        </div>
+      </div>
       {snippets ? (
         <>
-          <p>
-            <strong>{t('share.iframe')}</strong> <CopyButton value={snippets.iframe} />
-          </p>
-          <code className="snippet">{snippets.iframe}</code>
-          <p>
-            <strong>{t('share.script')}</strong> <CopyButton value={snippets.script} />
-          </p>
-          <code className="snippet">{snippets.script}</code>
+          <CopyField multiline label={t('share.iframe')} value={snippets.iframe} />
+          <CopyField multiline label={t('share.script')} value={snippets.script} />
         </>
       ) : (
-        <p>{t('share.notIncluded')}</p>
+        <p className="text-sm text-tertiary">{t('share.notIncluded')}</p>
       )}
-    </article>
+    </Card>
   );
 }

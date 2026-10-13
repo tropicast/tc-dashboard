@@ -1,0 +1,55 @@
+/* Untitled UI setup: https://www.untitledui.com/react/docs/installation */
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import './theme.css';
+
+@plugin "tailwindcss-react-aria-components";
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:where(.dark-mode, .dark-mode *));
+@custom-variant label (& [data-label]);
+@custom-variant focus-input-within (&:has(input:focus));
+
+@utility scrollbar-hide {
+  &::-webkit-scrollbar {
+    display: none;
+    -webkit-appearance: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@utility transition-inherit-all {
+  transition-property: inherit;
+  transition-duration: inherit;
+  transition-timing-function: inherit;
+}
+
+:root {
+  /* Self-hosted Inter (bundled by @fontsource-variable/inter); theme.css reads this variable. */
+  --font-inter: 'Inter Variable';
+  color-scheme: light;
+}
+:root.dark-mode {
+  color-scheme: dark;
+}
+
+html,
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-ligatures: contextual;
+  font-kerning: normal;
+}
+
+body {
+  @apply bg-primary text-primary;
+}
+
+/* Hide the default outline on chart elements. */
+.recharts-surface,
+.recharts-surface g,
+.recharts-surface path {
+  outline: none;
+}

@@ -1,9 +1,6 @@
 import { problemMessage } from '../../lib/request';
+import { Alert } from './Alert';
 
 export function Notice({ error }: { error: unknown }) {
-  return error ? (
-    <p role="alert" className="notice toast error">
-      {problemMessage(error)}
-    </p>
-  ) : null;
+  return error ? <Alert color="error" title={problemMessage(error)} /> : null;
 }

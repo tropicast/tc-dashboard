@@ -17,5 +17,17 @@ export default tseslint.config(
             'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
         },
     },
+    {
+        // Untitled UI components, copied from the library (npx untitledui add): keep them close to upstream.
+        files: [
+            'src/components/{base,application,foundations}/**',
+            'src/utils/**',
+            'src/hooks/use-clipboard.ts',
+        ],
+        rules: {
+            'react-refresh/only-export-components': 'off',
+            '@typescript-eslint/no-empty-object-type': 'off',
+        },
+    },
     prettier,
 );

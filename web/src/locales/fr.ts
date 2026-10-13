@@ -14,6 +14,10 @@ export const fr: Locale = {
     lightTheme: 'Thème clair',
     darkTheme: 'Thème sombre',
     mainNavigation: 'Navigation principale',
+    systemTheme: 'Thème du système',
+    theme: 'Thème',
+    openMenu: 'Ouvrir le menu',
+    closeMenu: 'Fermer le menu',
   },
   common: {
     copy: 'Copier',
@@ -64,6 +68,7 @@ export const fr: Locale = {
     joinTeam: 'Rejoindre l’équipe',
     invitationToken: 'Jeton d’invitation',
     acceptInvitation: 'Accepter l’invitation',
+    showCharacters: 'Afficher ou masquer les caractères',
   },
   onboarding: {
     workspaceTitle: 'Créez votre espace de travail',
@@ -79,6 +84,7 @@ export const fr: Locale = {
     readyText:
       'Installez Tropicast Station, connectez-vous avec votre compte et choisissez cette station pour passer à l’antenne.',
     openStations: 'Voir les stations',
+    step: 'Étape {{current}} sur {{total}}',
   },
   stations: {
     title: 'Stations',
@@ -89,7 +95,7 @@ export const fr: Locale = {
   },
   station: {
     loading: 'Chargement de la station…',
-    back: '← Stations',
+    back: 'Stations',
     statusUnavailable: 'Statut indisponible',
     live: 'En direct',
     offline: 'Hors antenne',
@@ -167,7 +173,8 @@ export const fr: Locale = {
     sendInvite: 'Envoyer l’invitation',
     members: 'Membres',
     devices: 'Appareils de bureau',
-    thisDevice: '(cet appareil)',
+    thisDevice: 'Cet appareil',
+    lastUsedColumn: 'Dernière utilisation',
     lastUsed: 'dernière utilisation le {{date}}',
   },
   billing: {

@@ -3,7 +3,15 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
-import { Field } from '../../atoms/Field';
+import { Laptop01, Send01 } from '@untitledui/icons';
+import { Table } from '@/components/application/table/table';
+import { Avatar } from '@/components/base/avatar/avatar';
+import { Badge } from '@/components/base/badges/badges';
+import { Button } from '@/components/base/buttons/button';
+import { ProgressBarBase } from '@/components/base/progress-indicators/progress-indicators';
+import { SelectField, TextField } from '../../atoms/FormFields';
+import { Card } from '../../molecules/Card';
+import { PageHeader } from '../../molecules/PageHeader';
 import { Notice } from '../../atoms/Notice';
 import { BillingPanel } from './BillingPanel';
 import { formatDateTime } from '../../../lib/i18n';
@@ -34,65 +42,123 @@ export function Account() {
       ),
   });
   return (
-    <section>
-      <h1>{t('account.title')}</h1>
-      <div className="grid">
-        <article className="panel">
-          <h2>{t('account.usage')}</h2>
-          <p>
-            <strong>{tenant.data?.plan.name ?? '…'}</strong>
+    <section className="flex flex-col gap-6">
+      <PageHeader title={t('account.title')} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card title={t('account.usage')}>
+          <p className="text-display-xs font-semibold text-primary">
+            {tenant.data?.plan.name ?? '…'}
           </p>
-          <p>
-            {tenant.data
-              ? t('account.usageLine', {
+          {tenant.data && (
+            <div className="flex flex-col gap-2">
+              <ProgressBarBase
+                value={Number(tenant.data.stationCount)}
+                max={Math.max(Number(tenant.data.plan.maxStations), 1)}
+              />
+              <p className="text-sm text-tertiary">
+                {t('account.usageLine', {
                   count: tenant.data.stationCount,
                   max: tenant.data.plan.maxStations,
                   listeners: tenant.data.plan.maxListeners,
-                })
-              : ''}
-          </p>
-        </article>
+                })}
+              </p>
+            </div>
+          )}
+        </Card>
         <BillingPanel />
-        <article className="panel">
-          <h2>{t('account.invite')}</h2>
-          <form onSubmit={invite.handleSubmit((value) => inviteMutation.mutate(value))}>
-            <Field label={t('common.email')}>
-              <input {...invite.register('email', { required: true })} />
-            </Field>
-            <Field label={t('account.role')}>
-              <select {...invite.register('role')}>
-                <option value="Broadcaster">{t('account.roles.Broadcaster')}</option>
-                <option value="Admin">{t('account.roles.Admin')}</option>
-                <option value="Owner">{t('account.roles.Owner')}</option>
-              </select>
-            </Field>
-            <button>{t('account.sendInvite')}</button>
-          </form>
-          <Notice error={inviteMutation.error} />
-        </article>
       </div>
-      <article className="panel">
-        <h2>{t('account.members')}</h2>
-        <ul>
-          {members.data?.map((member) => (
-            <li key={member.userId}>
-              {member.email} — {t(`account.roles.${member.role}`)}
-            </li>
-          ))}
-        </ul>
-      </article>
-      <article className="panel">
-        <h2>{t('account.devices')}</h2>
-        <ul>
-          {devices.data?.map((device) => (
-            <li key={device.id}>
-              {device.deviceName}
-              {device.current ? ` ${t('account.thisDevice')}` : ''} —{' '}
-              {t('account.lastUsed', { date: formatDateTime(device.lastUsedAt) })}
-            </li>
-          ))}
-        </ul>
-      </article>
+      <Card title={t('account.invite')}>
+        <form
+          className="grid gap-4 md:grid-cols-[1fr_12rem_auto] md:items-end"
+          onSubmit={invite.handleSubmit(
+            (value) => !inviteMutation.isPending && inviteMutation.mutate(value),
+          )}
+        >
+          <TextField
+            control={invite.control}
+            name="email"
+            rules={{ required: true }}
+            label={t('common.email')}
+            autoComplete="off"
+          />
+          <SelectField
+            control={invite.control}
+            name="role"
+            label={t('account.role')}
+            options={(['Broadcaster', 'Admin', 'Owner'] as const).map((role) => ({
+              value: role,
+              label: t(`account.roles.${role}`),
+            }))}
+          />
+          <Button
+            type="submit"
+            size="md"
+            iconLeading={Send01}
+            isLoading={inviteMutation.isPending}
+            showTextWhileLoading
+          >
+            {t('account.sendInvite')}
+          </Button>
+        </form>
+        <Notice error={inviteMutation.error} />
+      </Card>
+      <Card title={t('account.members')} bodyClassName="p-0 md:p-0">
+        <Table aria-label={t('account.members')} size="sm">
+          <Table.Header>
+            <Table.Head id="email" label={t('common.email')} isRowHeader />
+            <Table.Head id="role" label={t('account.role')} />
+          </Table.Header>
+          <Table.Body items={members.data ?? []}>
+            {(member) => (
+              <Table.Row id={member.userId}>
+                <Table.Cell>
+                  <div className="flex items-center gap-3">
+                    <Avatar size="sm" initials={member.email.slice(0, 2).toUpperCase()} />
+                    <span className="font-medium text-primary">{member.email}</span>
+                  </div>
+                </Table.Cell>
+                <Table.Cell>
+                  <Badge
+                    type="pill-color"
+                    color={member.role === 'Owner' ? 'brand' : 'gray'}
+                    size="sm"
+                  >
+                    {t(`account.roles.${member.role}`)}
+                  </Badge>
+                </Table.Cell>
+              </Table.Row>
+            )}
+          </Table.Body>
+        </Table>
+      </Card>
+      <Card title={t('account.devices')} bodyClassName="p-0 md:p-0">
+        <Table aria-label={t('account.devices')} size="sm">
+          <Table.Header>
+            <Table.Head id="device" label={t('account.devices')} isRowHeader />
+            <Table.Head id="used" label={t('account.lastUsedColumn')} />
+          </Table.Header>
+          <Table.Body items={devices.data ?? []}>
+            {(device) => (
+              <Table.Row id={device.id}>
+                <Table.Cell>
+                  <div className="flex items-center gap-3">
+                    <Laptop01 aria-hidden="true" className="size-5 shrink-0 text-fg-quaternary" />
+                    <span className="font-medium text-primary">{device.deviceName}</span>
+                    {device.current && (
+                      <Badge type="pill-color" color="success" size="sm">
+                        {t('account.thisDevice')}
+                      </Badge>
+                    )}
+                  </div>
+                </Table.Cell>
+                <Table.Cell>
+                  {t('account.lastUsed', { date: formatDateTime(device.lastUsedAt) })}
+                </Table.Cell>
+              </Table.Row>
+            )}
+          </Table.Body>
+        </Table>
+      </Card>
     </section>
   );
 }

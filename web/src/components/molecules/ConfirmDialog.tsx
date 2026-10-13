@@ -1,7 +1,12 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { AlertTriangle } from '@untitledui/icons';
+import { Heading } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
+import { Dialog, Modal, ModalOverlay } from '@/components/application/modals/modal';
+import { Button } from '@/components/base/buttons/button';
+import { FeaturedIcon } from '@/components/foundations/featured-icon/featured-icon';
 
-/** A modal confirmation. The native dialog traps focus, and Escape cancels. */
+/** A destructive confirmation (Untitled UI modal). React Aria traps focus; Escape or the backdrop cancels. */
 export function ConfirmDialog({
   title,
   confirmLabel,
@@ -18,38 +23,41 @@ export function ConfirmDialog({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    // showModal is missing in some test environments: open it non-modally there.
-    if (typeof dialog.showModal === 'function') dialog.showModal();
-    else dialog.setAttribute('open', '');
-    return () => {
-      if (typeof dialog.close === 'function') dialog.close();
-    };
-  }, []);
   return (
-    <dialog
-      ref={ref}
-      className="confirm"
-      aria-labelledby={titleId}
-      onCancel={(event) => {
-        event.preventDefault();
-        onCancel();
-      }}
+    // Not dismissable while busy: the request's error shows inside the dialog.
+    <ModalOverlay
+      isOpen
+      isDismissable={!busy}
+      isKeyboardDismissDisabled={busy}
+      onOpenChange={(open) => !open && onCancel()}
     >
-      <h2 id={titleId}>{title}</h2>
-      {children}
-      <p className="actions">
-        <button type="button" className="quiet" onClick={onCancel}>
-          {t('common.cancel')}
-        </button>
-        <button type="button" className="danger" disabled={busy} onClick={onConfirm}>
-          {confirmLabel}
-        </button>
-      </p>
-    </dialog>
+      <Modal className="max-w-100">
+        <Dialog>
+          <div className="flex w-full flex-col gap-4 p-4 sm:p-6">
+            <FeaturedIcon icon={AlertTriangle} color="error" theme="light" size="lg" />
+            <div className="flex flex-col gap-1">
+              <Heading slot="title" className="text-lg font-semibold text-primary">
+                {title}
+              </Heading>
+              <div className="flex flex-col gap-3 text-sm text-tertiary">{children}</div>
+            </div>
+            <div className="flex flex-col-reverse gap-3 pt-4 sm:grid sm:grid-cols-2">
+              <Button color="secondary" size="lg" isDisabled={busy} onPress={onCancel}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                color="primary-destructive"
+                size="lg"
+                isLoading={busy}
+                showTextWhileLoading
+                onPress={onConfirm}
+              >
+                {confirmLabel}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
   );
 }

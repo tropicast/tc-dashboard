@@ -21,7 +21,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Untitled UI components import from "@/…" */
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"]
 }
