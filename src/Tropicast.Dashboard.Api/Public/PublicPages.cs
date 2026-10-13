@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Tropicast.Dashboard.Domain;
 
 namespace Tropicast.Dashboard.Api.Public;
 
@@ -19,43 +21,109 @@ internal static class PublicPages
         Converters = { new JsonStringEnumConverter() },
     };
 
+    /// <summary>
+    /// Dashboard design (#86): the values are copied from the Untitled UI theme in <c>web/src/styles/theme.css</c>
+    /// (Tailwind neutral greys, teal brand, solid brand teal-700 for AA under white) so the public player matches the
+    /// dashboard without loading its stylesheet. Change them together. Inter only when installed: no font download.
+    /// The embed card is solid, not frosted: the host page behind it can be any colour and would break the contrast.
+    /// </summary>
     private const string Css = """
-        :root{color-scheme:light dark;--fg:#16202a;--bg:#fff;--muted:#5b6670;--accent:#0b6e4f;--card:#f3f5f7}
-        @media (prefers-color-scheme:dark){:root{--fg:#e8edf1;--bg:#111619;--muted:#9aa6af;--accent:#3fc28f;--card:#1b2227}}
-        *{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg)}
-        main{max-width:640px;margin:0 auto;padding:24px 16px}
-        .head{display:flex;gap:16px;align-items:center}.logo{width:88px;height:88px;border-radius:12px;object-fit:cover;background:var(--card)}
-        h1{font-size:1.6rem;margin:0}.meta{color:var(--muted);margin:2px 0 0}
-        .badge{display:inline-block;margin-top:6px;padding:2px 10px;border-radius:99px;background:var(--card);font-size:.85rem;color:var(--muted)}
-        .badge.live{background:#c62828;color:#fff}
-        .player{display:flex;gap:12px;align-items:center;margin:20px 0;padding:16px;border-radius:12px;background:var(--card)}
-        button{font:inherit;font-weight:600;min-width:112px;min-height:48px;border:0;border-radius:99px;background:var(--accent);color:#fff;cursor:pointer}
-        button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
-        #note{color:var(--muted);margin:0}.desc{white-space:pre-line}a{color:var(--accent)}footer{color:var(--muted);font-size:.85rem;margin-top:32px}
-        body.embed main{padding:8px}body.embed .logo{width:56px;height:56px}body.embed h1{font-size:1.1rem}body.embed .player{margin:8px 0 0;padding:8px 12px}
+        :root{color-scheme:light dark;--fg:oklch(20.5% 0 0);--muted:oklch(43.9% 0 0);--bg:oklch(98.5% 0 0);--card:#fff;--glass:rgb(255 255 255/.72);
+        --line:oklch(92.2% 0 0);--track:oklch(87% 0 0);--brand:oklch(51.1% .096 186.391);--link:oklch(51.1% .096 186.391);--tint:oklch(98.4% .014 180.72);
+        --focus:oklch(70.4% .14 182.503);--live:oklch(57.7% .245 27.325);
+        --shadow:0 12px 16px -4px rgb(0 0 0/.08),0 4px 6px -2px rgb(0 0 0/.03),0 2px 2px -1px rgb(0 0 0/.04)}
+        @media (prefers-color-scheme:dark){:root{--fg:oklch(98.5% 0 0);--muted:oklch(70.8% 0 0);--bg:oklch(14.5% 0 0);--card:oklch(20.5% 0 0);
+        --glass:rgb(23 23 23/.7);--line:oklch(26.9% 0 0);--track:oklch(37.1% 0 0);--link:oklch(77.7% .152 181.912);--tint:oklch(43.7% .078 188.216/.35)}}
+        *{box-sizing:border-box}
+        body{margin:0;min-height:100vh;font:16px/1.5 Inter,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--fg);
+        background:radial-gradient(circle at 15% 0,var(--tint),transparent 55%),var(--bg)}
+        main{max-width:560px;margin:0 auto;padding:32px 16px}a{color:var(--link)}
+        .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+        .card{position:relative;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow)}
+        @supports (backdrop-filter:blur(1px)){.card{background:var(--glass);backdrop-filter:blur(16px) saturate(1.4)}}
+        @media (prefers-reduced-transparency:reduce){.card{background:var(--card);backdrop-filter:none}}
+        body.embed .card{background:var(--card);backdrop-filter:none}
+        .top{display:flex;gap:12px;align-items:flex-start}.titles{flex:1;min-width:0}
+        .logo{flex:none;width:64px;height:64px;border-radius:12px;object-fit:cover;background:var(--line)}
+        h1{font-size:1.375rem;line-height:1.3;font-weight:600;margin:0;overflow-wrap:anywhere}h1 a{color:inherit;text-decoration:none}h1 a:hover{text-decoration:underline}
+        .meta,#note{margin:2px 0 0;color:var(--muted);font-size:.9375rem}#note:empty{display:none}.titles:has(#note:not(:empty)) .meta{display:none}
+        #note[data-busy]::before{content:"";display:inline-block;width:.8em;height:.8em;margin-right:.5em;vertical-align:-.05em;border:2px solid currentColor;
+        border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
+        @keyframes spin{to{transform:rotate(1turn)}}@keyframes pulse{50%{opacity:.55}}
+        .bar{display:flex;gap:10px;align-items:center;margin:20px 0 12px;font-size:.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
+        .badge{display:inline-flex;gap:6px;align-items:center;padding:0 8px;border-radius:99px;border:1px solid var(--line);font-weight:500;white-space:nowrap}
+        .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--muted)}
+        .badge.live{border-color:var(--live);background:var(--live);color:#fff}.badge.live::before{background:#fff}
+        .track{flex:1;height:4px;border-radius:99px;background:var(--track);overflow:hidden}
+        .track span{display:block;width:0;height:100%;background:var(--link);transition:width .4s}.on .track span{width:100%;animation:pulse 2s ease-in-out infinite}
+        .controls{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center}.sound{display:flex;align-items:center;justify-content:flex-end;gap:4px}
+        button,summary{display:inline-grid;place-items:center;font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+        .icon,summary{width:44px;height:44px;border-radius:10px}.icon:hover,summary:hover{background:var(--line)}
+        svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+        .play{width:64px;height:64px;border-radius:50%;background:var(--brand);color:#fff;box-shadow:var(--shadow)}.play svg{width:28px;height:28px;fill:currentColor;stroke:none}
+        .play:hover{filter:brightness(1.1)}.play:disabled{opacity:.45;cursor:not-allowed;filter:none}
+        .on .i-play,.i-stop,.muted .i-wave,.i-mute{display:none}.on .i-stop,.muted .i-mute{display:block}
+        :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+        input[type=range]{width:96px;accent-color:var(--link)}@media (hover:none),(max-width:419px){input[type=range]{display:none}}
+        details{position:relative}summary{list-style:none}summary::-webkit-details-marker{display:none}
+        .menu{position:absolute;right:0;top:48px;z-index:1;min-width:200px;margin:0;padding:4px;list-style:none;border:1px solid var(--line);
+        border-radius:12px;background:var(--card);box-shadow:var(--shadow)}
+        .menu a{display:block;padding:10px 12px;border-radius:8px;color:var(--fg);text-decoration:none}.menu a:hover{background:var(--line)}
+        .desc{white-space:pre-line;margin:24px 4px 0}footer{color:var(--muted);font-size:.8125rem;margin:32px 4px 0}
+        body.embed{min-height:0;background:transparent}body.embed main{max-width:none;padding:8px}
+        body.embed .card{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"play top sound" "bar bar bar";gap:0 12px;padding:12px;border-radius:12px}
+        .embed .controls{display:contents}.embed .play{grid-area:play;width:48px;height:48px}.embed .play svg{width:22px;height:22px}
+        .embed .top{grid-area:top;align-items:center;min-width:0}.embed .sound{grid-area:sound}.embed .controls>div:first-child,.embed input[type=range]{display:none}
+        .embed .logo{width:44px;height:44px;border-radius:8px}.embed h1{font-size:1rem}.embed .meta,.embed #note{font-size:.8125rem}
+        .embed .bar{grid-area:bar;margin:10px 0 0}.embed .titles{white-space:nowrap}.embed h1,.embed .meta{overflow:hidden;text-overflow:ellipsis}
+        @media (max-width:359px){.embed .logo{display:none}}
+        @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
         """;
 
     /// <summary>
     /// Plays the first stream the browser supports (Opus, else MP3) straight from the listener host; reconnects with
-    /// backoff (1 s doubling to 30 s) while the listener wants to play; refreshes the live state every 30 s.
+    /// backoff (1 s doubling to 30 s) while the listener wants to play; refreshes the live state every 30 s. Shows the
+    /// listening time, mute and volume, and shares the page (the share sheet, else the clipboard).
     /// </summary>
     private const string Player = """
-        (()=>{const d=JSON.parse(document.getElementById('station-data').textContent);
-        const b=document.getElementById('play'),badge=document.getElementById('status'),note=document.getElementById('note');
+        (()=>{const $=i=>document.getElementById(i),d=JSON.parse($('station-data').textContent);
+        const card=$('card'),b=$('play'),label=$('play-label'),badge=$('status'),note=$('note'),clock=$('elapsed'),mute=$('mute'),vol=$('volume');
         const a=new Audio();a.preload='none';
         const s=d.streams.find(x=>a.canPlayType(x.format==='Opus'?'audio/ogg; codecs="opus"':x.contentType))||d.streams[d.streams.length-1];
-        let want=false,delay=1000,timer=0;
-        const ui=()=>{b.textContent=want?d.t.stop:d.t.play;b.disabled=!want&&d.live===false;};
-        const live=v=>{d.live=v;badge.textContent=v===true?d.t.live:v===false?d.t.offline:'';badge.hidden=v==null;badge.className='badge'+(v?' live':'');ui();};
+        let want=false,delay=1000,timer=0,since=0,tick=0;
+        const say=(t,busy)=>{note.textContent=t;note.toggleAttribute('data-busy',!!busy);};
+        const ui=()=>{label.textContent=want?d.t.stop:d.t.play;card.classList.toggle('on',want);b.disabled=!want&&d.live===false;};
+        const live=v=>{d.live=v;badge.textContent=v===true?d.t.live:v===false?d.t.offline:'';badge.hidden=v==null;badge.classList.toggle('live',!!v);ui();};
+        const two=n=>String(n).padStart(2,'0');
+        const count=()=>{const n=Math.floor((Date.now()-since)/1000),h=Math.floor(n/3600),m=Math.floor(n/60)%60;
+        clock.textContent=(h?h+':'+two(m):m)+':'+two(n%60);};
         const start=()=>{clearTimeout(timer);a.src=s.url+(s.url.includes('?')?'&':'?')+'t='+Date.now();a.play().catch(retry);};
-        function retry(){if(!want)return;note.textContent=d.t.reconnecting;clearTimeout(timer);timer=setTimeout(start,delay);delay=Math.min(delay*2,30000);}
-        const stop=()=>{clearTimeout(timer);a.pause();a.removeAttribute('src');a.load();note.textContent='';};
-        a.addEventListener('playing',()=>{delay=1000;note.textContent='';});
+        function retry(){if(!want)return;say(d.t.reconnecting,true);clearTimeout(timer);timer=setTimeout(start,delay);delay=Math.min(delay*2,30000);}
+        const stop=()=>{clearTimeout(timer);clearInterval(tick);since=0;clock.textContent='0:00';a.pause();a.removeAttribute('src');a.load();say('');};
+        a.addEventListener('playing',()=>{delay=1000;say('');if(!since){since=Date.now();tick=setInterval(count,1000);}});
         for(const e of['error','ended','stalled'])a.addEventListener(e,retry);
         b.addEventListener('click',()=>{want=!want;if(want)start();else stop();ui();});
+        const sound=()=>{const m=a.muted||a.volume===0;mute.classList.toggle('muted',m);mute.setAttribute('aria-label',m?d.t.unmute:d.t.mute);};
+        mute.addEventListener('click',()=>{a.muted=!a.muted;if(!a.muted&&a.volume===0)vol.value=a.volume=1;sound();});
+        vol.addEventListener('input',()=>{a.volume=+vol.value;a.muted=false;sound();});
+        const share=$('share');share&&share.addEventListener('click',async()=>{try{if(navigator.share)await navigator.share({title:d.name,url:d.pageUrl});
+        else{await navigator.clipboard.writeText(d.pageUrl);say(d.t.copied);setTimeout(()=>note.textContent===d.t.copied&&say(''),3000);}}catch{}});
+        const menu=document.querySelector('details');menu&&menu.addEventListener('keydown',e=>{if(e.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary').focus();}});
+        document.addEventListener('click',e=>{if(menu&&menu.open&&!menu.contains(e.target))menu.open=false;});
         const poll=async()=>{try{const r=await fetch(d.statusUrl);if(r.ok)live((await r.json()).live);}catch{}setTimeout(poll,30000);};
-        live(d.live);setTimeout(poll,30000);})();
+        live(d.live);sound();setTimeout(poll,30000);})();
         """;
+
+    /// <summary>Inline icons (Untitled UI line style, 24 px, stroke 2), so the page loads no image for its controls.</summary>
+    private const string PlayIcon = """<svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg>""";
+
+    private const string StopIcon = """<svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>""";
+
+    private const string VolumeIcon = """<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path class="i-wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="i-mute" d="m16 9 6 6m0-6-6 6"/></svg>""";
+
+    private const string ShareIcon = """<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/></svg>""";
+
+    private const string MoreIcon = """<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>""";
 
     /// <summary>
     /// <c>&lt;script src="…/embed.js" data-station="tenant/station" async&gt;</c> puts the player iframe after itself.
@@ -71,13 +139,16 @@ internal static class PublicPages
     private static readonly Dictionary<string, string> English = new()
     {
         ["play"] = "Play", ["stop"] = "Stop", ["live"] = "Live", ["offline"] = "Offline", ["reconnecting"] = "Reconnecting…",
-        ["listen"] = "Listen live", ["website"] = "Website",
+        ["listen"] = "Listen live", ["website"] = "Website", ["mute"] = "Mute", ["unmute"] = "Unmute", ["volume"] = "Volume",
+        ["share"] = "Share", ["copied"] = "Link copied", ["more"] = "More options", ["page"] = "Station page", ["stream"] = "Open the {0} stream",
     };
 
     private static readonly Dictionary<string, string> French = new()
     {
         ["play"] = "Écouter", ["stop"] = "Arrêter", ["live"] = "En direct", ["offline"] = "Hors antenne", ["reconnecting"] = "Reconnexion…",
-        ["listen"] = "Écouter en direct", ["website"] = "Site web",
+        ["listen"] = "Écouter en direct", ["website"] = "Site web", ["mute"] = "Couper le son", ["unmute"] = "Rétablir le son",
+        ["volume"] = "Volume", ["share"] = "Partager", ["copied"] = "Lien copié", ["more"] = "Plus d’options", ["page"] = "Page de la station",
+        ["stream"] = "Ouvrir le flux {0}",
     };
 
     internal static string Station(PublicStationResponse station, string statusUrl, string nonce, bool embed)
@@ -88,9 +159,10 @@ internal static class PublicPages
         var summary = station.Description.Length > 0 ? station.Description : $"{station.Name}: {t["listen"]}";
         var description = Html.Encode(summary.Length > 300 ? summary[..300] : summary);
         var meta = string.Join(" · ", new[] { station.Genre, station.Country ?? "" }.Where(v => v.Length > 0));
-        var data = JsonSerializer.Serialize(new { streams = station.Streams, live = station.Live, statusUrl, t }, Json);
+        var pageUrl = station.PageUrl.AbsoluteUri;
+        var data = JsonSerializer.Serialize(new { name = station.Name, pageUrl, streams = station.Streams, live = station.Live, statusUrl, t }, Json);
         var logo = station.LogoUrl is { } url
-            ? $"""<img class="logo" src="{Html.Encode(url.AbsoluteUri)}" alt="" width="88" height="88" decoding="async">"""
+            ? $"""<img class="logo" src="{Html.Encode(url.AbsoluteUri)}" alt="" width="64" height="64" decoding="async">"""
             : "";
         var head = embed
             ? """<meta name="robots" content="noindex">"""
@@ -124,8 +196,13 @@ internal static class PublicPages
             </head>
             <body{(embed ? " class=\"embed\"" : "")}>
             <main>
-            <div class="head">{logo}<div><h1>{title}</h1>{(meta.Length > 0 ? $"""<p class="meta">{Html.Encode(meta)}</p>""" : "")}<span id="status" class="badge" hidden></span></div></div>
-            <div class="player"><button id="play" type="button">{t["play"]}</button><p id="note" role="status" aria-live="polite"></p></div>
+            <section id="card" class="card" aria-labelledby="name">
+            <div class="top">{logo}<div class="titles"><h1 id="name">{title}</h1>{(meta.Length > 0 ? $"""<p class="meta">{Html.Encode(meta)}</p>""" : "")}<p id="note" role="status" aria-live="polite"></p></div>{More(station, t, embed)}</div>
+            <div class="bar"><span id="status" class="badge" hidden></span><span class="track"><span></span></span><span id="elapsed">0:00</span></div>
+            <div class="controls"><div><button id="share" class="icon" type="button" aria-label="{t["share"]}">{ShareIcon}</button></div>
+            <button id="play" class="play" type="button">{PlayIcon}{StopIcon}<span id="play-label" class="sr">{t["play"]}</span></button>
+            <div class="sound"><button id="mute" class="icon" type="button" aria-label="{t["mute"]}">{VolumeIcon}</button><input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="{t["volume"]}"></div></div>
+            </section>
             {body}
             </main>
             <script id="station-data" type="application/json">{data}</script>
@@ -133,6 +210,19 @@ internal static class PublicPages
             </body>
             </html>
             """;
+    }
+
+    /// <summary>The "more" menu: the stream addresses and, in the embed, the station page.</summary>
+    private static string More(PublicStationResponse station, Dictionary<string, string> t, bool embed)
+    {
+        var items = station.Streams.Select(stream =>
+            $"""<li><a href="{Html.Encode(stream.Url.AbsoluteUri)}" target="_blank" rel="noopener">{Html.Encode(string.Format(CultureInfo.InvariantCulture, t["stream"], stream.Format == AudioFormat.Opus ? "Opus" : "MP3"))}</a></li>""");
+        if (embed)
+        {
+            items = items.Prepend($"""<li><a href="{Html.Encode(station.PageUrl.AbsoluteUri)}" target="_blank" rel="noopener">{t["page"]}</a></li>""");
+        }
+        var list = string.Concat(items);
+        return list.Length == 0 ? "" : $"""<details><summary aria-label="{t["more"]}">{MoreIcon}</summary><ul class="menu">{list}</ul></details>""";
     }
 
     internal static string EmbedNotIncluded(PublicStationResponse station, string nonce) => Message(nonce,

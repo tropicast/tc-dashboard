@@ -170,7 +170,31 @@ public sealed class PublicStationTests(DashboardFactory factory) : IClassFixture
 
         var html = await factory.CreateClient().GetStringAsync($"/listen/{tenantSlug}/radio-mada", Token);
 
-        Assert.Contains("<button id=\"play\" type=\"button\">", html, StringComparison.Ordinal);
+        Assert.Contains("<button id=\"play\" class=\"play\" type=\"button\">", html, StringComparison.Ordinal);
+        Assert.Contains("<span id=\"play-label\" class=\"sr\">Écouter</span>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("aria-pressed", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_player_card_names_every_icon_control_and_links_the_streams()
+    {
+        // #86: the dashboard-styled card. Icon-only controls need an accessible name; nothing loads from elsewhere.
+        var (_, tenantSlug, station) = await StationAsync(plan: "growth");
+        var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync($"/listen/{tenantSlug}/radio-mada", Token);
+
+        Assert.Contains("<section id=\"card\" class=\"card\" aria-labelledby=\"name\">", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"share\" class=\"icon\" type=\"button\" aria-label=\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"mute\" class=\"icon\" type=\"button\" aria-label=\"", html, StringComparison.Ordinal);
+        Assert.Contains("<input id=\"volume\" type=\"range\"", html, StringComparison.Ordinal);
+        Assert.Contains("<summary aria-label=\"", html, StringComparison.Ordinal);
+        Assert.Contains($"<a href=\"{station.ListenerUrls.Mp3.AbsoluteUri}\" target=\"_blank\" rel=\"noopener\">Ouvrir le flux MP3</a>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(" style=\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<link rel=\"stylesheet\"", html, StringComparison.Ordinal);
+        Assert.True(html.Length < 30_000, $"page is {html.Length} characters");
+
+        var embed = await client.GetStringAsync($"/embed/{tenantSlug}/radio-mada", Token);
+        Assert.Contains($"/listen/{tenantSlug}/radio-mada\" target=\"_blank\" rel=\"noopener\">", embed, StringComparison.Ordinal);
     }
 }
