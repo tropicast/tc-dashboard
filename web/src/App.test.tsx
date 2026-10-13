@@ -303,3 +303,23 @@ test('lists only active credentials and revokes one after confirmation', async (
   expect(deleted).toEqual(['c1']);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
+
+test('goes home after confirming the email', async () => {
+  let confirmed = false;
+  renderAt('/confirm-email?userId=u1&code=abc', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/confirm-email') {
+      confirmed = true;
+      return new Response(null, { status: 200 });
+    }
+    if (path === '/api/v1/auth/me') {
+      return Response.json({ id: 'u1', email: 'owner@example.com', memberships: [] });
+    }
+    return new Response(null, { status: 204 });
+  });
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+  expect(await screen.findByRole('heading', { name: 'Create your workspace' })).toBeInTheDocument();
+  expect(confirmed).toBe(true);
+});
