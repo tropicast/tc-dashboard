@@ -161,4 +161,16 @@ public sealed class PublicStationTests(DashboardFactory factory) : IClassFixture
         var html = await anonymous.GetStringAsync($"/listen/{tenantSlug}/radio-mada", Token);
         Assert.Contains("\"live\":true", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task The_play_button_is_a_plain_button_whose_label_says_what_it_does()
+    {
+        // #74: Play/Stop text plus aria-pressed made screen readers say "Stop, pressed".
+        var (_, tenantSlug, _) = await StationAsync();
+
+        var html = await factory.CreateClient().GetStringAsync($"/listen/{tenantSlug}/radio-mada", Token);
+
+        Assert.Contains("<button id=\"play\" type=\"button\">", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-pressed", html, StringComparison.Ordinal);
+    }
 }

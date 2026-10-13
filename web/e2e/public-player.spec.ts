@@ -52,7 +52,9 @@ test('the page weighs under 100 KB before audio and plays Opus', async ({ page }
   await page.locator('#play').click();
   await listener;
   await expect.poll(() => playedSeconds(page), { timeout: 15_000 }).toBeGreaterThan(2);
-  await expect(page.locator('#play')).toHaveAttribute('aria-pressed', 'true');
+  // The label says what the button does next (#74): no aria-pressed, which contradicted it.
+  await expect(page.locator('#play')).toHaveText('Stop');
+  await expect(page.locator('#play')).not.toHaveAttribute('aria-pressed');
 });
 
 test('a browser without Opus plays MP3', async ({ page }) => {
