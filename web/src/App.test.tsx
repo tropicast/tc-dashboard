@@ -464,6 +464,21 @@ test('moves focus to the new page heading after navigating (#70)', async () => {
   await waitFor(() => expect(document.activeElement).toBe(heading));
 });
 
+test('the first link skips the header and focuses the page content (#71)', async () => {
+  renderAt('/stations', (request) =>
+    new URL(request.url).pathname === '/api/v1/auth/me'
+      ? Response.json(signedIn)
+      : Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0 }),
+  );
+  const skip = await screen.findByRole('link', { name: 'Skip to content' });
+  const focusable = document.querySelectorAll('a[href], button, select, input');
+  expect(focusable[0]).toBe(skip);
+
+  fireEvent.click(skip);
+
+  expect(document.activeElement).toBe(document.getElementById('main'));
+});
+
 test('the analytics data is also a table for screen readers (#73)', async () => {
   const station = {
     id: 's1',

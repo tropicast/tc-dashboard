@@ -14,6 +14,7 @@ export const fr: Locale = {
     lightTheme: 'Thème clair',
     darkTheme: 'Thème sombre',
     mainNavigation: 'Navigation principale',
+    skipToContent: 'Aller au contenu',
     systemTheme: 'Thème du système',
     theme: 'Thème',
     openMenu: 'Ouvrir le menu',
