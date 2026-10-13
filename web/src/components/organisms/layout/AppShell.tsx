@@ -117,6 +117,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-primary">
+      {/* First Tab stop: skip the header and go to the page content (WCAG 2.4.1). */}
+      <a
+        href="#main"
+        onClick={(event) => {
+          event.preventDefault();
+          main.current?.focus();
+        }}
+        className="sr-only rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-brand-secondary shadow-lg outline-focus-ring focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-60 focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        {t('nav.skipToContent')}
+      </a>
       <header className="sticky top-0 z-40 border-b border-secondary bg-primary">
         <div className="mx-auto flex h-16 w-full max-w-container items-center gap-4 px-4 md:px-8">
           <Brand />
@@ -182,6 +193,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </AriaModalOverlay>
 
       <main
+        id="main"
         ref={main}
         tabIndex={-1}
         className="mx-auto w-full max-w-container flex-1 px-4 py-8 outline-hidden md:px-8 md:py-12"
