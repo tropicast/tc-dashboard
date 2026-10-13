@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../../api/client';
@@ -8,6 +8,8 @@ import type { components } from '../../../api/schema';
 import { CopyButton } from '../../atoms/CopyButton';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
+import { TrashIcon } from '../../atoms/TrashIcon';
+import { ConfirmDialog } from '../../molecules/ConfirmDialog';
 import { DirectoryStatus } from './DirectoryStatus';
 import { SharePanel } from './SharePanel';
 import { data } from '../../../lib/request';
@@ -87,6 +89,19 @@ export function StationDetail() {
       ),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ['credentials', tenantId, id] }),
+  });
+  const [toRevoke, setToRevoke] = useState<Credential | null>(null);
+  const revoke = useMutation({
+    mutationFn: (credentialId: string) =>
+      data<void>(
+        api.DELETE('/api/v1/stations/{stationId}/credentials/{credentialId}', {
+          params: { path: { stationId: id, credentialId } },
+        }),
+      ),
+    onSuccess: async () => {
+      setToRevoke(null);
+      await queryClient.invalidateQueries({ queryKey: ['credentials', tenantId, id] });
+    },
   });
   if (station.isPending) return <p>Loading station…</p>;
   if (!station.data) return <Notice error={station.error} />;
@@ -168,13 +183,28 @@ export function StationDetail() {
           </form>
           <Notice error={issue.error} />
           {issue.data && <IssuedCredential issued={issue.data} />}
-          <ul>
-            {credentials.data?.map((credential) => (
-              <li key={credential.id}>
-                {credential.deviceLabel} — {credential.revokedAt ? 'revoked' : 'active'}
-              </li>
-            ))}
-          </ul>
+          <ActiveCredentials
+            credentials={credentials.data?.filter((credential) => !credential.revokedAt) ?? []}
+            onRevoke={(credential) => {
+              revoke.reset();
+              setToRevoke(credential);
+            }}
+          />
+          {toRevoke && (
+            <ConfirmDialog
+              title={`Revoke “${toRevoke.deviceLabel}”?`}
+              confirmLabel="Revoke"
+              busy={revoke.isPending}
+              onConfirm={() => revoke.mutate(toRevoke.id)}
+              onCancel={() => setToRevoke(null)}
+            >
+              <p>
+                Any broadcast tool using this credential can no longer connect. A broadcast that is
+                live now continues until it reconnects. This cannot be undone.
+              </p>
+              <Notice error={revoke.error} />
+            </ConfirmDialog>
+          )}
         </article>
         <article className="panel">
           <h2>Desktop app</h2>
@@ -230,5 +260,41 @@ function IssuedCredential({
         <code>live.opus</code>.
       </p>
     </div>
+  );
+}
+
+/** Active credentials only: a revoked one cannot be used again, so it is not listed (#59). */
+function ActiveCredentials({
+  credentials,
+  onRevoke,
+}: {
+  credentials: Credential[];
+  onRevoke: (credential: Credential) => void;
+}) {
+  if (credentials.length === 0) return <p>No active credential.</p>;
+  return (
+    <ul className="credentials">
+      {credentials.map((credential) => (
+        <li key={credential.id}>
+          <span>
+            {credential.deviceLabel}{' '}
+            <small>
+              {credential.lastUsedAt
+                ? `last used ${new Date(credential.lastUsedAt).toLocaleString()}`
+                : 'never used'}
+            </small>
+          </span>
+          <button
+            type="button"
+            className="quiet icon"
+            aria-label={`Revoke ${credential.deviceLabel}`}
+            title="Revoke"
+            onClick={() => onRevoke(credential)}
+          >
+            <TrashIcon />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
