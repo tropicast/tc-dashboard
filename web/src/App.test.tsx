@@ -233,3 +233,23 @@ test('shows a new credential as separate connection settings', async () => {
   expect(value('Password')).toBe('Xr4-secret_43-characters-long-aaaaaaaaaaaa');
   expect(within(panel).getAllByRole('button', { name: 'Copy' })).toHaveLength(5);
 });
+
+test('goes home after confirming the email', async () => {
+  let confirmed = false;
+  renderAt('/confirm-email?userId=u1&code=abc', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/confirm-email') {
+      confirmed = true;
+      return new Response(null, { status: 200 });
+    }
+    if (path === '/api/v1/auth/me') {
+      return Response.json({ id: 'u1', email: 'owner@example.com', memberships: [] });
+    }
+    return new Response(null, { status: 204 });
+  });
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+  expect(await screen.findByRole('heading', { name: 'Create your workspace' })).toBeInTheDocument();
+  expect(confirmed).toBe(true);
+});

@@ -92,6 +92,7 @@ export function Signup() {
 
 export function EmailAction({ kind }: { kind: 'forgot' | 'confirm' }) {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const form = useForm({
     defaultValues: {
       email: '',
@@ -108,6 +109,10 @@ export function EmailAction({ kind }: { kind: 'forgot' | 'confirm' }) {
               body: { code: value.code, userId: value.userId },
             }),
           ),
+    // A confirmed address goes home (#60); the guard sends a signed-out visitor to sign in.
+    onSuccess: () => {
+      if (kind === 'confirm') navigate('/', { replace: true });
+    },
   });
   return (
     <FormPage title={kind === 'forgot' ? 'Reset your password' : 'Confirm your email'}>
