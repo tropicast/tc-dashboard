@@ -28,6 +28,14 @@ export interface ProgressBarProps {
    * It receives the raw value and the calculated percentage.
    */
   valueFormatter?: (value: number, valueInPercentage: number) => string | number;
+  /**
+   * Tropicast: the accessible name of the progress bar (WCAG 4.1.2). Required by axe's aria-progressbar-name.
+   */
+  'aria-label'?: string;
+  /**
+   * Tropicast: the value as screen readers should say it, e.g. "1 of 3 stations", instead of a bare number.
+   */
+  'aria-valuetext'?: string;
 }
 
 /**
@@ -39,12 +47,16 @@ export const ProgressBarBase = ({
   max = 100,
   className,
   progressClassName,
+  'aria-label': ariaLabel,
+  'aria-valuetext': ariaValueText,
 }: ProgressBarProps) => {
   const percentage = ((value - min) * 100) / (max - min);
 
   return (
     <div
       role="progressbar"
+      aria-label={ariaLabel}
+      aria-valuetext={ariaValueText}
       aria-valuenow={value}
       aria-valuemin={min}
       aria-valuemax={max}

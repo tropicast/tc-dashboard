@@ -56,6 +56,11 @@ export function Account() {
               <ProgressBarBase
                 value={Number(tenant.data.stationCount)}
                 max={Math.max(Number(tenant.data.plan.maxStations), 1)}
+                aria-label={t('account.stationsUsed')}
+                aria-valuetext={t('account.stationsUsedValue', {
+                  used: Number(tenant.data.stationCount),
+                  count: Number(tenant.data.plan.maxStations),
+                })}
               />
               <p className="text-sm text-tertiary">
                 {t('account.usageLine', {
