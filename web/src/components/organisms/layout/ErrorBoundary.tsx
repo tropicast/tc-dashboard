@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { Translation } from 'react-i18next';
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -9,12 +10,16 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
 
   render() {
     return this.state.failed ? (
-      <main className="auth">
-        <section>
-          <h1>Something went wrong</h1>
-          <button onClick={() => this.setState({ failed: false })}>Try again</button>
-        </section>
-      </main>
+      <Translation>
+        {(t) => (
+          <main className="auth">
+            <section>
+              <h1>{t('errors.title')}</h1>
+              <button onClick={() => this.setState({ failed: false })}>{t('errors.retry')}</button>
+            </section>
+          </main>
+        )}
+      </Translation>
     ) : (
       this.props.children
     );

@@ -1,15 +1,18 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
+import { formatDate } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import { Notice } from '../../atoms/Notice';
 
 type Billing = components['schemas']['BillingResponse'];
 
-const date = (value?: string | null) => (value ? new Date(value).toLocaleDateString() : '');
+const date = (value?: string | null) => (value ? formatDate(value) : '');
 
 /** Plan, subscription and the way to pay or manage it (Stripe's hosted pages; no card data here). */
 export function BillingPanel() {
+  const { t } = useTranslation();
   const tenantId = localStorage.getItem('tenant-id');
   const billing = useQuery({
     queryKey: ['billing', tenantId],
@@ -35,27 +38,25 @@ export function BillingPanel() {
   const subscribed = status === 'Active' || status === 'Trialing' || status === 'PastDue';
   return (
     <article className="panel">
-      <h2>Plan and billing</h2>
-      {returned === 'success' && (
-        <p role="status">Thank you: the plan changes as soon as the payment is confirmed.</p>
-      )}
+      <h2>{t('billing.title')}</h2>
+      {returned === 'success' && <p role="status">{t('billing.thanks')}</p>}
       <p>
         <strong>{current?.name ?? planId}</strong>
-        {status === 'Trialing' && ` · trial until ${date(billing.data.trialEnd)}`}
+        {status === 'Trialing' &&
+          ` · ${t('billing.trialUntil', { date: date(billing.data.trialEnd) })}`}
         {status === 'Active' &&
           (billing.data.cancelAtPeriodEnd
-            ? ` · ends ${date(billing.data.currentPeriodEnd)}`
-            : ` · renews ${date(billing.data.currentPeriodEnd)}`)}
+            ? ` · ${t('billing.ends', { date: date(billing.data.currentPeriodEnd) })}`
+            : ` · ${t('billing.renews', { date: date(billing.data.currentPeriodEnd) })}`)}
       </p>
       {status === 'PastDue' && (
         <p className="error" role="alert">
-          The last payment failed. Update the payment method before {date(billing.data.graceEndsAt)}
-          , or the workspace moves to the Free plan.
+          {t('billing.pastDue', { date: date(billing.data.graceEndsAt) })}
         </p>
       )}
       {enabled && canManage && (
         <button type="button" onClick={() => portal.mutate()} disabled={portal.isPending}>
-          Manage billing
+          {t('billing.manage')}
         </button>
       )}
       {enabled && !subscribed && (
@@ -66,16 +67,22 @@ export function BillingPanel() {
               <li key={plan.id}>
                 <strong>{plan.name}</strong> {plan.price && `· ${plan.price}`}
                 <br />
-                {plan.maxStations} station(s) · {plan.maxListeners} listeners · up to{' '}
-                {plan.maxBitrateKbps} kbps{plan.directoryListing && ' · RadioBrowser'}
-                {plan.embed && ' · embed'}
+                {t('billing.planLine', {
+                  count: plan.maxStations,
+                  listeners: plan.maxListeners,
+                  bitrate: plan.maxBitrateKbps,
+                })}
+                {plan.directoryListing && ` · ${t('billing.radioBrowser')}`}
+                {plan.embed && ` · ${t('billing.embed')}`}
                 <br />
                 <button
                   type="button"
                   onClick={() => checkout.mutate(plan.id)}
                   disabled={checkout.isPending}
                 >
-                  {trialAvailable ? 'Start free trial' : `Choose ${plan.name}`}
+                  {trialAvailable
+                    ? t('billing.startTrial')
+                    : t('billing.choose', { plan: plan.name })}
                 </button>
               </li>
             ))}

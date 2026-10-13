@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
 import { useMe } from '../../../hooks/use-me';
@@ -10,6 +11,7 @@ type PublicStation = components['schemas']['PublicStationResponse'];
 
 /** The station's public page and, when the plan includes it, the embeddable player. */
 export function SharePanel({ stationSlug }: { stationSlug: string }) {
+  const { t } = useTranslation();
   const me = useMe();
   const tenantId = localStorage.getItem('tenant-id');
   const tenantSlug = me.data?.memberships.find((m) => m.tenantId === tenantId)?.tenantSlug;
@@ -28,9 +30,9 @@ export function SharePanel({ stationSlug }: { stationSlug: string }) {
   const snippets = embedUrl ? embedSnippets(embedUrl, name) : undefined;
   return (
     <article className="panel">
-      <h2>Share</h2>
+      <h2>{t('share.title')}</h2>
       <p>
-        <strong>Public page</strong>{' '}
+        <strong>{t('share.publicPage')}</strong>{' '}
         <a href={pageUrl} target="_blank" rel="noopener">
           {pageUrl}
         </a>{' '}
@@ -39,16 +41,16 @@ export function SharePanel({ stationSlug }: { stationSlug: string }) {
       {snippets ? (
         <>
           <p>
-            <strong>Embed with an iframe</strong> <CopyButton value={snippets.iframe} />
+            <strong>{t('share.iframe')}</strong> <CopyButton value={snippets.iframe} />
           </p>
           <code className="snippet">{snippets.iframe}</code>
           <p>
-            <strong>Or with a script</strong> <CopyButton value={snippets.script} />
+            <strong>{t('share.script')}</strong> <CopyButton value={snippets.script} />
           </p>
           <code className="snippet">{snippets.script}</code>
         </>
       ) : (
-        <p>The embeddable player is included in the Growth and Pro plans.</p>
+        <p>{t('share.notIncluded')}</p>
       )}
     </article>
   );

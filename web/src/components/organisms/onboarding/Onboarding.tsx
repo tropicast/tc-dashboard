@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { api } from '../../../api/client';
@@ -13,6 +14,7 @@ import type { Station, Tenant } from '../../../lib/types';
 
 const tenantSchema = z.object({ name: z.string().min(2), slug: z.string().regex(/^[a-z0-9-]+$/) });
 export function Onboarding() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const tenant = useForm({
     resolver: zodResolver(tenantSchema),
@@ -56,63 +58,67 @@ export function Onboarding() {
   if (!createTenant.isSuccess)
     return (
       <section className="onboarding">
-        <h1>Create your workspace</h1>
-        <p>Start with the organization that owns your stations.</p>
+        <h1>{t('onboarding.workspaceTitle')}</h1>
+        <p>{t('onboarding.workspaceIntro')}</p>
         <form onSubmit={tenant.handleSubmit((value) => createTenant.mutate(value))}>
-          <Field label="Organization name" error={tenant.formState.errors.name?.message}>
+          <Field
+            label={t('onboarding.organizationName')}
+            error={tenant.formState.errors.name?.message}
+          >
             <input {...tenant.register('name')} />
           </Field>
-          <Field label="Workspace slug" error={tenant.formState.errors.slug?.message}>
+          <Field
+            label={t('onboarding.workspaceSlug')}
+            error={tenant.formState.errors.slug?.message}
+          >
             <input {...tenant.register('slug')} />
           </Field>
           <Notice error={createTenant.error} />
-          <button>Create workspace</button>
+          <button>{t('onboarding.createWorkspace')}</button>
         </form>
       </section>
     );
   if (!createStation.isSuccess)
     return (
       <section className="onboarding">
-        <h1>Create first station</h1>
+        <h1>{t('onboarding.stationTitle')}</h1>
         <form onSubmit={station.handleSubmit((value) => createStation.mutate(value))}>
-          <Field label="Station name">
+          <Field label={t('onboarding.stationName')}>
             <input {...station.register('name')} />
           </Field>
-          <Field label="Station slug">
+          <Field label={t('onboarding.stationSlug')}>
             <input {...station.register('slug')} />
           </Field>
-          <Field label="Description">
+          <Field label={t('common.description')}>
             <textarea {...station.register('description')} />
           </Field>
-          <Field label="Genre">
+          <Field label={t('common.genre')}>
             <input {...station.register('genre')} />
           </Field>
-          <Field label="Country">
+          <Field label={t('common.country')}>
             <input {...station.register('country')} />
           </Field>
-          <Field label="Language">
+          <Field label={t('common.language')}>
             <input {...station.register('language')} />
           </Field>
-          <Field label="Website">
+          <Field label={t('common.website')}>
             <input {...station.register('website')} />
           </Field>
           <label className="checkbox">
-            <input type="checkbox" {...station.register('listInDirectory')} /> List on RadioBrowser
+            <input type="checkbox" {...station.register('listInDirectory')} />{' '}
+            {t('common.listInDirectory')}
           </label>
           <Notice error={createStation.error} />
-          <button>Create station</button>
+          <button>{t('onboarding.createStation')}</button>
         </form>
       </section>
     );
   return (
     <section className="onboarding">
-      <h1>Station ready</h1>
-      <p>
-        Install Tropicast Desktop, then add a broadcast device under your station. It will receive a
-        one-time secret for linking.
-      </p>
+      <h1>{t('onboarding.readyTitle')}</h1>
+      <p>{t('onboarding.readyText')}</p>
       <Link className="button" to="/stations">
-        Open stations
+        {t('onboarding.openStations')}
       </Link>
     </section>
   );
