@@ -233,3 +233,73 @@ test('shows a new credential as separate connection settings', async () => {
   expect(value('Password')).toBe('Xr4-secret_43-characters-long-aaaaaaaaaaaa');
   expect(within(panel).getAllByRole('button', { name: 'Copy' })).toHaveLength(5);
 });
+
+test('lists only active credentials and revokes one after confirmation', async () => {
+  const deleted: string[] = [];
+  const credentials = [
+    {
+      id: 'c1',
+      deviceLabel: 'BUTT',
+      createdAt: '2026-10-11T22:00:00Z',
+      lastUsedAt: null,
+      revokedAt: null,
+    },
+    {
+      id: 'c2',
+      deviceLabel: 'Old laptop',
+      createdAt: '2026-10-10T22:00:00Z',
+      lastUsedAt: null,
+      revokedAt: '2026-10-11T08:00:00Z',
+    },
+  ];
+  renderAt('/stations/s1', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/stations/s1') {
+      return Response.json({
+        id: 's1',
+        publicId: 'radio1',
+        name: 'Radio One',
+        slug: 'radio-one',
+        description: '',
+        genre: 'Music',
+        country: 'MG',
+        language: 'mg',
+        logoUrl: null,
+        website: null,
+        listInDirectory: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        listenerUrls: { mp3: 'https://listen.example.test/stations/radio1/live.mp3', opus: null },
+      });
+    }
+    if (path === '/api/v1/stations/s1/status') {
+      return Response.json({ live: false, listeners: 0, outputs: [] });
+    }
+    if (path === '/api/v1/stations/s1/credentials') {
+      return Response.json(credentials.filter((c) => !deleted.includes(c.id) || c.revokedAt));
+    }
+    if (path === '/api/v1/stations/s1/credentials/c1' && request.method === 'DELETE') {
+      deleted.push('c1');
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+  });
+
+  const revokeButton = await screen.findByRole('button', { name: 'Revoke BUTT' });
+  expect(screen.queryByText(/Old laptop/)).not.toBeInTheDocument();
+
+  fireEvent.click(revokeButton);
+  const dialog = await screen.findByRole('dialog', { name: 'Revoke “BUTT”?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(deleted).toEqual([]);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Revoke BUTT' }));
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Revoke' }),
+  );
+
+  expect(await screen.findByText('No active credential.')).toBeInTheDocument();
+  expect(deleted).toEqual(['c1']);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
