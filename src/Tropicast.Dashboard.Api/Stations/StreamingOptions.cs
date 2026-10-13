@@ -16,4 +16,11 @@ internal sealed class StreamingOptions
     /// and Icecast serves at most its <c>&lt;clients&gt;</c> (1,500) at once. Lower it as the node fills up.
     /// </summary>
     public int MaxListenerCaps { get; set; } = 15_000;
+    /// <summary>
+    /// Icecast <c>&lt;clients&gt;</c> on the node: a station counts at most this much towards <see cref="MaxListenerCaps"/>,
+    /// whatever its plan's cap.
+    /// </summary>
+    public int MaxListenersPerStation { get; set; } = 1_500;
+
+    internal Application.Provisioning.NodeLimits Limits => new(MaxSources, MaxListenerCaps, MaxListenersPerStation);
 }

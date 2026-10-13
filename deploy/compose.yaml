@@ -36,6 +36,10 @@ services:
       Stats__Url: ${STATS_URL:-}
       # RadioBrowser listing (#13): adds opted-in live stations to the public directory.
       Directory__Enabled: ${DIRECTORY_ENABLED:-false}
+      # Capacity of the streaming node (#58): Icecast <sources>, summed listener caps, Icecast <clients>.
+      Streaming__MaxSources: ${STREAMING_MAX_SOURCES:-50}
+      Streaming__MaxListenerCaps: ${STREAMING_MAX_LISTENER_CAPS:-15000}
+      Streaming__MaxListenersPerStation: ${STREAMING_MAX_LISTENERS_PER_STATION:-1500}
       # Stripe (#14); without a secret key billing is off.
       Billing__SecretKey: ${STRIPE_SECRET_KEY:-}
       Billing__WebhookSecret: ${STRIPE_WEBHOOK_SECRET:-}
