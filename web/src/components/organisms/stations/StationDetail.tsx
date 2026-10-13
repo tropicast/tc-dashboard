@@ -167,14 +167,7 @@ export function StationDetail() {
             <button>Issue credential</button>
           </form>
           <Notice error={issue.error} />
-          {issue.data && (
-            <div className="secret" role="status">
-              <strong>Save this one-time secret now.</strong>
-              <code>
-                {issue.data.username}:{issue.data.secret}
-              </code>
-            </div>
-          )}
+          {issue.data && <IssuedCredential issued={issue.data} />}
           <ul>
             {credentials.data?.map((credential) => (
               <li key={credential.id}>
@@ -186,8 +179,9 @@ export function StationDetail() {
         <article className="panel">
           <h2>Desktop app</h2>
           <p>
-            Open Tropicast Desktop, choose this station, and enter a newly issued device credential.
-            The secret cannot be displayed again.
+            In Tropicast Station, sign in with your account and choose this station: no credential
+            to enter. Issue a credential only for another broadcast tool, or for a manual connection
+            profile.
           </p>
         </article>
       </div>
@@ -200,5 +194,41 @@ function CopyUrl({ label, value }: { label: string; value: string }) {
     <p>
       <strong>{label}</strong> <code>{value}</code> <CopyButton value={value} />
     </p>
+  );
+}
+
+/** Connection settings for a broadcast tool (Tropicast Station's manual profile, BUTT, Mixxx…), one copyable field each. */
+function IssuedCredential({
+  issued,
+}: {
+  issued: components['schemas']['IssuedCredentialResponse'];
+}) {
+  const ingest = new URL(issued.ingestUrl);
+  const port = ingest.port || (ingest.protocol === 'https:' ? '443' : '80');
+  const fields: [string, string][] = [
+    ['Server', ingest.hostname],
+    ['Port', port],
+    ['Mount', ingest.pathname],
+    ['Username', issued.username],
+    ['Password', issued.secret],
+  ];
+  return (
+    <div className="secret" role="status">
+      <strong>Save the password now: it cannot be shown again.</strong>
+      <dl>
+        {fields.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>
+              <code>{value}</code> <CopyButton value={value} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p>
+        Use TLS (HTTPS). For Opus, use the same settings with the mount ending in{' '}
+        <code>live.opus</code>.
+      </p>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App';
@@ -172,4 +172,64 @@ test('comes back to the desktop sign-in page after signing in', async () => {
 
   expect(await screen.findByRole('heading', { name: 'Sign in a desktop app' })).toBeInTheDocument();
   expect(await screen.findByText('Studio PC')).toBeInTheDocument();
+});
+
+test('shows a new credential as separate connection settings', async () => {
+  const station = {
+    id: 's1',
+    publicId: 'radio1',
+    name: 'Radio One',
+    slug: 'radio-one',
+    description: '',
+    genre: 'Music',
+    country: 'MG',
+    language: 'mg',
+    logoUrl: null,
+    website: null,
+    listInDirectory: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    listenerUrls: { mp3: 'https://listen.example.test/stations/radio1/live.mp3', opus: null },
+  };
+  renderAt('/stations/s1', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/stations/s1') return Response.json(station);
+    if (path === '/api/v1/stations/s1/status') {
+      return Response.json({ live: false, listeners: 0, outputs: [] });
+    }
+    if (path === '/api/v1/stations/s1/credentials' && request.method === 'GET')
+      return Response.json([]);
+    if (path === '/api/v1/stations/s1/credentials') {
+      return Response.json(
+        {
+          credential: {
+            id: 'c1',
+            deviceLabel: 'BUTT',
+            createdAt: '2026-10-11T23:00:00Z',
+            lastUsedAt: null,
+            revokedAt: null,
+          },
+          username: 'radio1',
+          secret: 'Xr4-secret_43-characters-long-aaaaaaaaaaaa',
+          ingestUrl: 'https://ingest.example.test/stations/radio1/live.mp3',
+        },
+        { status: 201 },
+      );
+    }
+    return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+  });
+
+  fireEvent.change(await screen.findByLabelText('Device label'), { target: { value: 'BUTT' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Issue credential' }));
+
+  const issued = await screen.findByText('Save the password now: it cannot be shown again.');
+  const panel = issued.closest('div')!;
+  const value = (label: string) =>
+    within(panel).getByText(label).closest('div')!.querySelector('code')!.textContent;
+  expect(value('Server')).toBe('ingest.example.test');
+  expect(value('Port')).toBe('443');
+  expect(value('Mount')).toBe('/stations/radio1/live.mp3');
+  expect(value('Username')).toBe('radio1');
+  expect(value('Password')).toBe('Xr4-secret_43-characters-long-aaaaaaaaaaaa');
+  expect(within(panel).getAllByRole('button', { name: 'Copy' })).toHaveLength(5);
 });

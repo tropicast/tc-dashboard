@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Tropicast.Dashboard.Api.Auth;
 using Tropicast.Dashboard.Application.Security;
@@ -22,7 +23,11 @@ internal sealed record CredentialResponse(Guid Id, string DeviceLabel, DateTimeO
 /// <param name="Credential">The stored credential.</param>
 /// <param name="Username">Icecast source username: the station's public ID.</param>
 /// <param name="Secret">Icecast source password. Store it in the device now; it cannot be shown again.</param>
-internal sealed record IssuedCredentialResponse(CredentialResponse Credential, string Username, string Secret);
+/// <param name="IngestUrl">
+/// Where a broadcast tool publishes MP3 (HTTPS, Icecast source protocol): host, port and mount in one URL. The Opus
+/// mount is the same with <c>live.opus</c>; the plan decides which formats are accepted.
+/// </param>
+internal sealed record IssuedCredentialResponse(CredentialResponse Credential, string Username, string Secret, Uri IngestUrl);
 
 /// <summary>
 /// Per-device broadcast credentials of a station. Customers never see a shared Icecast password; revoking one
@@ -56,8 +61,8 @@ internal static class CredentialEndpoints
     }
 
     private static async Task<Results<Created<IssuedCredentialResponse>, NotFound, ValidationProblem, ProblemHttpResult>> CreateAsync(
-        Guid stationId, CreateCredentialCommand command, HttpContext context, TenantAccess access, AppDbContext db, TimeProvider time,
-        CancellationToken cancellationToken)
+        Guid stationId, CreateCredentialCommand command, HttpContext context, TenantAccess access, AppDbContext db,
+        IOptions<StreamingOptions> streaming, TimeProvider time, CancellationToken cancellationToken)
     {
         var station = await db.Stations.SingleOrDefaultAsync(s => s.Id == stationId, cancellationToken);
         if (station is null)
@@ -79,10 +84,14 @@ internal static class CredentialEndpoints
             return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict,
                 title: "This station already has an active credential with this device label. Revoke it or choose another label.");
         }
+        // Same mount as the desktop API gives this station.
+        var assignment = await db.StreamAssignments.SingleOrDefaultAsync(a => a.StationId == station.Id, cancellationToken);
+        var mountBase = assignment?.MountBase ?? $"/stations/{station.PublicId}";
         // The secret must not be cached anywhere on the way back.
         context.Response.Headers.CacheControl = "no-store";
         return TypedResults.Created($"/api/v1/stations/{station.Id}/credentials/{credential.Id}",
-            new IssuedCredentialResponse(ToResponse(credential), station.PublicId, secret));
+            new IssuedCredentialResponse(ToResponse(credential), station.PublicId, secret,
+                new Uri(streaming.Value.IngestBaseUrl, $"{mountBase}/live.mp3")));
     }
 
     /// <summary>

@@ -2711,6 +2711,12 @@ export interface components {
             username: string;
             /** @description Icecast source password. Store it in the device now; it cannot be shown again. */
             secret: string;
+            /**
+             * Format: uri
+             * @description Where a broadcast tool publishes MP3 (HTTPS, Icecast source protocol): host, port and mount in one URL. The Opus
+             *     mount is the same with `live.opus`; the plan decides which formats are accepted.
+             */
+            ingestUrl: string;
         };
         /** @description Listener URLs of a station. Uri? ListenerUrls.Opus is null when the plan has no Opus. */
         ListenerUrls: {
