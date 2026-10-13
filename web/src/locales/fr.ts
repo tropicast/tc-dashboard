@@ -162,6 +162,9 @@ export const fr: Locale = {
   account: {
     title: 'Compte',
     usage: 'Utilisation',
+    stationsUsed: 'Stations utilisées',
+    stationsUsedValue_one: '{{used}} sur {{count}} station',
+    stationsUsedValue_other: '{{used}} sur {{count}} stations',
     usageLine: '{{count}} / {{max}} stations · {{listeners}} auditeurs par station',
     invite: 'Inviter un membre',
     role: 'Rôle',

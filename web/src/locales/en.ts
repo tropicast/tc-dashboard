@@ -159,6 +159,9 @@ export const en = {
   account: {
     title: 'Account',
     usage: 'Usage',
+    stationsUsed: 'Stations used',
+    stationsUsedValue_one: '{{used}} of {{count}} station',
+    stationsUsedValue_other: '{{used}} of {{count}} stations',
     usageLine: '{{count}} / {{max}} stations · {{listeners}} listeners per station',
     invite: 'Invite member',
     role: 'Role',

@@ -397,3 +397,35 @@ test('each page has its own title, page first (#69)', async () => {
   );
   await waitFor(() => expect(document.title).toBe('Stations · Tropicast'));
 });
+
+test('the station usage bar has a name and a spoken value (#72)', async () => {
+  renderAt('/account', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/tenants/current') {
+      return Response.json({
+        id: 't1',
+        name: 'Radio',
+        slug: 'radio',
+        stationCount: 1,
+        plan: { id: 'growth', name: 'Growth', maxStations: 3, maxListeners: 5000 },
+      });
+    }
+    if (path === '/api/v1/billing') {
+      return Response.json({
+        planId: 'growth',
+        status: null,
+        plans: [],
+        trialAvailable: false,
+        canManage: false,
+        enabled: false,
+      });
+    }
+    if (path.endsWith('/members') || path === '/api/v1/auth/devices') return Response.json([]);
+    return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+  });
+
+  const bar = await screen.findByRole('progressbar', { name: 'Stations used' });
+
+  expect(bar).toHaveAttribute('aria-valuetext', '1 of 3 stations');
+});
