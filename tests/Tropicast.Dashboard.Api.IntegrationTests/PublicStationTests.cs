@@ -194,7 +194,13 @@ public sealed class PublicStationTests(DashboardFactory factory) : IClassFixture
         Assert.DoesNotContain("<link rel=\"stylesheet\"", html, StringComparison.Ordinal);
         Assert.True(html.Length < 30_000, $"page is {html.Length} characters");
 
+        Assert.Contains("<span id=\"shared\" class=\"sr\" role=\"status\"></span>", html, StringComparison.Ordinal);
+        Assert.Contains("[hidden]{display:none!important}", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("oklch(", html, StringComparison.Ordinal);
+
+        // A dropdown cannot fit the 120 px iframe: the embed has no menu, its title links the station page.
         var embed = await client.GetStringAsync($"/embed/{tenantSlug}/radio-mada", Token);
-        Assert.Contains($"/listen/{tenantSlug}/radio-mada\" target=\"_blank\" rel=\"noopener\">", embed, StringComparison.Ordinal);
+        Assert.DoesNotContain("<details>", embed, StringComparison.Ordinal);
+        Assert.Contains($"<h1 id=\"name\"><a href=\"https://app.test/listen/{tenantSlug}/radio-mada\" target=\"_blank\" rel=\"noopener\">", embed, StringComparison.Ordinal);
     }
 }

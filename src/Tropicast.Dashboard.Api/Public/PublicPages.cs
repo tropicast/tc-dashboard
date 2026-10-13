@@ -28,13 +28,13 @@ internal static class PublicPages
     /// The embed card is solid, not frosted: the host page behind it can be any colour and would break the contrast.
     /// </summary>
     private const string Css = """
-        :root{color-scheme:light dark;--fg:oklch(20.5% 0 0);--muted:oklch(43.9% 0 0);--bg:oklch(98.5% 0 0);--card:#fff;--glass:rgb(255 255 255/.72);
-        --line:oklch(92.2% 0 0);--track:oklch(87% 0 0);--brand:oklch(51.1% .096 186.391);--link:oklch(51.1% .096 186.391);--tint:oklch(98.4% .014 180.72);
-        --focus:oklch(70.4% .14 182.503);--live:oklch(57.7% .245 27.325);
+        :root{color-scheme:light dark;--fg:#171717;--muted:#525252;--bg:#fafafa;--card:#fff;--glass:rgb(255 255 255/.72);
+        --line:#e5e5e5;--track:#d4d4d4;--brand:#00786f;--link:#00786f;--tint:#f0fdfa;
+        --focus:#00786f;--live:#e7000b;
         --shadow:0 12px 16px -4px rgb(0 0 0/.08),0 4px 6px -2px rgb(0 0 0/.03),0 2px 2px -1px rgb(0 0 0/.04)}
-        @media (prefers-color-scheme:dark){:root{--fg:oklch(98.5% 0 0);--muted:oklch(70.8% 0 0);--bg:oklch(14.5% 0 0);--card:oklch(20.5% 0 0);
-        --glass:rgb(23 23 23/.7);--line:oklch(26.9% 0 0);--track:oklch(37.1% 0 0);--link:oklch(77.7% .152 181.912);--tint:oklch(43.7% .078 188.216/.35)}}
-        *{box-sizing:border-box}
+        @media (prefers-color-scheme:dark){:root{--fg:#fafafa;--muted:#a1a1a1;--bg:#0a0a0a;--card:#171717;
+        --glass:rgb(23 23 23/.7);--line:#262626;--track:#404040;--link:#00d5be;--focus:#00d5be;--tint:rgb(0 95 90/.35)}}
+        *{box-sizing:border-box}[hidden]{display:none!important}
         body{margin:0;min-height:100vh;font:16px/1.5 Inter,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--fg);
         background:radial-gradient(circle at 15% 0,var(--tint),transparent 55%),var(--bg)}
         main{max-width:560px;margin:0 auto;padding:32px 16px}a{color:var(--link)}
@@ -46,7 +46,7 @@ internal static class PublicPages
         .top{display:flex;gap:12px;align-items:flex-start}.titles{flex:1;min-width:0}
         .logo{flex:none;width:64px;height:64px;border-radius:12px;object-fit:cover;background:var(--line)}
         h1{font-size:1.375rem;line-height:1.3;font-weight:600;margin:0;overflow-wrap:anywhere}h1 a{color:inherit;text-decoration:none}h1 a:hover{text-decoration:underline}
-        .meta,#note{margin:2px 0 0;color:var(--muted);font-size:.9375rem}#note:empty{display:none}.titles:has(#note:not(:empty)) .meta{display:none}
+        .meta,#note{margin:2px 0 0;color:var(--muted);font-size:.9375rem}#note:empty{margin:0}.titles:has(#note:not(:empty)) .meta{display:none}
         #note[data-busy]::before{content:"";display:inline-block;width:.8em;height:.8em;margin-right:.5em;vertical-align:-.05em;border:2px solid currentColor;
         border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
         @keyframes spin{to{transform:rotate(1turn)}}@keyframes pulse{50%{opacity:.55}}
@@ -62,7 +62,7 @@ internal static class PublicPages
         svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
         .play{width:64px;height:64px;border-radius:50%;background:var(--brand);color:#fff;box-shadow:var(--shadow)}.play svg{width:28px;height:28px;fill:currentColor;stroke:none}
         .play:hover{filter:brightness(1.1)}.play:disabled{opacity:.45;cursor:not-allowed;filter:none}
-        .on .i-play,.i-stop,.muted .i-wave,.i-mute{display:none}.on .i-stop,.muted .i-mute{display:block}
+        .on .i-play,.i-stop,.muted .i-wave,.i-mute,.done .i-share,.i-done{display:none}.on .i-stop,.muted .i-mute,.done .i-done{display:block}
         :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
         input[type=range]{width:96px;accent-color:var(--link)}@media (hover:none),(max-width:419px){input[type=range]{display:none}}
         details{position:relative}summary{list-style:none}summary::-webkit-details-marker{display:none}
@@ -70,20 +70,21 @@ internal static class PublicPages
         border-radius:12px;background:var(--card);box-shadow:var(--shadow)}
         .menu a{display:block;padding:10px 12px;border-radius:8px;color:var(--fg);text-decoration:none}.menu a:hover{background:var(--line)}
         .desc{white-space:pre-line;margin:24px 4px 0}footer{color:var(--muted);font-size:.8125rem;margin:32px 4px 0}
-        body.embed{min-height:0;background:transparent}body.embed main{max-width:none;padding:8px}
-        body.embed .card{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"play top sound" "bar bar bar";gap:0 12px;padding:12px;border-radius:12px}
+        body.embed{min-height:0;background:transparent}body.embed main{max-width:none;padding:6px}
+        body.embed .card{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"play top sound" "bar bar bar";gap:0 12px;padding:10px 12px;border-radius:12px}
         .embed .controls{display:contents}.embed .play{grid-area:play;width:48px;height:48px}.embed .play svg{width:22px;height:22px}
         .embed .top{grid-area:top;align-items:center;min-width:0}.embed .sound{grid-area:sound}.embed .controls>div:first-child,.embed input[type=range]{display:none}
         .embed .logo{width:44px;height:44px;border-radius:8px}.embed h1{font-size:1rem}.embed .meta,.embed #note{font-size:.8125rem}
-        .embed .bar{grid-area:bar;margin:10px 0 0}.embed .titles{white-space:nowrap}.embed h1,.embed .meta{overflow:hidden;text-overflow:ellipsis}
+        .embed .bar{grid-area:bar;margin:8px 0 0}.embed .titles{white-space:nowrap}.embed h1,.embed .meta{overflow:hidden;text-overflow:ellipsis}
         @media (max-width:359px){.embed .logo{display:none}}
-        @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+        @media (prefers-reduced-motion:reduce){*,::before,::after{animation:none!important;transition:none!important}}
         """;
 
     /// <summary>
     /// Plays the first stream the browser supports (Opus, else MP3) straight from the listener host; reconnects with
     /// backoff (1 s doubling to 30 s) while the listener wants to play; refreshes the live state every 30 s. Shows the
-    /// listening time, mute and volume, and shares the page (the share sheet, else the clipboard).
+    /// listening time, mute and volume, and shares the page: the share sheet, else the clipboard (a check mark and a
+    /// status message of its own, so "Reconnecting…" stays), else a prompt with the address to copy by hand.
     /// </summary>
     private const string Player = """
         (()=>{const $=i=>document.getElementById(i),d=JSON.parse($('station-data').textContent);
@@ -104,10 +105,12 @@ internal static class PublicPages
         for(const e of['error','ended','stalled'])a.addEventListener(e,retry);
         b.addEventListener('click',()=>{want=!want;if(want)start();else stop();ui();});
         const sound=()=>{const m=a.muted||a.volume===0;mute.classList.toggle('muted',m);mute.setAttribute('aria-label',m?d.t.unmute:d.t.mute);};
-        mute.addEventListener('click',()=>{a.muted=!a.muted;if(!a.muted&&a.volume===0)vol.value=a.volume=1;sound();});
+        mute.addEventListener('click',()=>{if(a.muted||a.volume===0){a.muted=false;if(a.volume===0)vol.value=a.volume=1;}else a.muted=true;sound();});
         vol.addEventListener('input',()=>{a.volume=+vol.value;a.muted=false;sound();});
-        const share=$('share');share&&share.addEventListener('click',async()=>{try{if(navigator.share)await navigator.share({title:d.name,url:d.pageUrl});
-        else{await navigator.clipboard.writeText(d.pageUrl);say(d.t.copied);setTimeout(()=>note.textContent===d.t.copied&&say(''),3000);}}catch{}});
+        const share=$('share'),shared=$('shared');share&&share.addEventListener('click',async()=>{
+        if(navigator.share){try{await navigator.share({title:d.name,url:d.pageUrl});}catch{}return;}
+        try{await navigator.clipboard.writeText(d.pageUrl);}catch{prompt(d.t.copy,d.pageUrl);return;}
+        shared.textContent=d.t.copied;share.classList.add('done');setTimeout(()=>{shared.textContent='';share.classList.remove('done');},3000);});
         const menu=document.querySelector('details');menu&&menu.addEventListener('keydown',e=>{if(e.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary').focus();}});
         document.addEventListener('click',e=>{if(menu&&menu.open&&!menu.contains(e.target))menu.open=false;});
         const poll=async()=>{try{const r=await fetch(d.statusUrl);if(r.ok)live((await r.json()).live);}catch{}setTimeout(poll,30000);};
@@ -121,7 +124,7 @@ internal static class PublicPages
 
     private const string VolumeIcon = """<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path class="i-wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="i-mute" d="m16 9 6 6m0-6-6 6"/></svg>""";
 
-    private const string ShareIcon = """<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/></svg>""";
+    private const string ShareIcon = """<svg class="i-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/></svg><svg class="i-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>""";
 
     private const string MoreIcon = """<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>""";
 
@@ -140,14 +143,14 @@ internal static class PublicPages
     {
         ["play"] = "Play", ["stop"] = "Stop", ["live"] = "Live", ["offline"] = "Offline", ["reconnecting"] = "Reconnecting…",
         ["listen"] = "Listen live", ["website"] = "Website", ["mute"] = "Mute", ["unmute"] = "Unmute", ["volume"] = "Volume",
-        ["share"] = "Share", ["copied"] = "Link copied", ["more"] = "More options", ["page"] = "Station page", ["stream"] = "Open the {0} stream",
+        ["share"] = "Share", ["copied"] = "Link copied", ["copy"] = "Copy this link", ["more"] = "More options", ["stream"] = "Open the {0} stream",
     };
 
     private static readonly Dictionary<string, string> French = new()
     {
         ["play"] = "Écouter", ["stop"] = "Arrêter", ["live"] = "En direct", ["offline"] = "Hors antenne", ["reconnecting"] = "Reconnexion…",
         ["listen"] = "Écouter en direct", ["website"] = "Site web", ["mute"] = "Couper le son", ["unmute"] = "Rétablir le son",
-        ["volume"] = "Volume", ["share"] = "Partager", ["copied"] = "Lien copié", ["more"] = "Plus d’options", ["page"] = "Page de la station",
+        ["volume"] = "Volume", ["share"] = "Partager", ["copied"] = "Lien copié", ["copy"] = "Copiez ce lien", ["more"] = "Plus d’options",
         ["stream"] = "Ouvrir le flux {0}",
     };
 
@@ -199,7 +202,7 @@ internal static class PublicPages
             <section id="card" class="card" aria-labelledby="name">
             <div class="top">{logo}<div class="titles"><h1 id="name">{title}</h1>{(meta.Length > 0 ? $"""<p class="meta">{Html.Encode(meta)}</p>""" : "")}<p id="note" role="status" aria-live="polite"></p></div>{More(station, t, embed)}</div>
             <div class="bar"><span id="status" class="badge" hidden></span><span class="track"><span></span></span><span id="elapsed">0:00</span></div>
-            <div class="controls"><div><button id="share" class="icon" type="button" aria-label="{t["share"]}">{ShareIcon}</button></div>
+            <div class="controls"><div><button id="share" class="icon" type="button" aria-label="{t["share"]}">{ShareIcon}</button><span id="shared" class="sr" role="status"></span></div>
             <button id="play" class="play" type="button">{PlayIcon}{StopIcon}<span id="play-label" class="sr">{t["play"]}</span></button>
             <div class="sound"><button id="mute" class="icon" type="button" aria-label="{t["mute"]}">{VolumeIcon}</button><input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="{t["volume"]}"></div></div>
             </section>
@@ -212,15 +215,19 @@ internal static class PublicPages
             """;
     }
 
-    /// <summary>The "more" menu: the stream addresses and, in the embed, the station page.</summary>
+    /// <summary>
+    /// The "more" menu with the stream addresses, on the station page only: in the embed, a dropdown cannot fit the
+    /// 120 px iframe, and the title already links the station page.
+    /// </summary>
     private static string More(PublicStationResponse station, Dictionary<string, string> t, bool embed)
     {
-        var items = station.Streams.Select(stream =>
-            $"""<li><a href="{Html.Encode(stream.Url.AbsoluteUri)}" target="_blank" rel="noopener">{Html.Encode(string.Format(CultureInfo.InvariantCulture, t["stream"], stream.Format == AudioFormat.Opus ? "Opus" : "MP3"))}</a></li>""");
         if (embed)
         {
-            items = items.Prepend($"""<li><a href="{Html.Encode(station.PageUrl.AbsoluteUri)}" target="_blank" rel="noopener">{t["page"]}</a></li>""");
+            return "";
         }
+
+        var items = station.Streams.Select(stream =>
+            $"""<li><a href="{Html.Encode(stream.Url.AbsoluteUri)}" target="_blank" rel="noopener">{Html.Encode(string.Format(CultureInfo.InvariantCulture, t["stream"], stream.Format == AudioFormat.Opus ? "Opus" : "MP3"))}</a></li>""");
         var list = string.Concat(items);
         return list.Length == 0 ? "" : $"""<details><summary aria-label="{t["more"]}">{MoreIcon}</summary><ul class="menu">{list}</ul></details>""";
     }
