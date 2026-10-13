@@ -429,3 +429,37 @@ test('the station usage bar has a name and a spoken value (#72)', async () => {
 
   expect(bar).toHaveAttribute('aria-valuetext', '1 of 3 stations');
 });
+
+test('moves focus to the new page heading after navigating (#70)', async () => {
+  const station = {
+    id: 's1',
+    publicId: 'radio1',
+    name: 'Radio One',
+    slug: 'radio-one',
+    description: '',
+    genre: 'Music',
+    country: 'MG',
+    language: 'mg',
+    logoUrl: null,
+    website: null,
+    listInDirectory: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    listenerUrls: { mp3: 'https://listen.example.test/stations/radio1/live.mp3', opus: null },
+  };
+  renderAt('/stations', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/stations')
+      return Response.json({ items: [station], page: 1, pageSize: 50, totalCount: 1 });
+    if (path === '/api/v1/stations/s1') return Response.json(station);
+    if (path === '/api/v1/stations/s1/status')
+      return Response.json({ live: false, listeners: 0, outputs: [] });
+    if (path === '/api/v1/stations/s1/credentials') return Response.json([]);
+    return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+  });
+
+  fireEvent.click(await screen.findByRole('link', { name: 'Radio One' }));
+
+  const heading = await screen.findByRole('heading', { level: 1, name: 'Radio One' });
+  await waitFor(() => expect(document.activeElement).toBe(heading));
+});
