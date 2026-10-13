@@ -18,6 +18,7 @@ import { CheckboxField, TextAreaField, TextField } from '../../atoms/FormFields'
 import { Notice } from '../../atoms/Notice';
 import { Card } from '../../molecules/Card';
 import { ConfirmDialog } from '../../molecules/ConfirmDialog';
+import { CopyField } from '../../molecules/CopyField';
 import { Loading } from '../../molecules/Loading';
 import { PageHeader } from '../../molecules/PageHeader';
 import { DirectoryStatus } from './DirectoryStatus';
@@ -118,6 +119,11 @@ export function StationDetail() {
   if (station.isPending) return <Loading label={t('station.loading')} />;
   if (!station.data) return <Notice error={station.error} />;
   const item = station.data.station;
+  const badge = status.data?.stale
+    ? { color: 'warning' as const, label: t('station.statusUnavailable') }
+    : status.data?.live
+      ? { color: 'success' as const, label: t('station.live') }
+      : { color: 'gray' as const, label: t('station.offline') };
   return (
     <section className="flex flex-col gap-6">
       <PageHeader
@@ -130,19 +136,9 @@ export function StationDetail() {
         }
         title={item.name}
         badge={
-          status.data?.stale ? (
-            <BadgeWithDot type="pill-color" color="warning" size="md">
-              {t('station.statusUnavailable')}
-            </BadgeWithDot>
-          ) : status.data?.live ? (
-            <BadgeWithDot type="pill-color" color="success" size="md">
-              {t('station.live')}
-            </BadgeWithDot>
-          ) : (
-            <BadgeWithDot type="pill-color" color="gray" size="md">
-              {t('station.offline')}
-            </BadgeWithDot>
-          )
+          <BadgeWithDot type="pill-color" color={badge.color} size="md">
+            {badge.label}
+          </BadgeWithDot>
         }
       />
       <div className="grid gap-6 lg:grid-cols-2">
@@ -165,15 +161,15 @@ export function StationDetail() {
           ) : null}
         </Card>
         <Card title={t('station.listenerUrls')}>
-          <CopyUrl label="MP3" value={item.listenerUrls.mp3} />
-          {item.listenerUrls.opus && <CopyUrl label="Opus" value={item.listenerUrls.opus} />}
+          <CopyField label="MP3" value={item.listenerUrls.mp3} />
+          {item.listenerUrls.opus && <CopyField label="Opus" value={item.listenerUrls.opus} />}
         </Card>
       </div>
       <SharePanel stationSlug={item.slug} />
       <Card title={t('station.settings')}>
         <form
           className="grid gap-5 md:grid-cols-2"
-          onSubmit={form.handleSubmit((value) => update.mutate(value))}
+          onSubmit={form.handleSubmit((value) => !update.isPending && update.mutate(value))}
         >
           <TextField control={form.control} name="name" label={t('common.name')} />
           <TextField control={form.control} name="slug" label={t('common.slug')} />
@@ -215,7 +211,9 @@ export function StationDetail() {
         <Card title={t('station.devices')} className="lg:col-span-2">
           <form
             className="flex flex-col gap-3 sm:flex-row sm:items-start"
-            onSubmit={credentialForm.handleSubmit((value) => issue.mutate(value))}
+            onSubmit={credentialForm.handleSubmit(
+              (value) => !issue.isPending && issue.mutate(value),
+            )}
           >
             <div className="flex-1">
               <TextField
@@ -267,18 +265,6 @@ export function StationDetail() {
         </Card>
       </div>
     </section>
-  );
-}
-
-function CopyUrl({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-secondary">{label}</span>
-      <div className="flex items-center gap-2 rounded-lg bg-secondary py-1 pr-1 pl-3 ring-1 ring-secondary ring-inset">
-        <code className="min-w-0 flex-1 font-mono text-sm break-all text-primary">{value}</code>
-        <CopyButton value={value} />
-      </div>
-    </div>
   );
 }
 
@@ -342,7 +328,9 @@ function ActiveCredentials({
       <Table aria-label={t('station.devices')} size="sm">
         <Table.Header>
           <Table.Head id="device" label={t('station.deviceLabel')} isRowHeader />
-          <Table.Head id="actions" />
+          <Table.Head id="actions">
+            <span className="sr-only">{t('credentials.revoke')}</span>
+          </Table.Head>
         </Table.Header>
         <Table.Body items={credentials}>
           {(credential) => (

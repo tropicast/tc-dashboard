@@ -6,6 +6,7 @@ import { ArrowRight, Building07, CheckCircle, Signal01 } from '@untitledui/icons
 import type { FC, ReactNode } from 'react';
 import { Button } from '@/components/base/buttons/button';
 import { FeaturedIcon } from '@/components/foundations/featured-icon/featured-icon';
+import { Card } from '../../molecules/Card';
 import { z } from 'zod';
 import { api } from '../../../api/client';
 import { selectedTenantId } from '../../../api/client';
@@ -68,7 +69,9 @@ export function Onboarding() {
       >
         <form
           className="flex flex-col gap-5"
-          onSubmit={tenant.handleSubmit((value) => createTenant.mutate(value))}
+          onSubmit={tenant.handleSubmit(
+            (value) => !createTenant.isPending && createTenant.mutate(value),
+          )}
         >
           <TextField
             control={tenant.control}
@@ -88,7 +91,9 @@ export function Onboarding() {
       <Step step={2} icon={Signal01} title={t('onboarding.stationTitle')}>
         <form
           className="grid gap-5 sm:grid-cols-2"
-          onSubmit={station.handleSubmit((value) => createStation.mutate(value))}
+          onSubmit={station.handleSubmit(
+            (value) => !createStation.isPending && createStation.mutate(value),
+          )}
         >
           <TextField control={station.control} name="name" label={t('onboarding.stationName')} />
           <TextField control={station.control} name="slug" label={t('onboarding.stationSlug')} />
@@ -182,9 +187,7 @@ function Step({
           {description && <p className="text-md text-tertiary">{description}</p>}
         </div>
       </div>
-      <div className="rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary md:p-6">
-        {children}
-      </div>
+      <Card>{children}</Card>
     </section>
   );
 }

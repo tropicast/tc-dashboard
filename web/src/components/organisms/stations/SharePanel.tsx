@@ -8,6 +8,7 @@ import { embedSnippets } from '../../../lib/embed';
 import { data } from '../../../lib/request';
 import { CopyButton } from '../../atoms/CopyButton';
 import { Card } from '../../molecules/Card';
+import { CopyField } from '../../molecules/CopyField';
 
 type PublicStation = components['schemas']['PublicStationResponse'];
 
@@ -49,29 +50,12 @@ export function SharePanel({ stationSlug }: { stationSlug: string }) {
       </div>
       {snippets ? (
         <>
-          <Snippet label={t('share.iframe')} value={snippets.iframe} />
-          <Snippet label={t('share.script')} value={snippets.script} />
+          <CopyField multiline label={t('share.iframe')} value={snippets.iframe} />
+          <CopyField multiline label={t('share.script')} value={snippets.script} />
         </>
       ) : (
         <p className="text-sm text-tertiary">{t('share.notIncluded')}</p>
       )}
     </Card>
-  );
-}
-
-/** Untitled UI code snippet: label, copy button and the code on a muted surface. */
-function Snippet({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-secondary">{label}</span>
-        <CopyButton value={value} />
-      </div>
-      <pre className="overflow-x-auto rounded-lg bg-secondary p-3 ring-1 ring-secondary ring-inset">
-        <code className="font-mono text-xs break-all whitespace-pre-wrap text-primary">
-          {value}
-        </code>
-      </pre>
-    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState, type FC, type ReactNode } from 'react';
+import { useEffect, useState, type FC, type ReactNode } from 'react';
 import {
   LogOut01,
   Menu02,
@@ -39,6 +39,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  // One workspace choice for the header and the drawer (both selects show the same value).
+  const [tenantId, setTenantId] = useState(localStorage.getItem('tenant-id') ?? '');
+  const chooseTenant = (id: string) => {
+    localStorage.setItem('tenant-id', id);
+    setTenantId(id);
+    void queryClient.invalidateQueries();
+  };
+  // The drawer exists only below `lg`: close it when the window grows past that (tablet rotation),
+  // or it would keep the page inert and scroll-locked with nothing visible to close it.
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const wide = window.matchMedia('(min-width: 1024px)');
+    const close = () => wide.matches && setMenuOpen(false);
+    wide.addEventListener('change', close);
+    return () => wide.removeEventListener('change', close);
+  }, []);
+  const closeMenu = () => setMenuOpen(false);
   const logout = useMutation({
     mutationFn: () => data<void>(api.POST('/api/v1/auth/logout')),
     onSuccess: () => {
@@ -68,7 +85,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItems />
           </nav>
           <div className="ml-auto flex items-center gap-2 max-lg:hidden">
-            <TenantSelect />
+            <TenantSelect value={tenantId} onChange={chooseTenant} />
             <LanguageSelect />
             <ThemeMenu />
             {signOut}
@@ -101,20 +118,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             className="flex h-full flex-col gap-6 overflow-y-auto bg-primary px-4 pt-4 pb-6 outline-hidden"
           >
             <div className="flex items-center justify-between">
-              <Brand />
+              <Brand onNavigate={closeMenu} />
               <AriaButton
                 aria-label={t('nav.closeMenu')}
-                onPress={() => setMenuOpen(false)}
+                onPress={closeMenu}
                 className="rounded-lg p-2 text-fg-quaternary outline-focus-ring hover:bg-primary_hover hover:text-fg-quaternary_hover focus-visible:outline-2"
               >
                 <XClose aria-hidden="true" className="size-6" />
               </AriaButton>
             </div>
             <nav aria-label={t('nav.mainNavigation')}>
-              <NavItems vertical onNavigate={() => setMenuOpen(false)} />
+              <NavItems vertical onNavigate={closeMenu} />
             </nav>
             <div className="mt-auto flex flex-col gap-4 border-t border-secondary pt-6">
-              <TenantSelect withLabel />
+              <TenantSelect value={tenantId} onChange={chooseTenant} withLabel />
               <LanguageSelect withLabel />
               <div className="flex items-center justify-between gap-2">
                 <ThemeMenu />
@@ -132,11 +149,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function Brand() {
+function Brand({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   return (
     <Link
       to="/"
+      onClick={onNavigate}
       className="flex shrink-0 items-center gap-2.5 rounded-xs outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       <img src="/tropicast-logo.svg" alt="Tropicast" className="h-8 w-auto" />
@@ -183,14 +201,21 @@ function NavItems({
   );
 }
 
-function TenantSelect({ withLabel = false }: { withLabel?: boolean }) {
+function TenantSelect({
+  value,
+  onChange,
+  withLabel = false,
+}: {
+  value: string;
+  onChange: (tenantId: string) => void;
+  withLabel?: boolean;
+}) {
   const { t } = useTranslation();
   const me = useMe();
-  const [tenantId, setTenantId] = useState(localStorage.getItem('tenant-id') ?? '');
   const memberships = me.data?.memberships ?? [];
   if (memberships.length < 2) return null;
-  const active = memberships.some((membership) => membership.tenantId === tenantId)
-    ? tenantId
+  const active = memberships.some((membership) => membership.tenantId === value)
+    ? value
     : memberships[0].tenantId;
   return (
     <NativeSelect
@@ -199,11 +224,7 @@ function TenantSelect({ withLabel = false }: { withLabel?: boolean }) {
       aria-label={withLabel ? undefined : t('nav.tenant')}
       className={withLabel ? undefined : 'w-44'}
       value={active}
-      onChange={(event) => {
-        localStorage.setItem('tenant-id', event.target.value);
-        setTenantId(event.target.value);
-        void queryClient.invalidateQueries();
-      }}
+      onChange={(event) => onChange(event.target.value)}
       options={memberships.map((membership) => ({
         value: membership.tenantId,
         label: membership.tenantName,

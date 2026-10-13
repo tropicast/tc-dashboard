@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_TIMEOUT = 2000;
 
@@ -28,52 +28,62 @@ type UseClipboardReturnType = {
  */
 export const useClipboard = (): UseClipboardReturnType => {
   const [copied, setCopied] = useState<string | boolean>(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Fallback function for older browsers
-  const fallback = (text: string, id?: string) => {
-    try {
-      // Textarea to copy the text to the clipboard
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.position = 'absolute';
-      textArea.style.left = '-99999px';
-
-      document.body.appendChild(textArea);
-      textArea.select();
-
-      const success = document.execCommand('copy');
-      textArea.remove();
-
-      setCopied(id || true);
-      setTimeout(() => setCopied(false), DEFAULT_TIMEOUT);
-
-      return success
-        ? { success: true }
-        : { success: false, error: new Error('execCommand returned false') };
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err : new Error('Fallback copy failed'),
-      };
-    }
-  };
-
-  const copy = useCallback(async (text: string, id?: string) => {
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(text);
-
-        setCopied(id || true);
-        setTimeout(() => setCopied(false), DEFAULT_TIMEOUT);
-
-        return { success: true };
-      } catch {
-        // If modern method fails, try fallback
-        return fallback(text, id);
-      }
-    }
-    return fallback(text);
+  // Tropicast: show "copied" only after a copy that worked, and restart the timer on each copy.
+  const markCopied = useCallback((id?: string) => {
+    clearTimeout(timer.current);
+    setCopied(id || true);
+    timer.current = setTimeout(() => setCopied(false), DEFAULT_TIMEOUT);
   }, []);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // Fallback function for older browsers and non-secure contexts
+  const fallback = useCallback(
+    (text: string, id?: string) => {
+      try {
+        // Textarea to copy the text to the clipboard
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'absolute';
+        textArea.style.left = '-99999px';
+
+        document.body.appendChild(textArea);
+        textArea.select();
+
+        const success = document.execCommand('copy');
+        textArea.remove();
+
+        if (!success) return { success: false, error: new Error('execCommand returned false') };
+        markCopied(id);
+        return { success: true };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err : new Error('Fallback copy failed'),
+        };
+      }
+    },
+    [markCopied],
+  );
+
+  const copy = useCallback(
+    async (text: string, id?: string) => {
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(text);
+          markCopied(id);
+          return { success: true };
+        } catch {
+          // If modern method fails, try fallback
+          return fallback(text, id);
+        }
+      }
+      return fallback(text, id);
+    },
+    [fallback, markCopied],
+  );
 
   return { copied, copy };
 };

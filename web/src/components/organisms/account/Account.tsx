@@ -70,7 +70,9 @@ export function Account() {
       <Card title={t('account.invite')}>
         <form
           className="grid gap-4 md:grid-cols-[1fr_12rem_auto] md:items-end"
-          onSubmit={invite.handleSubmit((value) => inviteMutation.mutate(value))}
+          onSubmit={invite.handleSubmit(
+            (value) => !inviteMutation.isPending && inviteMutation.mutate(value),
+          )}
         >
           <TextField
             control={invite.control}

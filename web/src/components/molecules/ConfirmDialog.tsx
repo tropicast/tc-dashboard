@@ -24,7 +24,13 @@ export function ConfirmDialog({
 }) {
   const { t } = useTranslation();
   return (
-    <ModalOverlay isOpen isDismissable onOpenChange={(open) => !open && onCancel()}>
+    // Not dismissable while busy: the request's error shows inside the dialog.
+    <ModalOverlay
+      isOpen
+      isDismissable={!busy}
+      isKeyboardDismissDisabled={busy}
+      onOpenChange={(open) => !open && onCancel()}
+    >
       <Modal className="max-w-100">
         <Dialog>
           <div className="flex w-full flex-col gap-4 p-4 sm:p-6">
@@ -36,7 +42,7 @@ export function ConfirmDialog({
               <div className="flex flex-col gap-3 text-sm text-tertiary">{children}</div>
             </div>
             <div className="flex flex-col-reverse gap-3 pt-4 sm:grid sm:grid-cols-2">
-              <Button color="secondary" size="lg" onPress={onCancel}>
+              <Button color="secondary" size="lg" isDisabled={busy} onPress={onCancel}>
                 {t('common.cancel')}
               </Button>
               <Button

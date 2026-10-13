@@ -9,18 +9,7 @@
     <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Tropicast</title>
-    <script>
-      // Apply the saved theme before the first paint (no flash); ThemeProvider takes over after.
-      try {
-        const theme = localStorage.getItem('theme');
-        const dark =
-          theme === 'dark' ||
-          (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList.toggle('dark-mode', dark);
-      } catch {
-        /* storage blocked: stay light until React mounts */
-      }
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

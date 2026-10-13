@@ -9,6 +9,7 @@ import { Button } from '@/components/base/buttons/button';
 import { FeaturedIcon } from '@/components/foundations/featured-icon/featured-icon';
 import { Alert } from '../../atoms/Alert';
 import { TextField } from '../../atoms/FormFields';
+import { Card } from '../../molecules/Card';
 import { Loading } from '../../molecules/Loading';
 import { Notice } from '../../atoms/Notice';
 import { formatDateTime } from '../../../lib/i18n';
@@ -28,13 +29,13 @@ export function DeviceApproval() {
         <FeaturedIcon icon={Laptop01} color="brand" theme="modern" size="xl" />
         <h1 className="text-display-xs font-semibold text-primary">{t('device.title')}</h1>
       </div>
-      <div className="flex flex-col gap-5 rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary md:p-6">
+      <Card bodyClassName="gap-5">
         {code ? (
           <Decision code={code} />
         ) : (
           <CodeForm onCode={(value) => setParams({ code: value })} />
         )}
-      </div>
+      </Card>
     </section>
   );
 }

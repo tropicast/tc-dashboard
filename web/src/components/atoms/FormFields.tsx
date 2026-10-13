@@ -75,16 +75,27 @@ export function TextAreaField<T extends FieldValues>({
   );
 }
 
-export function CheckboxField<T extends FieldValues>({ control, name, label, hint }: Bound<T>) {
-  const { field } = useController({ control, name });
+export function CheckboxField<T extends FieldValues>({
+  control,
+  name,
+  rules,
+  label,
+  hint,
+}: Bound<T>) {
+  const {
+    field: { ref, value, onChange, onBlur },
+    fieldState,
+  } = useController({ control, name, rules });
   return (
     <Checkbox
-      name={field.name}
-      isSelected={Boolean(field.value)}
-      onChange={field.onChange}
-      onBlur={field.onBlur}
+      inputRef={ref}
+      name={name}
+      isSelected={Boolean(value)}
+      onChange={onChange}
+      onBlur={onBlur}
+      isInvalid={fieldState.invalid}
       label={label}
-      hint={hint}
+      hint={fieldState.error?.message || hint}
     />
   );
 }
@@ -92,17 +103,25 @@ export function CheckboxField<T extends FieldValues>({ control, name, label, hin
 export function SelectField<T extends FieldValues>({
   control,
   name,
+  rules,
   label,
+  hint,
   options,
 }: Bound<T> & { options: { label: string; value: string }[] }) {
-  const { field } = useController({ control, name });
+  const {
+    field: { ref, value, onChange, onBlur },
+    fieldState,
+  } = useController({ control, name, rules });
   return (
     <NativeSelect
+      ref={ref}
       label={label}
-      name={field.name}
-      value={field.value}
-      onChange={(event) => field.onChange(event.target.value)}
-      onBlur={field.onBlur}
+      name={name}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      onBlur={onBlur}
+      aria-invalid={fieldState.invalid || undefined}
+      hint={fieldState.error?.message || (typeof hint === 'string' ? hint : undefined)}
       options={options}
     />
   );

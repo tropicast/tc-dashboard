@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App';
+import { CopyButton } from './components/atoms/CopyButton';
 import i18n from './lib/i18n';
 import { queryClient } from './lib/query-client';
 
@@ -340,4 +341,44 @@ test('translates the page content, not only the header, when French is chosen', 
   } finally {
     await i18n.changeLanguage('en');
   }
+});
+
+test('ignores a second submit while the first request is pending', async () => {
+  let posts = 0;
+  let release: () => void = () => {};
+  renderAt('/forgot-password', (request) => {
+    if (new URL(request.url).pathname !== '/api/v1/auth/forgot-password') {
+      return new Response(null, { status: 204 });
+    }
+    posts += 1;
+    return new Promise((resolve) => {
+      release = () => resolve(new Response(null, { status: 204 }));
+    });
+  });
+
+  fireEvent.change(await screen.findByLabelText('Email'), {
+    target: { value: 'owner@example.com' },
+  });
+  const form = screen.getByLabelText('Email').closest('form')!;
+  fireEvent.submit(form);
+  await vi.waitFor(() => expect(posts).toBe(1));
+  // Enter in a one-field form submits it again: the pending request must not be repeated.
+  fireEvent.submit(form);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(posts).toBe(1);
+  release();
+  expect(await screen.findByRole('button', { name: 'Email sent' })).toBeInTheDocument();
+});
+
+test('does not claim a copy that failed', async () => {
+  vi.stubGlobal('navigator', { ...navigator, clipboard: undefined });
+  document.execCommand = vi.fn(() => false);
+  render(<CopyButton value="secret" />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(document.execCommand).toHaveBeenCalledWith('copy');
+  expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
 });

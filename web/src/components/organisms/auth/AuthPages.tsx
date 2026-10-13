@@ -49,7 +49,7 @@ export function Login() {
     >
       <form
         className="flex flex-col gap-5"
-        onSubmit={form.handleSubmit((value) => mutation.mutate(value))}
+        onSubmit={form.handleSubmit((value) => !mutation.isPending && mutation.mutate(value))}
       >
         <TextField
           control={form.control}
@@ -89,7 +89,7 @@ export function Signup() {
     >
       <form
         className="flex flex-col gap-5"
-        onSubmit={form.handleSubmit((value) => mutation.mutate(value))}
+        onSubmit={form.handleSubmit((value) => !mutation.isPending && mutation.mutate(value))}
       >
         <TextField
           control={form.control}
@@ -143,7 +143,7 @@ export function EmailAction({ kind }: { kind: 'forgot' | 'confirm' }) {
     <FormPage title={kind === 'forgot' ? t('auth.resetTitle') : t('auth.confirmTitle')}>
       <form
         className="flex flex-col gap-5"
-        onSubmit={form.handleSubmit((value) => mutation.mutate(value))}
+        onSubmit={form.handleSubmit((value) => !mutation.isPending && mutation.mutate(value))}
       >
         {kind === 'forgot' ? (
           <TextField
@@ -199,7 +199,7 @@ export function Reset() {
     <FormPage title={t('auth.newPasswordTitle')}>
       <form
         className="flex flex-col gap-5"
-        onSubmit={form.handleSubmit((value) => mutation.mutate(value))}
+        onSubmit={form.handleSubmit((value) => !mutation.isPending && mutation.mutate(value))}
       >
         <TextField
           control={form.control}
@@ -239,7 +239,7 @@ export function AcceptInvite() {
     <FormPage title={t('auth.joinTeam')}>
       <form
         className="flex flex-col gap-5"
-        onSubmit={form.handleSubmit((value) => mutation.mutate(value))}
+        onSubmit={form.handleSubmit((value) => !mutation.isPending && mutation.mutate(value))}
       >
         <TextField
           control={form.control}
@@ -254,6 +254,10 @@ export function AcceptInvite() {
   );
 }
 
+/**
+ * While pending, React Aria renders the button as type="button", so Enter in a one-field form
+ * would submit again: each form's onSubmit also ignores a pending mutation.
+ */
 function SubmitButton({ busy = false, children }: { busy?: boolean; children: string }) {
   return (
     <Button type="submit" size="lg" className="w-full" isLoading={busy} showTextWhileLoading>

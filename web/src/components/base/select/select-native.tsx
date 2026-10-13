@@ -1,10 +1,12 @@
-import { type SelectHTMLAttributes, useId } from 'react';
+import { type Ref, type SelectHTMLAttributes, useId } from 'react';
 import { ChevronDown } from '@untitledui/icons';
 import { HintText } from '@/components/base/input/hint-text';
 import { Label } from '@/components/base/input/label';
 import { cx } from '@/utils/cx';
 
 interface NativeSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
+  /** Tropicast: forwarded to the <select> (React 19 ref prop), e.g. for react-hook-form focus. */
+  ref?: Ref<HTMLSelectElement>;
   label?: string;
   hint?: string;
   selectClassName?: string;
