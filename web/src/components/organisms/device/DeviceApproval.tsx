@@ -1,10 +1,12 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { Trans, useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
 import { Field } from '../../atoms/Field';
 import { Notice } from '../../atoms/Notice';
+import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import type { Problem } from '../../../lib/types';
 
@@ -12,11 +14,12 @@ type DeviceRequest = components['schemas']['DeviceRequestResponse'];
 
 /** The page a desktop app opens during sign-in (device code flow): check the device, then approve or deny it. */
 export function DeviceApproval() {
+  const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const code = params.get('code')?.trim() ?? '';
   return (
     <section>
-      <h1>Sign in a desktop app</h1>
+      <h1>{t('device.title')}</h1>
       {code ? (
         <Decision code={code} />
       ) : (
@@ -27,10 +30,11 @@ export function DeviceApproval() {
 }
 
 function CodeForm({ onCode }: { onCode: (code: string) => void }) {
+  const { t } = useTranslation();
   const form = useForm({ defaultValues: { code: '' } });
   return (
     <form onSubmit={form.handleSubmit((value) => onCode(value.code.trim()))}>
-      <Field label="Code shown in Tropicast Station">
+      <Field label={t('device.codeLabel')}>
         <input
           autoComplete="off"
           autoCapitalize="characters"
@@ -38,12 +42,13 @@ function CodeForm({ onCode }: { onCode: (code: string) => void }) {
           {...form.register('code', { required: true })}
         />
       </Field>
-      <button>Continue</button>
+      <button>{t('common.continue')}</button>
     </form>
   );
 }
 
 function Decision({ code }: { code: string }) {
+  const { t } = useTranslation();
   const request = useQuery({
     queryKey: ['device-request', code],
     queryFn: () =>
@@ -64,18 +69,15 @@ function Decision({ code }: { code: string }) {
   if (decide.isSuccess) {
     return (
       <p role="status">
-        {decide.variables === 'approve'
-          ? 'Done. Go back to Tropicast Station: it is signed in.'
-          : 'Refused. Tropicast Station was not signed in.'}
+        {decide.variables === 'approve' ? t('device.approved') : t('device.denied')}
       </p>
     );
   }
-  if (request.isPending) return <p>Checking the code…</p>;
+  if (request.isPending) return <p>{t('device.checking')}</p>;
   if (request.isError) {
     return (request.error as Problem | undefined)?.status === 404 ? (
       <p role="alert" className="notice toast error">
-        The code {code} is unknown, expired or already used. Start the sign-in again in Tropicast
-        Station.
+        {t('device.unknown', { code })}
       </p>
     ) : (
       <Notice error={request.error} />
@@ -85,21 +87,25 @@ function Decision({ code }: { code: string }) {
   return (
     <>
       <p>
-        <strong>{device.deviceName}</strong> asks to sign in to your account with the code{' '}
-        <strong>{device.userCode}</strong>. Check that this code is the one shown in Tropicast
-        Station.
+        <Trans
+          i18nKey="device.asks"
+          values={{ name: device.deviceName, code: device.userCode }}
+          components={{ b: <strong /> }}
+        />
       </p>
       <p>
-        Asked at {new Date(device.createdAt).toLocaleString()}. Expires at{' '}
-        {new Date(device.expiresAt).toLocaleString()}.
+        {t('device.times', {
+          created: formatDateTime(device.createdAt),
+          expires: formatDateTime(device.expiresAt),
+        })}
       </p>
       <Notice error={decide.error} />
       <p>
         <button disabled={decide.isPending} onClick={() => decide.mutate('approve')}>
-          Approve
+          {t('device.approve')}
         </button>{' '}
         <button disabled={decide.isPending} onClick={() => decide.mutate('deny')}>
-          Deny
+          {t('device.deny')}
         </button>
       </p>
     </>

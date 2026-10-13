@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { api } from '../../../api/client';
 import { Notice } from '../../atoms/Notice';
@@ -6,6 +7,7 @@ import { data } from '../../../lib/request';
 import type { components } from '../../../api/schema';
 
 export function Stations() {
+  const { t } = useTranslation();
   const stations = useQuery({
     queryKey: ['stations', localStorage.getItem('tenant-id')],
     queryFn: () =>
@@ -17,8 +19,8 @@ export function Stations() {
     <section>
       <div className="heading">
         <div>
-          <h1>Stations</h1>
-          <p>Your current tenant stations.</p>
+          <h1>{t('stations.title')}</h1>
+          <p>{t('stations.intro')}</p>
         </div>
       </div>
       <Notice error={stations.error} />
@@ -30,14 +32,15 @@ export function Stations() {
                 <Link to={`/stations/${station.id}`}>{station.name}</Link>
               </h2>
               <p>
-                {station.genre || 'No genre'} · {station.country || 'Worldwide'}
+                {station.genre || t('stations.noGenre')} ·{' '}
+                {station.country || t('stations.worldwide')}
               </p>
               <a href={station.listenerUrls.mp3}>{station.listenerUrls.mp3}</a>
             </article>
           ))}
         </div>
       ) : (
-        <p>No stations yet.</p>
+        <p>{t('stations.empty')}</p>
       )}
     </section>
   );

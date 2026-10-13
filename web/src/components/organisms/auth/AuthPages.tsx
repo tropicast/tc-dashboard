@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { api, refreshAntiforgery } from '../../../api/client';
@@ -19,6 +20,7 @@ function returnPath(state: unknown) {
 }
 
 export function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const form = useForm({
@@ -35,29 +37,27 @@ export function Login() {
     },
   });
   return (
-    <FormPage title="Sign in">
+    <FormPage title={t('auth.signIn')}>
       <form onSubmit={form.handleSubmit((value) => mutation.mutate(value))}>
-        <Field label="Email" error={form.formState.errors.email?.message}>
+        <Field label={t('common.email')} error={form.formState.errors.email?.message}>
           <input autoComplete="email" {...form.register('email')} />
         </Field>
-        <Field
-          label="Password (12 or more characters)"
-          error={form.formState.errors.password?.message}
-        >
+        <Field label={t('auth.password')} error={form.formState.errors.password?.message}>
           <input type="password" autoComplete="current-password" {...form.register('password')} />
         </Field>
         <Notice error={mutation.error} />
-        <button disabled={mutation.isPending}>Sign in</button>
+        <button disabled={mutation.isPending}>{t('auth.signIn')}</button>
       </form>
       <p>
-        <Link to="/signup">Create account</Link> ·{' '}
-        <Link to="/forgot-password">Forgot password?</Link>
+        <Link to="/signup">{t('auth.createAccount')}</Link> ·{' '}
+        <Link to="/forgot-password">{t('auth.forgotPassword')}</Link>
       </p>
     </FormPage>
   );
 }
 
 export function Signup() {
+  const { t } = useTranslation();
   const form = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
@@ -67,30 +67,28 @@ export function Signup() {
       data<void>(api.POST('/api/v1/auth/register', { body })),
   });
   return (
-    <FormPage title="Create account">
+    <FormPage title={t('auth.createAccount')}>
       <form onSubmit={form.handleSubmit((value) => mutation.mutate(value))}>
-        <Field label="Email" error={form.formState.errors.email?.message}>
+        <Field label={t('common.email')} error={form.formState.errors.email?.message}>
           <input autoComplete="email" {...form.register('email')} />
         </Field>
-        <Field
-          label="Password (12 or more characters)"
-          error={form.formState.errors.password?.message}
-        >
+        <Field label={t('auth.password')} error={form.formState.errors.password?.message}>
           <input type="password" autoComplete="new-password" {...form.register('password')} />
         </Field>
         <Notice error={mutation.error} />
         <button disabled={mutation.isPending}>
-          {mutation.isSuccess ? 'Check your email' : 'Create account'}
+          {mutation.isSuccess ? t('auth.checkEmail') : t('auth.createAccount')}
         </button>
       </form>
       <p>
-        <Link to="/login">Sign in</Link>
+        <Link to="/login">{t('auth.signIn')}</Link>
       </p>
     </FormPage>
   );
 }
 
 export function EmailAction({ kind }: { kind: 'forgot' | 'confirm' }) {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const form = useForm({
@@ -115,25 +113,25 @@ export function EmailAction({ kind }: { kind: 'forgot' | 'confirm' }) {
     },
   });
   return (
-    <FormPage title={kind === 'forgot' ? 'Reset your password' : 'Confirm your email'}>
+    <FormPage title={kind === 'forgot' ? t('auth.resetTitle') : t('auth.confirmTitle')}>
       <form onSubmit={form.handleSubmit((value) => mutation.mutate(value))}>
         {kind === 'forgot' ? (
-          <Field label="Email">
+          <Field label={t('common.email')}>
             <input autoComplete="email" {...form.register('email', { required: true })} />
           </Field>
         ) : (
           <>
-            <Field label="User ID">
+            <Field label={t('auth.userId')}>
               <input {...form.register('userId', { required: true })} />
             </Field>
-            <Field label="Confirmation code">
+            <Field label={t('auth.confirmationCode')}>
               <input {...form.register('code', { required: true })} />
             </Field>
           </>
         )}
         <Notice error={mutation.error} />
         <button disabled={mutation.isPending}>
-          {mutation.isSuccess ? 'Email sent' : 'Continue'}
+          {mutation.isSuccess ? t('auth.emailSent') : t('common.continue')}
         </button>
       </form>
     </FormPage>
@@ -141,6 +139,7 @@ export function EmailAction({ kind }: { kind: 'forgot' | 'confirm' }) {
 }
 
 export function Reset() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const form = useForm({
     resolver: zodResolver(
@@ -157,25 +156,26 @@ export function Reset() {
       data<void>(api.POST('/api/v1/auth/reset-password', { body })),
   });
   return (
-    <FormPage title="Set new password">
+    <FormPage title={t('auth.newPasswordTitle')}>
       <form onSubmit={form.handleSubmit((value) => mutation.mutate(value))}>
-        <Field label="Email">
+        <Field label={t('common.email')}>
           <input {...form.register('email')} />
         </Field>
-        <Field label="Reset code">
+        <Field label={t('auth.resetCode')}>
           <input {...form.register('code')} />
         </Field>
-        <Field label="New password (12 or more characters)">
+        <Field label={t('auth.newPassword')}>
           <input type="password" {...form.register('newPassword')} />
         </Field>
         <Notice error={mutation.error} />
-        <button>{mutation.isSuccess ? 'Password updated' : 'Update password'}</button>
+        <button>{mutation.isSuccess ? t('auth.passwordUpdated') : t('auth.updatePassword')}</button>
       </form>
     </FormPage>
   );
 }
 
 export function AcceptInvite() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const form = useForm({ defaultValues: { token: params.get('token') ?? '' } });
@@ -185,13 +185,13 @@ export function AcceptInvite() {
     onSuccess: () => navigate('/'),
   });
   return (
-    <FormPage title="Join team">
+    <FormPage title={t('auth.joinTeam')}>
       <form onSubmit={form.handleSubmit((value) => mutation.mutate(value))}>
-        <Field label="Invitation token">
+        <Field label={t('auth.invitationToken')}>
           <input {...form.register('token', { required: true })} />
         </Field>
         <Notice error={mutation.error} />
-        <button>Accept invitation</button>
+        <button>{t('auth.acceptInvitation')}</button>
       </form>
     </FormPage>
   );

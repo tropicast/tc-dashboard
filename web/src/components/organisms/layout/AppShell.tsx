@@ -31,17 +31,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header>
         <Link className="brand" to="/">
           <img src="/tropicast-logo.svg" alt="Tropicast" />
-          <span>{t('dashboard')}</span>
+          <span>{t('nav.dashboard')}</span>
         </Link>
-        <nav aria-label="Main navigation">
-          <NavLink to="/stations">{t('stations')}</NavLink>
-          <NavLink to="/account">{t('account')}</NavLink>
+        <nav aria-label={t('nav.mainNavigation')}>
+          <NavLink to="/stations">{t('nav.stations')}</NavLink>
+          <NavLink to="/account">{t('nav.account')}</NavLink>
         </nav>
         {me.data && me.data.memberships.length > 1 && (
           <label>
-            {t('tenant')}
+            {t('nav.tenant')}
             <select
-              aria-label={t('tenant')}
+              aria-label={t('nav.tenant')}
               value={activeTenantId}
               onChange={(event) => {
                 localStorage.setItem('tenant-id', event.target.value);
@@ -58,17 +58,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           </label>
         )}
         <label>
-          {t('language')}
+          {t('nav.language')}
           <select
-            aria-label={t('language')}
+            aria-label={t('nav.language')}
             value={i18n.resolvedLanguage}
             onChange={(event) => {
               localStorage.setItem('language', event.target.value);
               void i18n.changeLanguage(event.target.value);
             }}
           >
-            <option value="en">{t('english')}</option>
-            <option value="fr">{t('french')}</option>
+            <option value="en">{t('nav.english')}</option>
+            <option value="fr">{t('nav.french')}</option>
           </select>
         </label>
         <button
@@ -79,10 +79,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             localStorage.setItem('theme', next ? 'dark' : 'light');
           }}
         >
-          {dark ? t('lightTheme') : t('darkTheme')}
+          {dark ? t('nav.lightTheme') : t('nav.darkTheme')}
         </button>
         <button className="quiet" onClick={() => logout.mutate()}>
-          {t('signOut')}
+          {t('nav.signOut')}
         </button>
       </header>
       <main>{children}</main>

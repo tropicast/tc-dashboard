@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { lazy, Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../../api/client';
 import type { components } from '../../../api/schema';
@@ -12,6 +13,7 @@ import { TrashIcon } from '../../atoms/TrashIcon';
 import { ConfirmDialog } from '../../molecules/ConfirmDialog';
 import { DirectoryStatus } from './DirectoryStatus';
 import { SharePanel } from './SharePanel';
+import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
 import type { Credential, Station, Status } from '../../../lib/types';
@@ -19,6 +21,7 @@ import type { Credential, Station, Status } from '../../../lib/types';
 const StationStats = lazy(() => import('../../../StationStats'));
 
 export function StationDetail() {
+  const { t } = useTranslation();
   const { id = '' } = useParams();
   const tenantId = localStorage.getItem('tenant-id');
   const queryClient = useQueryClient();
@@ -103,83 +106,94 @@ export function StationDetail() {
       await queryClient.invalidateQueries({ queryKey: ['credentials', tenantId, id] });
     },
   });
-  if (station.isPending) return <p>Loading station…</p>;
+  if (station.isPending) return <p>{t('station.loading')}</p>;
   if (!station.data) return <Notice error={station.error} />;
   const item = station.data.station;
   return (
     <section>
       <div className="heading">
         <div>
-          <Link to="/stations">← Stations</Link>
+          <Link to="/stations">{t('station.back')}</Link>
           <h1>{item.name}</h1>
         </div>
         <span className={`badge ${status.data?.live ? 'live' : ''}`}>
-          {status.data?.stale ? 'Status unavailable' : status.data?.live ? 'Live' : 'Offline'}
+          {status.data?.stale
+            ? t('station.statusUnavailable')
+            : status.data?.live
+              ? t('station.live')
+              : t('station.offline')}
         </span>
       </div>
       <div className="grid">
         <article>
-          <h2>Live status</h2>
-          <strong>{status.data?.listeners ?? '—'} listeners</strong>
+          <h2>{t('station.liveStatus')}</h2>
+          <strong>
+            {status.data ? t('common.listeners', { count: Number(status.data.listeners) }) : '—'}
+          </strong>
           {status.data?.outputs.map((output) => (
             <p key={output.format}>
-              {output.format}: {output.listeners} listeners · {output.bitrateKbps ?? '—'} kbps
+              {t('station.output', {
+                format: output.format,
+                count: Number(output.listeners),
+                bitrate: output.bitrateKbps ?? '—',
+              })}
             </p>
           ))}
         </article>
         <article>
-          <h2>Listener URLs</h2>
+          <h2>{t('station.listenerUrls')}</h2>
           <CopyUrl label="MP3" value={item.listenerUrls.mp3} />
           {item.listenerUrls.opus && <CopyUrl label="Opus" value={item.listenerUrls.opus} />}
         </article>
       </div>
       <SharePanel stationSlug={item.slug} />
       <article className="panel">
-        <h2>Station settings</h2>
+        <h2>{t('station.settings')}</h2>
         <form className="form-grid" onSubmit={form.handleSubmit((value) => update.mutate(value))}>
-          <Field label="Name">
+          <Field label={t('common.name')}>
             <input {...form.register('name')} />
           </Field>
-          <Field label="Slug">
+          <Field label={t('common.slug')}>
             <input {...form.register('slug')} />
           </Field>
-          <Field label="Genre">
+          <Field label={t('common.genre')}>
             <input {...form.register('genre')} />
           </Field>
-          <Field label="Country">
+          <Field label={t('common.country')}>
             <input {...form.register('country')} />
           </Field>
-          <Field label="Language">
+          <Field label={t('common.language')}>
             <input {...form.register('language')} />
           </Field>
-          <Field label="Website">
+          <Field label={t('common.website')}>
             <input {...form.register('website')} />
           </Field>
-          <Field label="Description">
+          <Field label={t('common.description')}>
             <textarea {...form.register('description')} />
           </Field>
           <label className="checkbox">
-            <input type="checkbox" {...form.register('listInDirectory')} /> List on RadioBrowser
+            <input type="checkbox" {...form.register('listInDirectory')} />{' '}
+            {t('common.listInDirectory')}
           </label>
           <DirectoryStatus stationId={id} />
           <Notice error={update.error} />
-          <button>Save settings</button>
+          <button>{t('station.save')}</button>
         </form>
       </article>
       <section>
-        <h2>Analytics</h2>
-        <Suspense fallback={<p>Loading analytics…</p>}>
+        <h2>{t('station.analytics')}</h2>
+        <Suspense fallback={<p>{t('station.loadingAnalytics')}</p>}>
           <StationStats stationId={id} />
         </Suspense>
       </section>
       <div className="grid">
         <article className="panel">
-          <h2>Broadcast devices</h2>
+          <h2>{t('station.devices')}</h2>
           <form onSubmit={credentialForm.handleSubmit((value) => issue.mutate(value))}>
-            <Field label="Device label">
+            <Field label={t('station.deviceLabel')}>
               <input {...credentialForm.register('deviceLabel', { required: true })} />
             </Field>
-            <button>Issue credential</button>
+            <button>{t('station.issue')}</button>
           </form>
           <Notice error={issue.error} />
           {issue.data && <IssuedCredential issued={issue.data} />}
@@ -192,27 +206,20 @@ export function StationDetail() {
           />
           {toRevoke && (
             <ConfirmDialog
-              title={`Revoke “${toRevoke.deviceLabel}”?`}
-              confirmLabel="Revoke"
+              title={t('credentials.revokeTitle', { label: toRevoke.deviceLabel })}
+              confirmLabel={t('credentials.revoke')}
               busy={revoke.isPending}
               onConfirm={() => revoke.mutate(toRevoke.id)}
               onCancel={() => setToRevoke(null)}
             >
-              <p>
-                Any broadcast tool using this credential can no longer connect. A broadcast that is
-                live now continues until it reconnects. This cannot be undone.
-              </p>
+              <p>{t('credentials.revokeText')}</p>
               <Notice error={revoke.error} />
             </ConfirmDialog>
           )}
         </article>
         <article className="panel">
-          <h2>Desktop app</h2>
-          <p>
-            In Tropicast Station, sign in with your account and choose this station: no credential
-            to enter. Issue a credential only for another broadcast tool, or for a manual connection
-            profile.
-          </p>
+          <h2>{t('station.desktopTitle')}</h2>
+          <p>{t('station.desktopText')}</p>
         </article>
       </div>
     </section>
@@ -233,18 +240,19 @@ function IssuedCredential({
 }: {
   issued: components['schemas']['IssuedCredentialResponse'];
 }) {
+  const { t } = useTranslation();
   const ingest = new URL(issued.ingestUrl);
   const port = ingest.port || (ingest.protocol === 'https:' ? '443' : '80');
   const fields: [string, string][] = [
-    ['Server', ingest.hostname],
-    ['Port', port],
-    ['Mount', ingest.pathname],
-    ['Username', issued.username],
-    ['Password', issued.secret],
+    [t('credentials.server'), ingest.hostname],
+    [t('credentials.port'), port],
+    [t('credentials.mount'), ingest.pathname],
+    [t('credentials.username'), issued.username],
+    [t('credentials.password'), issued.secret],
   ];
   return (
     <div className="secret" role="status">
-      <strong>Save the password now: it cannot be shown again.</strong>
+      <strong>{t('credentials.savePassword')}</strong>
       <dl>
         {fields.map(([label, value]) => (
           <div key={label}>
@@ -256,8 +264,7 @@ function IssuedCredential({
         ))}
       </dl>
       <p>
-        Use TLS (HTTPS). For Opus, use the same settings with the mount ending in{' '}
-        <code>live.opus</code>.
+        {t('credentials.tlsNote')} <code>live.opus</code>.
       </p>
     </div>
   );
@@ -271,7 +278,8 @@ function ActiveCredentials({
   credentials: Credential[];
   onRevoke: (credential: Credential) => void;
 }) {
-  if (credentials.length === 0) return <p>No active credential.</p>;
+  const { t } = useTranslation();
+  if (credentials.length === 0) return <p>{t('credentials.none')}</p>;
   return (
     <ul className="credentials">
       {credentials.map((credential) => (
@@ -280,15 +288,15 @@ function ActiveCredentials({
             {credential.deviceLabel}{' '}
             <small>
               {credential.lastUsedAt
-                ? `last used ${new Date(credential.lastUsedAt).toLocaleString()}`
-                : 'never used'}
+                ? t('credentials.lastUsed', { date: formatDateTime(credential.lastUsedAt) })
+                : t('credentials.neverUsed')}
             </small>
           </span>
           <button
             type="button"
             className="quiet icon"
-            aria-label={`Revoke ${credential.deviceLabel}`}
-            title="Revoke"
+            aria-label={t('credentials.revokeLabel', { label: credential.deviceLabel })}
+            title={t('credentials.revoke')}
             onClick={() => onRevoke(credential)}
           >
             <TrashIcon />

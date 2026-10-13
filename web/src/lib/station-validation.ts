@@ -1,19 +1,24 @@
 import { z } from 'zod';
+import i18n from './i18n';
+
+// Messages are functions: they are read when a form validates, in the current language.
 
 const country = z.union([
   z.literal(''),
-  z.string().regex(/^[A-Za-z]{2}$/, 'Use a two-letter country code, e.g. MG.'),
+  z.string().regex(/^[A-Za-z]{2}$/, { error: () => i18n.t('validation.country') }),
 ]);
 const language = z.union([
   z.literal(''),
   z
     .string()
     .max(35)
-    .regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, 'Use a language tag, e.g. mg or fr-CA.'),
+    .regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, { error: () => i18n.t('validation.language') }),
 ]);
 const website = z.union([
   z.literal(''),
-  z.url().refine((value) => /^https?:\/\//i.test(value), 'Use an absolute http(s) address.'),
+  z
+    .url()
+    .refine((value) => /^https?:\/\//i.test(value), { error: () => i18n.t('validation.website') }),
 ]);
 
 export const stationSchema = z.object({

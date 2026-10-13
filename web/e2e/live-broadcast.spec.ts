@@ -167,7 +167,7 @@ test('signs up, goes live with a device credential, and shows the listener', asy
     await test.step('dashboard shows the station live with one listener', async () => {
       await page.goto(`/stations/${station.stationId}`);
       await expect(page.getByText('Live', { exact: true })).toBeVisible({ timeout: 45_000 });
-      await expect(page.getByText('1 listeners', { exact: true })).toBeVisible({ timeout: 45_000 });
+      await expect(page.getByText('1 listener', { exact: true })).toBeVisible({ timeout: 45_000 });
     });
 
     await test.step('bitrate above the plan is refused', async () => {

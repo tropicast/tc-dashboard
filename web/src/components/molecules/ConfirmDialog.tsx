@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /** A modal confirmation. The native dialog traps focus, and Escape cancels. */
 export function ConfirmDialog({
@@ -16,6 +17,7 @@ export function ConfirmDialog({
   onCancel: () => void;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
@@ -42,7 +44,7 @@ export function ConfirmDialog({
       {children}
       <p className="actions">
         <button type="button" className="quiet" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </button>
         <button type="button" className="danger" disabled={busy} onClick={onConfirm}>
           {confirmLabel}

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App';
+import i18n from './lib/i18n';
 import { queryClient } from './lib/query-client';
 
 afterEach(() => {
@@ -322,4 +323,21 @@ test('goes home after confirming the email', async () => {
 
   expect(await screen.findByRole('heading', { name: 'Create your workspace' })).toBeInTheDocument();
   expect(confirmed).toBe(true);
+});
+
+test('translates the page content, not only the header, when French is chosen', async () => {
+  localStorage.setItem('language', 'fr');
+  await i18n.changeLanguage('fr');
+  try {
+    renderAt('/stations', (request) =>
+      new URL(request.url).pathname === '/api/v1/auth/me'
+        ? Response.json(signedIn)
+        : Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0 }),
+    );
+    expect(await screen.findByText('Les stations de cet espace de travail.')).toBeInTheDocument();
+    expect(screen.getByText('Aucune station pour l’instant.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Compte' })).toBeInTheDocument();
+  } finally {
+    await i18n.changeLanguage('en');
+  }
 });
