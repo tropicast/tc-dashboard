@@ -12,6 +12,7 @@ export const en = {
     lightTheme: 'Light theme',
     darkTheme: 'Dark theme',
     mainNavigation: 'Main navigation',
+    skipToContent: 'Skip to content',
     systemTheme: 'System theme',
     theme: 'Theme',
     openMenu: 'Open menu',
