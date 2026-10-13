@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App';
@@ -381,4 +381,19 @@ test('does not claim a copy that failed', async () => {
   expect(document.execCommand).toHaveBeenCalledWith('copy');
   expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
+});
+
+test('each page has its own title, page first (#69)', async () => {
+  renderAt('/login', () => Response.json({ title: 'Unauthorized' }, { status: 401 }));
+  await screen.findByRole('heading', { name: 'Sign in' });
+  await waitFor(() => expect(document.title).toBe('Sign in · Tropicast'));
+  cleanup();
+  queryClient.clear();
+
+  renderAt('/stations', (request) =>
+    new URL(request.url).pathname === '/api/v1/auth/me'
+      ? Response.json(signedIn)
+      : Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0 }),
+  );
+  await waitFor(() => expect(document.title).toBe('Stations · Tropicast'));
 });

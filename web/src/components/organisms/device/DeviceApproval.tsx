@@ -15,12 +15,14 @@ import { Notice } from '../../atoms/Notice';
 import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import type { Problem } from '../../../lib/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 type DeviceRequest = components['schemas']['DeviceRequestResponse'];
 
 /** The page a desktop app opens during sign-in (device code flow): check the device, then approve or deny it. */
 export function DeviceApproval() {
   const { t } = useTranslation();
+  useDocumentTitle(t('device.title'));
   const [params, setParams] = useSearchParams();
   const code = params.get('code')?.trim() ?? '';
   return (

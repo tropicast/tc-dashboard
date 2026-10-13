@@ -15,6 +15,7 @@ import { Notice } from '../../atoms/Notice';
 import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
 import type { Station, Tenant } from '../../../lib/types';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 const tenantSchema = z.object({ name: z.string().min(2), slug: z.string().regex(/^[a-z0-9-]+$/) });
 export function Onboarding() {
@@ -161,6 +162,7 @@ function Step({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  useDocumentTitle(title);
   return (
     <section className="mx-auto flex max-w-xl flex-col gap-8">
       <div className="flex flex-col gap-4">

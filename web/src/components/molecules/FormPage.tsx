@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 /** Untitled UI log in / sign up layout: logo, heading and supporting text over a narrow form. */
 export function FormPage({
@@ -13,6 +14,7 @@ export function FormPage({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  useDocumentTitle(title);
   return (
     <main className="flex min-h-dvh flex-col items-center bg-primary px-4 py-12 sm:py-24">
       <div className="flex w-full max-w-90 flex-col gap-8">
