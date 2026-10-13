@@ -77,7 +77,13 @@ export default function StationStats({ stationId }: { stationId: string }) {
       {/* Chart colours come from Untitled UI tokens through currentColor, so they follow the theme. */}
       <div className="h-60 text-xs text-tertiary">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={stats.data.points} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
+          {/* Named for screen readers (#73); the accessibility layer keeps arrow-key exploration. */}
+          <AreaChart
+            data={stats.data.points}
+            margin={{ top: 4, right: 4, bottom: 0, left: -16 }}
+            title={t('stats.chartTitle')}
+            desc={t('stats.chartDescription')}
+          >
             <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.15} />
             <XAxis
               dataKey="start"
@@ -108,6 +114,24 @@ export default function StationStats({ stationId }: { stationId: string }) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
+      {/* The chart's data as text (WCAG 1.1.1): read by screen readers, not shown. */}
+      <table className="sr-only">
+        <caption>{t('stats.tableCaption')}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t('stats.periodStart')}</th>
+            <th scope="col">{t('stats.peakListeners')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stats.data.points.map((point) => (
+            <tr key={point.start}>
+              <td>{formatDateTime(point.start)}</td>
+              <td>{formatNumber(Number(point.peakListeners))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

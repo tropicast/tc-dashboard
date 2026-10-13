@@ -463,3 +463,59 @@ test('moves focus to the new page heading after navigating (#70)', async () => {
   const heading = await screen.findByRole('heading', { level: 1, name: 'Radio One' });
   await waitFor(() => expect(document.activeElement).toBe(heading));
 });
+
+test('the analytics data is also a table for screen readers (#73)', async () => {
+  const station = {
+    id: 's1',
+    publicId: 'radio1',
+    name: 'Radio One',
+    slug: 'radio-one',
+    description: '',
+    genre: 'Music',
+    country: 'MG',
+    language: 'mg',
+    logoUrl: null,
+    website: null,
+    listInDirectory: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    listenerUrls: { mp3: 'https://listen.example.test/stations/radio1/live.mp3', opus: null },
+  };
+  renderAt('/stations/s1', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/stations/s1') return Response.json(station);
+    if (path === '/api/v1/stations/s1/status')
+      return Response.json({ live: false, listeners: 0, outputs: [] });
+    if (path === '/api/v1/stations/s1/credentials') return Response.json([]);
+    if (path === '/api/v1/stations/s1/stats') {
+      return Response.json({
+        peakListeners: 1200,
+        egressBytes: 1_534_000_000,
+        listenerHours: 3.4166,
+        points: [
+          {
+            start: '2026-10-12T10:00:00Z',
+            peakListeners: 5,
+            listenerHours: 0.4,
+            egressBytes: 1000,
+          },
+          {
+            start: '2026-10-12T10:05:00Z',
+            peakListeners: 1200,
+            listenerHours: 3,
+            egressBytes: 2000,
+          },
+        ],
+      });
+    }
+    return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+  });
+
+  const table = await screen.findByRole('table', { name: 'Peak listeners per period' });
+
+  const rows = within(table).getAllByRole('row');
+  expect(rows).toHaveLength(3);
+  expect(within(rows[2]).getByText('1,200')).toBeInTheDocument();
+  expect(screen.getByText('1.5 GB')).toBeInTheDocument();
+  expect(screen.getByText('3 h 25 min')).toBeInTheDocument();
+});
