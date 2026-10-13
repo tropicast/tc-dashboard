@@ -12,7 +12,13 @@ import {
 import { Loading } from './components/molecules/Loading';
 import { api } from './api/client';
 import type { components } from './api/schema';
-import { formatDate, formatDateTime } from './lib/i18n';
+import {
+  formatBytes,
+  formatDate,
+  formatDateTime,
+  formatListeningTime,
+  formatNumber,
+} from './lib/i18n';
 
 export default function StationStats({ stationId }: { stationId: string }) {
   const { t } = useTranslation();
@@ -35,10 +41,21 @@ export default function StationStats({ stationId }: { stationId: string }) {
       </p>
     );
   }
+  const egress = Number(stats.data.egressBytes);
+  const hours = Number(stats.data.listenerHours);
+  // Friendly values (#75); the exact one is in the tooltip, for operators.
   const metrics = [
-    { label: t('stats.peak'), value: stats.data.peakListeners },
-    { label: t('stats.egress'), value: Number(stats.data.egressBytes) / 1_000_000_000 },
-    { label: t('stats.hours'), value: stats.data.listenerHours },
+    { label: t('stats.peak'), value: formatNumber(Number(stats.data.peakListeners)) },
+    {
+      label: t('stats.egress'),
+      value: formatBytes(egress),
+      exact: t('stats.exactBytes', { value: formatNumber(egress) }),
+    },
+    {
+      label: t('stats.hours'),
+      value: formatListeningTime(hours),
+      exact: t('stats.exactHours', { value: formatNumber(hours, 2) }),
+    },
   ];
   return (
     <div className="flex flex-col gap-6">
@@ -51,7 +68,9 @@ export default function StationStats({ stationId }: { stationId: string }) {
             <dt className="text-sm font-medium text-tertiary first-letter:uppercase">
               {metric.label}
             </dt>
-            <dd className="text-display-xs font-semibold text-primary">{metric.value}</dd>
+            <dd className="text-display-xs font-semibold text-primary" title={metric.exact}>
+              {metric.value}
+            </dd>
           </div>
         ))}
       </dl>

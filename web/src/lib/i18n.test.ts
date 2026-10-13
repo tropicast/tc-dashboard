@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { en } from '../locales/en';
 import { fr } from '../locales/fr';
-import i18n from './i18n';
+import i18n, { formatBytes, formatListeningTime } from './i18n';
 
 type Texts = { [key: string]: string | Texts };
 
@@ -46,3 +46,29 @@ test('the page language follows the interface language (#68)', async () => {
   await i18n.changeLanguage('en');
   expect(document.documentElement.lang).toBe('en');
 });
+
+test.each([
+  [0, '0 B', '0 o'],
+  [950, '950 B', '950 o'],
+  [123_456, '123.5 kB', '123,5 ko'],
+  [1_534_000_000, '1.5 GB', '1,5 Go'],
+  [1_534_270_000_000, '1.5 TB', '1,5 To'],
+])('formatBytes(%d) is "%s" in English, "%s" in French (#75)', async (bytes, english, french) => {
+  expect(formatBytes(bytes)).toBe(english);
+  await i18n.changeLanguage('fr');
+  expect(formatBytes(bytes).replace(/\s/g, ' ')).toBe(french);
+});
+
+test.each([
+  [0.25, '15 min', '15 min'],
+  [3.4166, '3 h 25 min', '3 h 25 min'],
+  [2, '2 h', '2 h'],
+  [1250.6, '1,251 h', '1 251 h'],
+])(
+  'formatListeningTime(%d) is "%s" in English, "%s" in French (#75)',
+  async (hours, english, french) => {
+    expect(formatListeningTime(hours)).toBe(english);
+    await i18n.changeLanguage('fr');
+    expect(formatListeningTime(hours).replace(/\s/g, ' ')).toBe(french);
+  },
+);
