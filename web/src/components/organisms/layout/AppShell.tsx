@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useState, type FC, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FC, type ReactNode, type RefObject } from 'react';
 import {
   LogOut01,
   Menu02,
@@ -17,7 +17,7 @@ import {
   ModalOverlay as AriaModalOverlay,
 } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/base/buttons/button';
 import { Dropdown } from '@/components/base/dropdown/dropdown';
 import { NativeSelect } from '@/components/base/select/select-native';
@@ -33,6 +33,43 @@ const themeIcons: Record<Theme, FC<{ className?: string }>> = {
   dark: Moon01,
   system: Monitor01,
 };
+
+/**
+ * After each page change, focus the new page's heading so screen readers read it and the next Tab starts in the
+ * content (WCAG 2.4.3). Pages that load first get their heading a moment later: wait for it, up to 3 s. The first
+ * page load keeps the browser's own focus.
+ */
+function useFocusPageHeading(main: RefObject<HTMLElement | null>) {
+  const { pathname } = useLocation();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const container = main.current;
+    if (!container) return;
+    container.focus({ preventScroll: true });
+    const focusHeading = () => {
+      const heading = container.querySelector<HTMLElement>('h1');
+      if (!heading) return false;
+      heading.tabIndex = -1;
+      heading.classList.add('outline-hidden');
+      // Only if the user has not moved on in the meantime.
+      if (document.activeElement === container || document.activeElement === document.body)
+        heading.focus({ preventScroll: true });
+      return true;
+    };
+    if (focusHeading()) return;
+    const observer = new MutationObserver(() => focusHeading() && observer.disconnect());
+    observer.observe(container, { childList: true, subtree: true });
+    const timeout = window.setTimeout(() => observer.disconnect(), 3000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timeout);
+    };
+  }, [pathname, main]);
+}
 
 /** Untitled UI header navigation: logo, primary nav and actions; a slide-out menu below `lg`. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -56,6 +93,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => wide.removeEventListener('change', close);
   }, []);
   const closeMenu = () => setMenuOpen(false);
+  const main = useRef<HTMLElement>(null);
+  useFocusPageHeading(main);
   const logout = useMutation({
     mutationFn: () => data<void>(api.POST('/api/v1/auth/logout')),
     onSuccess: () => {
@@ -142,7 +181,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </AriaModal>
       </AriaModalOverlay>
 
-      <main className="mx-auto w-full max-w-container flex-1 px-4 py-8 md:px-8 md:py-12">
+      <main
+        ref={main}
+        tabIndex={-1}
+        className="mx-auto w-full max-w-container flex-1 px-4 py-8 outline-hidden md:px-8 md:py-12"
+      >
         {children}
       </main>
     </div>
