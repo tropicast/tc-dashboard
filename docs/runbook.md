@@ -94,6 +94,15 @@ Optional variables: `APP_HOST` (default `app.tropicastradio.com`),
 (`587`), `SOURCE_AUTH_USER` (`icecast`), `BACKUP_PG_IMAGE`
 (`postgres:18-alpine`: match Neon's major version).
 
+Streaming node capacity (optional; defaults match tc-streaming's Icecast):
+`STREAMING_MAX_SOURCES` (`50`, Icecast `<sources>`),
+`STREAMING_MAX_LISTENER_CAPS` (`15000`, the summed listener caps one node
+accepts) and `STREAMING_MAX_LISTENERS_PER_STATION` (`1500`, Icecast
+`<clients>`: a station counts at most this much towards the sum, so a Pro
+cap fits). When new stations get `503 No streaming capacity`, the API logs a
+Critical "Streaming node … is full" with the reason: add a node, or raise the
+limit after checking the node's real load.
+
 Values must not contain a single quote (`'`): the workflow writes them quoted.
 
 ## 2. Provision the node

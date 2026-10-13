@@ -140,6 +140,41 @@ public sealed class ProvisioningTests(PostgresContainer postgres) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task A_Pro_station_does_not_fill_the_node_for_everyone_else()
+    {
+        // #58: a Pro cap (25,000) alone was above the node's 15,000, so every later station was refused.
+        await using var production = new DashboardFactory(postgres)
+        {
+            Settings = new Dictionary<string, string> { ["Streaming:MaxSources"] = "50", ["Streaming:MaxListenerCaps"] = "15000" },
+        };
+        await production.InitializeAsync();
+        await StationAsync(production, "pro");
+
+        var (_, free) = await StationAsync(production);
+
+        Assert.Equal("Radio", free.Name);
+    }
+
+    [Fact]
+    public async Task A_checkout_is_refused_before_payment_when_the_upgraded_station_would_not_fit()
+    {
+        // Two Free stations (100 each); Growth counts 1,500 (the per-station ceiling), so 1,600 > 1,500.
+        await using var small = new DashboardFactory(postgres)
+        {
+            Settings = new Dictionary<string, string> { ["Streaming:MaxListenerCaps"] = "1500" },
+        };
+        await small.InitializeAsync();
+        await StationAsync(small);
+        var (owner, _) = await StationAsync(small);
+
+        var refused = await owner.SendAsync(HttpMethod.Post, "/api/v1/billing/checkout", new { planId = "growth" });
+
+        refused.Status(HttpStatusCode.ServiceUnavailable);
+        Assert.Contains(small.Logs.Lines, l => l.StartsWith("Critical", StringComparison.Ordinal) && l.Contains("is full", StringComparison.Ordinal));
+        Assert.Empty(small.Payments.Checkouts);
+    }
+
+    [Fact]
     public async Task With_the_background_loops_a_plan_change_reaches_the_node_within_seconds()
     {
         await using var live = new DashboardFactory(postgres)

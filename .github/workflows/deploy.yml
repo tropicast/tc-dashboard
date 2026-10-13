@@ -127,6 +127,10 @@ jobs:
           OPERATOR_EMAIL: ${{ vars.OPERATOR_EMAIL }}
           STATS_URL: ${{ vars.STATS_URL }}
           DIRECTORY_ENABLED: ${{ vars.DIRECTORY_ENABLED || 'false' }}
+          # Streaming node capacity (#58); defaults match Icecast's config in tc-streaming.
+          STREAMING_MAX_SOURCES: ${{ vars.STREAMING_MAX_SOURCES || '50' }}
+          STREAMING_MAX_LISTENER_CAPS: ${{ vars.STREAMING_MAX_LISTENER_CAPS || '15000' }}
+          STREAMING_MAX_LISTENERS_PER_STATION: ${{ vars.STREAMING_MAX_LISTENERS_PER_STATION || '1500' }}
           # Monitoring (#16): COMPOSE_PROFILES=monitoring starts Alloy; the API then exports to it.
           COMPOSE_PROFILES: ${{ vars.COMPOSE_PROFILES }}
           # Stripe (#14): secret key and webhook signing secret; price IDs and labels per plan.
@@ -181,7 +185,7 @@ jobs:
                  STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_STARTER STRIPE_PRICE_GROWTH STRIPE_PRICE_PRO
                  PRICE_LABEL_STARTER PRICE_LABEL_GROWTH PRICE_LABEL_PRO BACKUP_S3_ENDPOINT
                  BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY BACKUP_AGE_RECIPIENT
-                 BACKUP_PG_IMAGE)
+                 BACKUP_PG_IMAGE STREAMING_MAX_SOURCES STREAMING_MAX_LISTENER_CAPS STREAMING_MAX_LISTENERS_PER_STATION)
           # Single quotes: Compose reads the values literally ($ stays $).
           # Sent over stdin, never on a command line.
           for name in "${names[@]}"; do

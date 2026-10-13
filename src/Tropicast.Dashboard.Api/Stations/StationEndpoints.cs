@@ -8,7 +8,6 @@ using Tropicast.Dashboard.Application.Stations;
 using Tropicast.Dashboard.Domain;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
-using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Stations;
@@ -201,24 +200,15 @@ internal static partial class StationEndpoints
     private static async Task<bool> NodeFullAsync(AppDbContext db, StreamingOptions streaming, Plan plan, ILogger logger,
         CancellationToken cancellationToken)
     {
-        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"node:" + streaming.Node}))", cancellationToken);
-        var assigned = await db.StreamAssignments.IgnoreQueryFilters([AppDbContext.TenantFilter])
-            .Where(a => a.Node == streaming.Node && a.Station.DeletedAt == null)
-            // Same stations as the node's stations.json: suspended tenants are not provisioned.
-            .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.Status == TenantStatus.Active),
-                a => a.Station.TenantId, t => t.Id, (_, t) => t.PlanId)
-            .Join(db.Plans, planId => planId, p => p.Id, (_, p) => p)
-            .ToListAsync(cancellationToken);
-        var reason = NodeCapacity.WhyNot(assigned, plan, new NodeLimits(streaming.MaxSources, streaming.MaxListenerCaps));
+        await NodeLoad.LockAsync(db, streaming.Node, cancellationToken);
+        var load = await NodeLoad.ReadAsync(db, streaming.Node, cancellationToken);
+        var reason = NodeCapacity.WhyNot(load.Select(s => s.Plan), plan, streaming.Limits);
         if (reason is not null)
         {
-            LogNodeFull(logger, streaming.Node, reason);
+            NodeLoad.LogNodeFull(logger, streaming.Node, reason);
         }
         return reason is not null;
     }
-
-    [LoggerMessage(Level = LogLevel.Critical, Message = "Streaming node {Node} is full: {Reason}. Add a node or raise its limits.")]
-    private static partial void LogNodeFull(ILogger logger, string node, string reason);
 
     /// <summary>Saves; a duplicate slug answers 409, a concurrent change 412.</summary>
     private static async Task<ProblemHttpResult?> SaveAsync(AppDbContext db, CancellationToken cancellationToken)

@@ -39,4 +39,15 @@ public sealed class ProvisioningRulesTests
         Assert.Contains("sources", NodeCapacity.WhyNot([Plan.Free, Plan.Free], Plan.Free, limits), StringComparison.Ordinal);
         Assert.Contains("listener caps", NodeCapacity.WhyNot([Plan.Starter], Plan.Starter, limits), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void A_station_counts_at_most_the_node_ceiling_so_a_Pro_plan_fits()
+    {
+        var limits = new NodeLimits();
+        Assert.Equal(1_500, NodeCapacity.ListenersOf(Plan.Pro, limits));
+        Assert.Equal(100, NodeCapacity.ListenersOf(Plan.Free, limits));
+        Assert.Null(NodeCapacity.WhyNot([Plan.Pro], Plan.Free, limits));
+        Assert.Null(NodeCapacity.WhyNot(Enumerable.Repeat(Plan.Pro, 10), limits));
+        Assert.Contains("15000", NodeCapacity.WhyNot(Enumerable.Repeat(Plan.Pro, 10), Plan.Free, limits), StringComparison.Ordinal);
+    }
 }
