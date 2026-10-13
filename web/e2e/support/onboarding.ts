@@ -81,9 +81,9 @@ export async function signUpWithStation(
   await page.goto(`${confirmation.pathname}${confirmation.search}`);
   await expect(page.getByRole('heading', { name: 'Confirm your email' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('button', { name: 'Email sent' })).toBeVisible();
+  // Confirmed: the page goes home, and the guard sends this signed-out visitor to sign in (#60).
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 
-  await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
