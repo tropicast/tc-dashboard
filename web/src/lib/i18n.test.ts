@@ -39,3 +39,10 @@ test('French counts follow French plural rules, including large numbers', async 
   expect(i18n.t('common.listeners', { count: 2 })).toBe('2 auditeurs');
   expect(i18n.t('common.listeners', { count: 1_000_000 })).toBe('1000000 auditeurs');
 });
+
+test('the page language follows the interface language (#68)', async () => {
+  await i18n.changeLanguage('fr');
+  expect(document.documentElement.lang).toBe('fr');
+  await i18n.changeLanguage('en');
+  expect(document.documentElement.lang).toBe('en');
+});

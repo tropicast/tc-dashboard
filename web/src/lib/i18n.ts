@@ -41,8 +41,17 @@ void i18n.use(initReactI18next).init({
   debug: false,
   interpolation: { escapeValue: false },
 });
-syncValidationLanguage(i18n.language);
-i18n.on('languageChanged', syncValidationLanguage);
+/** Screen readers pick their pronunciation from `<html lang>` (WCAG 3.1.1). */
+function syncDocumentLanguage(language: string) {
+  document.documentElement.lang = language.startsWith('fr') ? 'fr' : 'en';
+}
+
+function onLanguage(language: string) {
+  syncValidationLanguage(language);
+  syncDocumentLanguage(language);
+}
+onLanguage(i18n.language);
+i18n.on('languageChanged', onLanguage);
 
 /** Formats a date and time in the interface language. */
 export function formatDateTime(value: string | number | Date) {
