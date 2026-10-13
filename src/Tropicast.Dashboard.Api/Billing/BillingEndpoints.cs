@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.Stations;
 using Tropicast.Dashboard.Application.Billing;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
@@ -79,7 +80,8 @@ internal static partial class BillingEndpoints
             .WithSummary("The tenant's plan, subscription and the plans on offer.");
         billing.MapPost("/checkout", CheckoutAsync).RequireAuthorization(TenantPolicies.Owner).AddEndpointFilter<RequestValidation>()
             .WithSummary("Starts a hosted checkout for a paid plan; redirect the browser to the returned URL.")
-            .ProducesProblem(StatusCodes.Status409Conflict);
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
         billing.MapPost("/portal", PortalAsync).RequireAuthorization(TenantPolicies.Owner)
             .WithSummary("Opens the billing portal: payment methods, invoices, plan changes (applied at period end), cancellation.");
         billing.MapGet("/usage", UsageAsync).RequireAuthorization(TenantPolicies.Admin)
@@ -107,7 +109,7 @@ internal static partial class BillingEndpoints
 
     private static async Task<Results<Ok<RedirectResponse>, ProblemHttpResult>> CheckoutAsync(CheckoutRequestBody request, HttpContext context,
         UserManager<AppUser> users, AppDbContext db, IPaymentProvider payments, IOptions<BillingOptions> options, IOptions<AppOptions> app,
-        CancellationToken cancellationToken)
+        IOptions<StreamingOptions> streaming, ILoggerFactory loggers, CancellationToken cancellationToken)
     {
         if (!options.Value.Enabled || !payments.Sells(request.PlanId))
         {
@@ -119,6 +121,16 @@ internal static partial class BillingEndpoints
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict,
                 title: "This tenant already has a subscription: change or cancel it in the billing portal.");
+        }
+        // Before taking a payment: the upgraded stations must still fit on their node (#58).
+        if (await db.Plans.SingleOrDefaultAsync(p => p.Id == request.PlanId, cancellationToken) is { } plan
+            && NodeLoad.WhyNotOnPlan(await NodeLoad.ReadAsync(db, streaming.Value.Node, cancellationToken), tenant.Id, plan,
+                streaming.Value.Limits) is { } reason)
+        {
+            var logger = loggers.CreateLogger(typeof(BillingEndpoints));
+            NodeLoad.LogNodeFull(logger, streaming.Value.Node, reason);
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "No streaming capacity is free for this plan right now. The operator has been alerted; try again later.");
         }
         var user = await users.GetUserAsync(context.User) ?? throw new InvalidOperationException("Signed-in user not found.");
         var account = new Uri(new Uri(app.Value.PublicBaseUrl), "/account");
