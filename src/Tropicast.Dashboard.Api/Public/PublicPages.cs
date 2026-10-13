@@ -45,7 +45,7 @@ internal static class PublicPages
         const a=new Audio();a.preload='none';
         const s=d.streams.find(x=>a.canPlayType(x.format==='Opus'?'audio/ogg; codecs="opus"':x.contentType))||d.streams[d.streams.length-1];
         let want=false,delay=1000,timer=0;
-        const ui=()=>{b.textContent=want?d.t.stop:d.t.play;b.setAttribute('aria-pressed',want);b.disabled=!want&&d.live===false;};
+        const ui=()=>{b.textContent=want?d.t.stop:d.t.play;b.disabled=!want&&d.live===false;};
         const live=v=>{d.live=v;badge.textContent=v===true?d.t.live:v===false?d.t.offline:'';badge.hidden=v==null;badge.className='badge'+(v?' live':'');ui();};
         const start=()=>{clearTimeout(timer);a.src=s.url+(s.url.includes('?')?'&':'?')+'t='+Date.now();a.play().catch(retry);};
         function retry(){if(!want)return;note.textContent=d.t.reconnecting;clearTimeout(timer);timer=setTimeout(start,delay);delay=Math.min(delay*2,30000);}
@@ -125,7 +125,7 @@ internal static class PublicPages
             <body{(embed ? " class=\"embed\"" : "")}>
             <main>
             <div class="head">{logo}<div><h1>{title}</h1>{(meta.Length > 0 ? $"""<p class="meta">{Html.Encode(meta)}</p>""" : "")}<span id="status" class="badge" hidden></span></div></div>
-            <div class="player"><button id="play" type="button" aria-pressed="false">{t["play"]}</button><p id="note" role="status" aria-live="polite"></p></div>
+            <div class="player"><button id="play" type="button">{t["play"]}</button><p id="note" role="status" aria-live="polite"></p></div>
             {body}
             </main>
             <script id="station-data" type="application/json">{data}</script>
