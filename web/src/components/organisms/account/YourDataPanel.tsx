@@ -19,19 +19,6 @@ export function YourDataPanel() {
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
   const form = useForm({ defaultValues: { password: '' } });
-  const download = useMutation({
-    mutationFn: async () => {
-      const exported = await data<unknown>(api.GET('/api/v1/auth/account/export'));
-      const url = URL.createObjectURL(
-        new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' }),
-      );
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `tropicast-account-${new Date().toISOString().slice(0, 10)}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-    },
-  });
   const remove = useMutation({
     mutationFn: (password: string) =>
       data<void>(api.DELETE('/api/v1/auth/account', { body: { password } })),
@@ -44,13 +31,13 @@ export function YourDataPanel() {
   return (
     <Card title={t('account.yourData')} description={t('account.yourDataHint')}>
       <div className="flex flex-wrap gap-3">
+        {/* A plain download: the browser saves the API's attachment (file name, no-store) itself. */}
         <Button
           color="secondary"
           size="md"
           iconLeading={Download01}
-          isLoading={download.isPending}
-          showTextWhileLoading
-          onPress={() => download.mutate()}
+          href="/api/v1/auth/account/export"
+          download
         >
           {t('account.exportData')}
         </Button>
@@ -63,7 +50,6 @@ export function YourDataPanel() {
           {t('account.deleteAccount')}
         </Button>
       </div>
-      <Notice error={download.error} />
       {confirming && (
         <ConfirmDialog
           title={t('account.deleteTitle')}

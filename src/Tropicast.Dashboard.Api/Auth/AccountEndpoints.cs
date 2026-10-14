@@ -50,7 +50,7 @@ internal static class AccountEndpoints
                 + "Owner of a workspace that still has other members, stations or a paid subscription.");
     }
 
-    private static async Task<Results<NoContent, ValidationProblem>> AcceptTermsAsync(AcceptTermsRequest request, HttpContext context,
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> AcceptTermsAsync(AcceptTermsRequest request, HttpContext context,
         UserManager<AppUser> users, TimeProvider time)
     {
         if (request.Version != Legal.TermsVersion)
@@ -62,7 +62,11 @@ internal static class AccountEndpoints
         }
         var user = await users.GetUserAsync(context.User) ?? throw new InvalidOperationException("Signed-in user not found.");
         user.AcceptTerms(Legal.TermsVersion, time.GetUtcNow());
-        await users.UpdateAsync(user);
+        if (!(await users.UpdateAsync(user)).Succeeded)
+        {
+            // E.g. the account changed in another tab meanwhile: nothing was saved.
+            return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Your account changed meanwhile. Try again.");
+        }
         return TypedResults.NoContent();
     }
 
@@ -110,8 +114,9 @@ internal static class AccountEndpoints
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         // Not tracked: the database cascades them with the user (and with a deleted workspace), not EF.
+        // Ordered: concurrent deletions lock the workspace rows below in the same order, so they cannot deadlock.
         var memberships = await db.Memberships.IgnoreQueryFilters([AppDbContext.TenantFilter]).AsNoTracking()
-            .Where(m => m.UserId == user.Id).ToListAsync(cancellationToken);
+            .Where(m => m.UserId == user.Id).OrderBy(m => m.TenantId).ToListAsync(cancellationToken);
         var emptyTenants = new List<Guid>();
         foreach (var owned in memberships.Where(m => m.Role == MembershipRole.Owner))
         {
@@ -134,8 +139,7 @@ internal static class AccountEndpoints
                 return Conflict($"Delete the stations of \"{tenant.Name}\" first.");
             }
             if (await db.Subscriptions.IgnoreQueryFilters([AppDbContext.TenantFilter]).AnyAsync(s => s.TenantId == tenant.Id
-                    && (s.Status == SubscriptionStatus.Trialing || s.Status == SubscriptionStatus.Active
-                        || s.Status == SubscriptionStatus.PastDue), cancellationToken))
+                    && s.Status != SubscriptionStatus.Canceled, cancellationToken))
             {
                 return Conflict($"Cancel the subscription of \"{tenant.Name}\" in the billing portal first.");
             }
@@ -143,10 +147,7 @@ internal static class AccountEndpoints
         }
 
         // Desktop devices: signed out, and the broadcast credentials they got for themselves revoked.
-        var sessions = await db.DeviceSessions.Where(s => s.UserId == user.Id && s.RevokedAt == null).ToListAsync(cancellationToken);
-        sessions.ForEach(s => s.Revoke(now));
-        await db.SaveChangesAsync(cancellationToken);
-        await DeviceCredentials.RevokeAsync(db, db.DeviceSessions.Where(s => s.UserId == user.Id), now, cancellationToken);
+        await AuthEndpoints.RevokeAllDevicesAsync(db, user.Id, now, cancellationToken);
 
         // The audit log stays with the workspace, without the actor.
         await db.AuditEntries.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(e => e.ActorUserId == user.Id)
@@ -157,9 +158,6 @@ internal static class AccountEndpoints
                 membership.Role.ToString(), now));
         }
         await db.SaveChangesAsync(cancellationToken);
-        // Invitations hold the inviter's ID; their addresses belong to the workspace's invitees.
-        await db.Invitations.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(i => i.InvitedBy == user.Id)
-            .ExecuteDeleteAsync(cancellationToken);
         // A workspace the user alone used goes too, unless deleted stations keep it: their history stays for accounting,
         // with no member.
         var allStations = db.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter, AppDbContext.DeletedFilter]);
@@ -168,11 +166,6 @@ internal static class AccountEndpoints
             .ExecuteDeleteAsync(cancellationToken);
 
         // Memberships, device sessions and requests, security events and Identity rows cascade with the user.
-        // The tenant access check of this request may track a membership the database already cascaded away.
-        foreach (var entry in db.ChangeTracker.Entries<Membership>().ToList())
-        {
-            entry.State = EntityState.Detached;
-        }
         var result = await users.DeleteAsync(user);
         if (!result.Succeeded)
         {

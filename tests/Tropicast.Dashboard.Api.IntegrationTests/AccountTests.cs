@@ -139,8 +139,16 @@ public sealed class AccountTests(DashboardFactory factory) : IClassFixture<Dashb
                 .IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(s => s.TenantId == tenantId)
                 .ExecuteUpdateAsync(set => set.SetProperty(s => s.DeletedAt, DateTimeOffset.UtcNow), Token);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Subscriptions.Add(Subscription.Create(tenantId, Plan.Starter.Id, SubscriptionStatus.Active, DateTimeOffset.UtcNow));
+            // Incomplete: checkout or 3-D Secure still pending, so Stripe may still charge.
+            db.Subscriptions.Add(Subscription.Create(tenantId, Plan.Starter.Id, SubscriptionStatus.Incomplete, DateTimeOffset.UtcNow));
             await db.SaveChangesAsync(Token);
+        }
+        await AssertRefusedAsync(owner, "Cancel the subscription");
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<AppDbContext>().Subscriptions.IgnoreQueryFilters([AppDbContext.TenantFilter])
+                .Where(s => s.TenantId == tenantId)
+                .ExecuteUpdateAsync(set => set.SetProperty(s => s.Status, SubscriptionStatus.Active), Token);
         }
         await AssertRefusedAsync(owner, "Cancel the subscription");
     }
@@ -157,19 +165,35 @@ public sealed class AccountTests(DashboardFactory factory) : IClassFixture<Dashb
         var email = Browser.Unique("leaver");
         var userId = await leaver.SignUpAndLoginAsync(email);
         var ownTenant = await leaver.CreateTenantAsync();
+        Guid invitationId;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Memberships.Add(Membership.Create(sharedTenant, userId, MembershipRole.Admin, DateTimeOffset.UtcNow));
             db.AuditEntries.Add(AuditEntry.Record(sharedTenant, userId, "station.created", "Station", "x", null, DateTimeOffset.UtcNow));
+            var invitation = Invitation.Create(sharedTenant, Browser.Unique("invitee"), MembershipRole.Broadcaster,
+                new string('a', 64), userId, DateTimeOffset.UtcNow);
+            db.Invitations.Add(invitation);
+            invitationId = invitation.Id;
             await db.SaveChangesAsync(Token);
         }
+        // The same account, signed in on another browser.
+        var otherBrowser = new Browser(factory);
+        (await otherBrowser.LoginAsync(email)).Status(HttpStatusCode.NoContent);
         var tokens = await (await new Browser(factory).Http.PostAsJsonAsync("/api/v1/auth/token",
             new { email, password = Browser.Password, deviceName = "Laptop" }, Token)).Content.ReadFromJsonAsync<JsonElement>(Token);
 
         (await leaver.SendAsync(HttpMethod.Delete, "/api/v1/auth/account", new { password = Browser.Password })).Status(HttpStatusCode.NoContent);
 
         (await leaver.Http.GetAsync("/api/v1/auth/me", Token)).Status(HttpStatusCode.Unauthorized);
+        // Other sessions end at once, not when their cookie or access token is next validated.
+        (await otherBrowser.Http.GetAsync("/api/v1/auth/me", Token)).Status(HttpStatusCode.Unauthorized);
+        (await otherBrowser.Http.GetAsync("/api/v1/auth/account/export", Token)).Status(HttpStatusCode.Unauthorized);
+        using (var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me"))
+        {
+            request.Headers.Authorization = Browser.Bearer(tokens.GetProperty("accessToken").GetString()!);
+            (await new Browser(factory).Http.SendAsync(request, Token)).Status(HttpStatusCode.Unauthorized);
+        }
         (await leaver.LoginAsync(email)).Status(HttpStatusCode.Unauthorized);
         (await leaver.Http.PostAsJsonAsync("/api/v1/auth/token/refresh",
             new { refreshToken = tokens.GetProperty("refreshToken").GetString() }, Token)).Status(HttpStatusCode.Unauthorized);
@@ -187,6 +211,9 @@ public sealed class AccountTests(DashboardFactory factory) : IClassFixture<Dashb
             var audit = db.AuditEntries.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(e => e.TenantId == sharedTenant);
             Assert.False(await audit.AnyAsync(e => e.ActorUserId == userId, Token));
             Assert.True(await audit.AnyAsync(e => e.Action == AccountEndpoints.AccountDeleted && e.ActorUserId == null, Token));
+            // Their pending invitations stay valid for the workspace, without the inviter.
+            var kept = await db.Invitations.IgnoreQueryFilters([AppDbContext.TenantFilter]).SingleAsync(i => i.Id == invitationId, Token);
+            Assert.Null(kept.InvitedBy);
         }
         (await owner.Http.GetAsync("/api/v1/auth/me", Token)).Status(HttpStatusCode.OK);
     }

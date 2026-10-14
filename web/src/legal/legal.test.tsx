@@ -163,3 +163,48 @@ test('deletes the account after confirming with the password', async () => {
     password: 'my secret passphrase',
   });
 });
+
+test('someone who does not accept new terms can still reach their data or sign out', async () => {
+  const fetch = renderAt('/', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json({ ...me, termsAccepted: false });
+    if (path === '/api/v1/auth/logout') return new Response(null, { status: 204 });
+    if (path.endsWith('/members') || path === '/api/v1/auth/devices') return Response.json([]);
+    return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+  });
+  expect(
+    await screen.findByRole('heading', { name: 'Our terms have changed' }),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: 'Download my data or delete my account' }));
+  // The Account page stays open without accepting.
+  expect(await screen.findByRole('link', { name: 'Download my data' })).toHaveAttribute(
+    'href',
+    '/api/v1/auth/account/export',
+  );
+  expect(screen.getByRole('button', { name: 'Delete account' })).toBeInTheDocument();
+  expect(calls(fetch, 'POST', '/api/v1/auth/terms')).toHaveLength(0);
+});
+
+test('the terms prompt signs out without accepting', async () => {
+  const fetch = renderAt('/', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json({ ...me, termsAccepted: false });
+    return new Response(null, { status: 204 });
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+  await waitFor(() => expect(calls(fetch, 'POST', '/api/v1/auth/logout')).toHaveLength(1));
+  expect(calls(fetch, 'POST', '/api/v1/auth/terms')).toHaveLength(0);
+});
+
+test('an app older than the API reloads before accepting the new version', async () => {
+  const fetch = renderAt('/', (request) =>
+    new URL(request.url).pathname === '/api/v1/auth/me'
+      ? Response.json({ ...me, termsVersion: '2099-01-01', termsAccepted: false })
+      : new Response(null, { status: 204 }),
+  );
+  expect(
+    await screen.findByRole('button', { name: 'Reload to read the new version' }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Accept and continue' })).not.toBeInTheDocument();
+  expect(calls(fetch, 'POST', '/api/v1/auth/terms')).toHaveLength(0);
+});

@@ -216,7 +216,7 @@ internal static class AuthSetup
     }
 
     /// <summary>Authentication scheme names are case-insensitive (RFC 9110).</summary>
-    private static bool IsBearer(HttpRequest request)
+    internal static bool IsBearer(HttpRequest request)
         => request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
 
     private static Task SetStatus(HttpResponse response, int status)

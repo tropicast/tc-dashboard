@@ -196,6 +196,8 @@ export const fr: Locale = {
     updatedBody:
       'Lisez les Conditions d’utilisation et la Politique de confidentialité mises à jour, puis acceptez-les pour continuer à utiliser Tropicast.',
     accept: 'Accepter et continuer',
+    reload: 'Recharger pour lire la nouvelle version',
+    manageAccount: 'Télécharger mes données ou supprimer mon compte',
     back: 'Retour à Tropicast',
   },
   account: {

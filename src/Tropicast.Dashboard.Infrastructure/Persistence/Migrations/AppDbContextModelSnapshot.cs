@@ -726,7 +726,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
-                    b.Property<Guid>("InvitedBy")
+                    b.Property<Guid?>("InvitedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("invited_by");
 
@@ -1460,8 +1460,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Infrastructure.Identity.AppUser", null)
                         .WithMany()
                         .HasForeignKey("InvitedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_invitations_users_invited_by");
 
                     b.HasOne("Tropicast.Dashboard.Domain.Tenants.Tenant", null)

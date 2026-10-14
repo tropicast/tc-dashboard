@@ -24,7 +24,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   if (me.isError) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
-  // A new version of the terms must be accepted before going on.
-  if (me.data.termsAccepted === false) return <TermsPrompt />;
+  // A new version of the terms must be accepted before going on; the Account page stays open, so someone who
+  // refuses can still download their data or delete their account.
+  if (me.data.termsAccepted === false && location.pathname !== '/account') {
+    return <TermsPrompt version={me.data.termsVersion} />;
+  }
   return <>{children}</>;
 }

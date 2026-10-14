@@ -190,6 +190,8 @@ export const en = {
     updatedBody:
       'Please read the updated Terms of Service and Privacy Policy, then accept them to keep using Tropicast.',
     accept: 'Accept and continue',
+    reload: 'Reload to read the new version',
+    manageAccount: 'Download my data or delete my account',
     back: 'Back to Tropicast',
   },
   account: {

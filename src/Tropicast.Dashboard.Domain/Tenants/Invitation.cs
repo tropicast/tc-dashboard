@@ -18,7 +18,8 @@ public sealed class Invitation : ITenantOwned
     public MembershipRole Role { get; private set; }
     /// <summary>Lowercase hex SHA-256 of the token in the link.</summary>
     public string TokenHash { get; private set; } = null!;
-    public Guid InvitedBy { get; private set; }
+    /// <summary>Who sent it; null once that account is deleted.</summary>
+    public Guid? InvitedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? AcceptedAt { get; private set; }

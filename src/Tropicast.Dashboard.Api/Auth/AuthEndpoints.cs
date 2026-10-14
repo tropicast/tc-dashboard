@@ -357,7 +357,8 @@ internal static class AuthEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task RevokeAllDevicesAsync(AppDbContext db, Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>Signs every desktop device of the user out and revokes the broadcast credentials they got for themselves.</summary>
+    internal static async Task RevokeAllDevicesAsync(AppDbContext db, Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var sessions = await db.DeviceSessions.Where(s => s.UserId == userId && s.RevokedAt == null).ToListAsync(cancellationToken);
         sessions.ForEach(s => s.Revoke(now));

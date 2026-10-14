@@ -138,7 +138,7 @@ internal sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitat
     public void Configure(EntityTypeBuilder<Invitation> builder)
     {
         builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.InvitedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(e => e.InvitedBy).OnDelete(DeleteBehavior.SetNull);
         builder.Property(e => e.Email).HasMaxLength(256);
         builder.Property(e => e.TokenHash).HasMaxLength(64).IsFixedLength();
         builder.HasIndex(e => e.TokenHash).IsUnique();

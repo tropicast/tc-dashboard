@@ -53,16 +53,25 @@ EU-hosted tool.
 `DELETE /api/v1/auth/account` checks the password, then in one transaction:
 
 1. **Refuses (409)** while the user is the last Owner of a workspace that still
-   has other members, active stations, or a trialing, active or past-due
-   subscription. The message says what to do first.
+   has other members, active stations, or a subscription that is not canceled
+   (including `Incomplete`: a checkout or 3-D Secure step Stripe may still
+   charge for). The message says what to do first. Workspace rows are locked in
+   ID order, so concurrent deletions cannot deadlock.
 2. Signs out every desktop device and revokes the broadcast credentials those
    devices got for themselves.
 3. Removes the user from audit entries (`actor_user_id = NULL`) and records
    `account.deleted` in each shared workspace.
-4. Deletes the invitations the user sent, and the workspaces they alone used,
-   unless deleted stations keep a workspace for its records (it stays, with no
-   member).
+4. Deletes the workspaces they alone used, unless deleted stations keep a
+   workspace for its records (it stays, with no member). Invitations they sent
+   stay valid, with `invited_by = NULL`.
 5. Deletes the user. Memberships, device sessions and requests, security
    events and Identity rows cascade. The browser session ends.
+
+Every other session ends at once: the API answers 401 to any cookie or access
+token whose user no longer exists (`TenantAccessMiddleware`), instead of
+waiting for the cookie's security stamp check or the token's expiry.
+
+When a new terms version is published, a user who does not accept it can still
+open the Account page (download, delete) or sign out from the prompt.
 
 Backups still hold the account for up to 30 days.
