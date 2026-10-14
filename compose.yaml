@@ -48,7 +48,7 @@ services:
 
   # Development SMTP server: every email lands in its web UI, nothing is delivered.
   mail:
-    image: axllent/mailpit:v1.31.4
+    image: axllent/mailpit:v1.31.5
     ports:
       - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
 
