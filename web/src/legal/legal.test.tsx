@@ -150,6 +150,8 @@ test('deletes the account after confirming with the password', async () => {
     if (path.endsWith('/members') || path === '/api/v1/auth/devices') return Response.json([]);
     return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
   });
+  // The signed-in shell links to the legal pages too.
+  expect(await screen.findByRole('navigation', { name: 'Legal' })).toBeInTheDocument();
   fireEvent.click(await screen.findByRole('button', { name: 'Delete account' }));
   const dialog = await screen.findByRole('dialog', { name: 'Delete your account?' });
   fireEvent.change(within(dialog).getByLabelText('Your password'), {
