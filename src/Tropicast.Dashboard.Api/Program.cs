@@ -48,7 +48,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // OTEL_EXPORTER_OTLP_ENDPOINT is set; otherwise collected but not sent.
 var otlp = !string.IsNullOrEmpty(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 var telemetry = builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("tc-dashboard", serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString()))
+    .ConfigureResource(resource => resource.AddService("tc-dashboard", serviceVersion: ApiEndpoints.AppVersion))
     .WithTracing(tracing =>
     {
         tracing.AddAspNetCoreInstrumentation(options => options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))

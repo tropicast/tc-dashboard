@@ -1,0 +1,150 @@
+name: Release
+
+# Push a tag such as v0.2.0 (or v0.2.0-rc.1) on a commit that is on main (#96). The tag is the only place
+# the version is set: the images are built with it and the running API reports it (/api/v1/version, OTel).
+#   ghcr.io/tropicast/dashboard:<version>             API + SPA (also :latest for non-pre-release tags)
+#   ghcr.io/tropicast/dashboard-migrations:<version>  migration bundle
+# Then a DRAFT GitHub Release is created with the CHANGELOG.md section as notes. Deploying stays manual:
+# run deploy.yml with ref=v<version>.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check tag format, branch and changelog
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$tag' must look like v1.2.3 or v1.2.3-rc.1."
+            exit 1
+          fi
+          core="${BASH_REMATCH[1]}"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::Tag $tag is not on main."; exit 1; }
+          # Pre-release tags use their base version's section.
+          grep -Eq "^## \[${core//./\\.}\]" CHANGELOG.md ||
+            { echo "::error::CHANGELOG.md has no '## [$core]' section. Rename Unreleased to it before tagging."; exit 1; }
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${BASH_REMATCH[2]}" ]]; then echo "prerelease=true"; else echo "prerelease=false"; fi >> "$GITHUB_OUTPUT"
+
+  images:
+    name: Images
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      LATEST: ${{ needs.verify.outputs.prerelease == 'false' }}
+    steps:
+      # Per-job Docker config: keep registry logins and buildx state in this job.
+      - name: Isolate the Docker config
+        run: |
+          mkdir -p "$RUNNER_TEMP/docker"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          # BuildKit from Google's Docker Hub mirror: Docker Hub refuses or times out on shared runners.
+          driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      # Rebuilt rather than retagged from image.yml: the version is compiled into the API. The layer cache
+      # from image.yml makes this mostly a re-publish.
+      - name: API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          build-args: VERSION=${{ env.VERSION }}
+          tags: |
+            ghcr.io/tropicast/dashboard:${{ env.VERSION }}
+            ${{ env.LATEST == 'true' && 'ghcr.io/tropicast/dashboard:latest' || '' }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,mode=max,scope=dashboard
+
+      - name: Migration bundle image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: migrations
+          push: true
+          build-args: VERSION=${{ env.VERSION }}
+          tags: |
+            ghcr.io/tropicast/dashboard-migrations:${{ env.VERSION }}
+            ${{ env.LATEST == 'true' && 'ghcr.io/tropicast/dashboard-migrations:latest' || '' }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=dashboard-migrations
+          cache-to: type=gha,mode=max,scope=dashboard-migrations
+
+      - name: Check the API reports the version
+        run: |
+          docker run -d --name dashboard -p 127.0.0.1:8080:8080 "ghcr.io/tropicast/dashboard:$VERSION"
+          trap 'docker rm -f dashboard > /dev/null' EXIT
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/health/live > /dev/null && break; sleep 1; done
+          reported=$(curl -fsS http://127.0.0.1:8080/api/v1/version | jq -r .version)
+          [[ "$reported" == "$VERSION" ]] || { docker logs dashboard; echo "::error::The image reports '$reported', expected '$VERSION'."; exit 1; }
+          echo "The image reports $reported."
+
+  publish:
+    name: Draft GitHub Release
+    needs: [verify, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          core="${VERSION%%-*}"
+          # The CHANGELOG.md section for this version, then GitHub's list of merged PRs (.github/release.yml).
+          awk -v v="$core" '/^## \[/ { on = index($0, "[" v "]") > 0; next } on' CHANGELOG.md > notes.md
+          {
+            cat notes.md
+            echo
+            echo "**Images:** \`ghcr.io/tropicast/dashboard:$VERSION\`, \`ghcr.io/tropicast/dashboard-migrations:$VERSION\`"
+            echo
+            echo "Deploy: run the **Deploy** workflow with \`ref=$GITHUB_REF_NAME\`."
+          } > release-notes.md
+          prerelease=()
+          if [[ "$PRERELEASE" == true ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft "${prerelease[@]}" \
+            --title "Tropicast Dashboard $VERSION" --verify-tag \
+            --notes-file release-notes.md --generate-notes

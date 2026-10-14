@@ -15,7 +15,11 @@ internal static class ApiEndpoints
             .ExcludeFromDescription();
     }
 
-    private static string AppVersion { get; } =
+    /// <summary>
+    /// Version of this build without the commit suffix: the release tag's version (<c>-p:Version</c>), or the
+    /// <c>0.0.0</c> development placeholder from Directory.Build.props.
+    /// </summary>
+    internal static string AppVersion { get; } =
         typeof(ApiEndpoints).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
         ?? "0.0.0";
 }

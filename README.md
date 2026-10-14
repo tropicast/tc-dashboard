@@ -395,8 +395,13 @@ behind the `IPaymentProvider` port; no card data reaches the API.
 
 `.github/workflows/ci.yml` runs on GitHub-hosted runners: .NET build and
 tests plus the stale-client check, web format/lint/test/build, and a Docker
-image build with a `/health` and SPA smoke test. Pull request runs are
+image build with a `/health`, SPA and version smoke test. Pull request runs are
 cancelled when superseded; runs on `main` always finish.
+
+Releases are tag-driven: pushing `v1.2.3` (or `v1.2.3-rc.1`) on `main` builds
+versioned images and drafts a GitHub Release from [`CHANGELOG.md`](CHANGELOG.md).
+The tag is the only place the version is set; the repository holds a `0.0.0`
+placeholder. Steps: [Releasing](docs/runbook.md#releasing).
 
 ## Production
 
@@ -406,13 +411,14 @@ node, which calls source auth over it. The database is Neon PostgreSQL, with
 nightly encrypted dumps to object storage, a daily backup check, and a monthly
 restore test run offline.
 
-| Path                           | What                                                                                      |
-| ------------------------------ | ----------------------------------------------------------------------------------------- |
-| `infra/terraform`              | server, firewall, primary IPs, private network, Cloudflare DNS                            |
-| `infra/ansible`                | hardening, Docker, deploy user, backup timer                                              |
-| `deploy/`                      | production Compose file, Caddyfile, `deploy.sh`, `backup.sh`, `restore-test.sh`           |
-| `.github/workflows/image.yml`  | images `ghcr.io/tropicast/dashboard{,-migrations}:sha-<commit>` for each commit on `main` |
-| `.github/workflows/deploy.yml` | manual deploy: migrate, swap, health check, automatic return to the running release       |
+| Path                            | What                                                                                                        |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `infra/terraform`               | server, firewall, primary IPs, private network, Cloudflare DNS                                              |
+| `infra/ansible`                 | hardening, Docker, deploy user, backup timer                                                                |
+| `deploy/`                       | production Compose file, Caddyfile, `deploy.sh`, `backup.sh`, `restore-test.sh`                             |
+| `.github/workflows/image.yml`   | images `ghcr.io/tropicast/dashboard{,-migrations}:sha-<commit>` for each commit on `main`                   |
+| `.github/workflows/release.yml` | on a `v*` tag: images `:<version>`, draft GitHub Release from `CHANGELOG.md`                                |
+| `.github/workflows/deploy.yml`  | manual deploy (commit or release tag): migrate, swap, health check, automatic return to the running release |
 
 Setup, deploy, rollback, restore and secret rotation:
 [docs/runbook.md](docs/runbook.md).

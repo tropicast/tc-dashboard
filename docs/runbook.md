@@ -24,7 +24,7 @@ up and restored. Issue #15. The streaming node has its own runbook:
 | Server, firewall, primary IPs, private network, DNS | Hetzner Cloud, Cloudflare | `infra/terraform` |
 | Hardening, Docker, deploy user, backup timer | the node | `infra/ansible` |
 | API + Caddy | `/opt/tc-dashboard` on the node | `deploy/compose.yaml`, `deploy/deploy.sh` |
-| Images | `ghcr.io/tropicast/dashboard`, `dashboard-migrations` (`sha-<commit>`) | `.github/workflows/image.yml` |
+| Images | `ghcr.io/tropicast/dashboard`, `dashboard-migrations` (`sha-<commit>`; `<version>` for releases) | `.github/workflows/image.yml`, `release.yml` |
 | Database | Neon | connection URIs in secrets |
 | Backups | `s3://<bucket>/db/*.dump.age` | `deploy/backup.sh`, `deploy/restore-test.sh` |
 
@@ -137,8 +137,10 @@ Values must not contain a single quote (`'`): the workflow writes them quoted.
 ## 3. Deploy
 
 Every commit on main builds `ghcr.io/tropicast/dashboard:sha-<commit>` and the
-migration image (*Image* workflow). To deploy, run the **Deploy** workflow
-with `ref=main` (or a SHA on main). It:
+migration image (*Image* workflow). A release tag builds `:<version>` images
+(see [Releasing](#releasing)). To deploy, run the **Deploy** workflow with
+`ref=main`, a SHA on main, or a release tag such as `v0.2.0` (deploys the
+`:0.2.0` images). It:
 
 1. writes `/opt/tc-dashboard/.env` from the secrets and variables;
 2. uploads the bundle (compose file, Caddyfile, scripts, image tag);
@@ -165,9 +167,37 @@ Migrations only **add** (expand); a later release removes what is unused
 
 - **Roll back** to the previous release: on the node,
   `/opt/tc-dashboard/deploy.sh rollback` (no pull, no migration), or run
-  *Deploy* with the older SHA.
+  *Deploy* with the older SHA or release tag.
 - A migration is never rolled back automatically. If one must be undone,
   restore the database (section 5) or ship a new migration.
+
+### Releasing
+
+The git tag is the only place the version is set. `Directory.Build.props` and
+`web/package.json` hold a `0.0.0` placeholder, which local and CI builds report.
+
+1. In a PR, rename `## [Unreleased]` in `CHANGELOG.md` to
+   `## [x.y.z] - YYYY-MM-DD` and add a new empty `Unreleased` section. Merge it.
+2. Tag the merge commit on main:
+
+   ```sh
+   git switch main && git pull
+   git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1   # or v0.2.0
+   ```
+
+3. The *Release* workflow:
+   - checks the tag format (`v1.2.3` or `v1.2.3-rc.1`), that the commit is on
+     main, and that `CHANGELOG.md` has a section for the version (pre-release
+     tags use their base version);
+   - builds and pushes `dashboard:<version>` and `dashboard-migrations:<version>`
+     (plus `:latest` for non-pre-release tags);
+   - checks `/api/v1/version` in the image reports the version;
+   - creates a **draft** GitHub Release: the changelog section, then the merged
+     PRs grouped by label (`.github/release.yml`; label a PR `skip-changelog` to
+     omit it).
+4. Review the draft and publish it.
+5. Run *Deploy* with `ref=v<version>`. Check
+   `https://app.tropicastradio.com/api/v1/version`.
 
 ## 4. Cutover from the stand-ins (with tc-streaming#42)
 
