@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { LegalLinks } from '../../legal/LegalLinks';
 
 /** Untitled UI log in / sign up layout: logo, heading and supporting text over a narrow form. */
 export function FormPage({
@@ -38,6 +39,7 @@ export function FormPage({
             {footer}
           </div>
         )}
+        <LegalLinks />
       </div>
     </main>
   );

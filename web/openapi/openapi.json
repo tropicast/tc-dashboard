@@ -817,6 +817,75 @@
         }
       }
     },
+    "/api/v1/auth/terms": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Accepts the current version of the Terms of Service and the Privacy Policy.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptTermsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/account/export": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Downloads everything stored about the signed-in user, as JSON.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/account": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Deletes the signed-in account after checking the password. Refused (409) while the user is the last Owner of a workspace that still has other members, stations or a paid subscription.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/v1/auth/device/code": {
       "post": {
         "tags": [
@@ -1977,6 +2046,18 @@
           }
         }
       },
+      "AcceptTermsRequest": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "maxLength": 32,
+            "type": "string"
+          }
+        }
+      },
       "AudioFormat": {
         "enum": [
           "Mp3",
@@ -2411,6 +2492,17 @@
           }
         },
         "description": "A broadcast credential, without its secret."
+      },
+      "DeleteAccountRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
       },
       "DeviceCodeRequest": {
         "required": [
@@ -2946,22 +3038,35 @@
         "required": [
           "id",
           "email",
-          "memberships"
+          "memberships",
+          "termsVersion",
+          "termsAccepted"
         ],
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
+            "description": "Account ID.",
             "format": "uuid"
           },
           "email": {
-            "type": "string"
+            "type": "string",
+            "description": "Sign-in address."
           },
           "memberships": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MembershipResponse"
-            }
+            },
+            "description": "The user's workspaces and roles."
+          },
+          "termsVersion": {
+            "type": "string",
+            "description": "The current version of the Terms of Service and Privacy Policy."
+          },
+          "termsAccepted": {
+            "type": "boolean",
+            "description": "Whether the user accepted that version; if not, the SPA asks before going on."
           }
         }
       },
@@ -3467,16 +3572,23 @@
       "RegisterRequest": {
         "required": [
           "email",
-          "password"
+          "password",
+          "acceptTerms"
         ],
         "type": "object",
         "properties": {
           "email": {
             "maxLength": 256,
-            "type": "string"
+            "type": "string",
+            "description": "Address to confirm; it becomes the sign-in name."
           },
           "password": {
-            "type": "string"
+            "type": "string",
+            "description": "At least 12 characters."
+          },
+          "acceptTerms": {
+            "type": "boolean",
+            "description": "The user ticked \"I accept the Terms of Service and the Privacy Policy\"; required to be true."
           }
         }
       },

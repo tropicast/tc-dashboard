@@ -13,6 +13,7 @@ import { Home } from './components/organisms/Home';
 import { ErrorBoundary } from './components/organisms/layout/ErrorBoundary';
 import { AuthGuard } from './components/organisms/layout/AuthGuard';
 import { AppShell } from './components/organisms/layout/AppShell';
+import { LegalPage } from './legal/LegalPage';
 import { StationDetail } from './components/organisms/stations/StationDetail';
 import { Stations } from './components/organisms/stations/Stations';
 import '@/styles/globals.css';
@@ -50,6 +51,8 @@ export default function App() {
               <Route path="/forgot-password" element={<EmailAction kind="forgot" />} />
               <Route path="/reset-password" element={<Reset />} />
               <Route path="/invitations/accept" element={<AcceptInvite />} />
+              <Route path="/privacy" element={<LegalPage document="privacy" />} />
+              <Route path="/terms" element={<LegalPage document="terms" />} />
               <Route path="*" element={<ProtectedRoutes />} />
             </Routes>
           </ErrorBoundary>

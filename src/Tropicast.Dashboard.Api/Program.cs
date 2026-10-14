@@ -112,6 +112,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
 app.MapApi();
 app.MapAuth();
+app.MapAccount();
 app.MapDeviceAuthorization();
 app.MapInvitations();
 app.MapTenants();

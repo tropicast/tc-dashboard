@@ -93,6 +93,8 @@ test('signs up then creates a workspace and first station', async ({ page }) => 
   await page.goto('/signup');
   await page.getByLabel('Email').fill('owner@example.com');
   await page.getByLabel('Password (12 or more characters)').fill('password1234');
+  // React Aria keeps the native checkbox visually hidden under its label: click the label.
+  await page.getByText('I accept the Terms of Service and the Privacy Policy').click();
   const registration = page.waitForRequest(
     (request) => request.url().endsWith('/api/v1/auth/register') && request.method() === 'POST',
   );
@@ -100,6 +102,7 @@ test('signs up then creates a workspace and first station', async ({ page }) => 
   expect((await registration).postDataJSON()).toEqual({
     email: 'owner@example.com',
     password: 'password1234',
+    acceptTerms: true,
   });
   await expect(page.getByRole('button', { name: 'Check your email' })).toBeVisible();
 

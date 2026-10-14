@@ -27,6 +27,7 @@ import { api } from '../../../api/client';
 import { useMe } from '../../../hooks/use-me';
 import { queryClient } from '../../../lib/query-client';
 import { data } from '../../../lib/request';
+import { LegalLinks } from '../../../legal/LegalLinks';
 
 const themeIcons: Record<Theme, FC<{ className?: string }>> = {
   light: Sun,
@@ -200,6 +201,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {children}
       </main>
+      <footer className="px-4 pb-8 md:px-8">
+        <LegalLinks />
+      </footer>
     </div>
   );
 }

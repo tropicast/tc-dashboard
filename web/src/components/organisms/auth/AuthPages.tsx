@@ -1,18 +1,23 @@
+import type { ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { api, refreshAntiforgery } from '../../../api/client';
 import { Button } from '@/components/base/buttons/button';
-import { TextField } from '../../atoms/FormFields';
+import { CheckboxField, TextField } from '../../atoms/FormFields';
 import { Notice } from '../../atoms/Notice';
 import { FormPage } from '../../molecules/FormPage';
 import { queryClient } from '../../../lib/query-client';
 import { data } from '../../../lib/request';
+import i18n from '../../../lib/i18n';
 
 const loginSchema = z.object({ email: z.email(), password: z.string().min(12) });
+const signupSchema = loginSchema.extend({
+  acceptTerms: z.boolean().refine(Boolean, { error: () => i18n.t('legal.mustAccept') }),
+});
 
 /** The in-app page the guard sent the visitor from; never another site. */
 function returnPath(state: unknown) {
@@ -75,11 +80,11 @@ export function Login() {
 export function Signup() {
   const { t } = useTranslation();
   const form = useForm({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    resolver: zodResolver(signupSchema),
+    defaultValues: { email: '', password: '', acceptTerms: false },
   });
   const mutation = useMutation({
-    mutationFn: (body: z.infer<typeof loginSchema>) =>
+    mutationFn: (body: z.infer<typeof signupSchema>) =>
       data<void>(api.POST('/api/v1/auth/register', { body })),
   });
   return (
@@ -105,6 +110,18 @@ export function Signup() {
           autoComplete="new-password"
           passwordToggleLabel={t('auth.showCharacters')}
         />
+        <div className="flex flex-col gap-1.5">
+          <CheckboxField control={form.control} name="acceptTerms" label={t('legal.acceptLabel')} />
+          <p className="pl-6 text-sm text-tertiary">
+            <Trans
+              i18nKey="legal.readBoth"
+              components={{
+                terms: <TextLink to="/terms" />,
+                privacy: <TextLink to="/privacy" />,
+              }}
+            />
+          </p>
+        </div>
         <Notice error={mutation.error} />
         <SubmitButton busy={mutation.isPending}>
           {mutation.isSuccess ? t('auth.checkEmail') : t('auth.createAccount')}
@@ -266,7 +283,8 @@ function SubmitButton({ busy = false, children }: { busy?: boolean; children: st
   );
 }
 
-function TextLink({ to, children }: { to: string; children: string }) {
+/** Children are optional: <Trans> fills them in. */
+function TextLink({ to, children }: { to: string; children?: ReactNode }) {
   return (
     <Link
       to={to}

@@ -26,6 +26,15 @@ ASP.NET Core Identity on the same database (`users`, `user_claims`,
   passwords of at least 12 characters. Credential endpoints are rate limited
   per IP (`RateLimits:Auth`, default 10 per minute). Answers do not reveal
   whether an email address has an account.
+- **Terms and privacy (#94):** sign-up requires `acceptTerms: true` and stores
+  the accepted version and time on the user. `GET /me` returns `termsVersion`
+  (current) and `termsAccepted`; when a new version is published the SPA asks
+  for it and posts it to `POST /terms`. See
+  [Privacy and data retention](data-retention.md).
+- **Your data:** `GET /account/export` downloads the account, memberships,
+  devices, security events and the user's own audit entries as JSON.
+  `DELETE /account` (password in the body) deletes the account; see
+  [Privacy and data retention](data-retention.md#account-deletion).
 - **Tenants:** requests choose a tenant with the `X-Tenant-Id` header
   (optional when the user has one membership). Endpoints authorize with
   `TenantPolicies`:

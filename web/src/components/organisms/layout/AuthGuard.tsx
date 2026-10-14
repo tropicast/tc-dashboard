@@ -4,6 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useMe } from '../../../hooks/use-me';
 import { selectTenant } from '../../../lib/tenant';
 import { Loading } from '../../molecules/Loading';
+import { TermsPrompt } from '../../../legal/TermsPrompt';
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -23,5 +24,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   if (me.isError) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
+  // A new version of the terms must be accepted before going on.
+  if (me.data.termsAccepted === false) return <TermsPrompt />;
   return <>{children}</>;
 }

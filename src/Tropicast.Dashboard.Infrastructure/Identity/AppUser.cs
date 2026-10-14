@@ -12,4 +12,15 @@ public sealed class AppUser : IdentityUser<Guid>
     }
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>Version of the Terms of Service and Privacy Policy the user accepted; null before the first acceptance.</summary>
+    public string? TermsVersion { get; set; }
+
+    public DateTimeOffset? TermsAcceptedAt { get; set; }
+
+    public void AcceptTerms(string version, DateTimeOffset now)
+    {
+        TermsVersion = version;
+        TermsAcceptedAt = now;
+    }
 }

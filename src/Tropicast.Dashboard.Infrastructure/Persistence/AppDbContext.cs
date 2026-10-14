@@ -60,6 +60,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
             user.HasIndex(u => u.NormalizedUserName).HasDatabaseName("ix_users_normalized_user_name").IsUnique();
             // Identity enforces unique emails in code; the database backs it up against races.
             user.HasIndex(u => u.NormalizedEmail).HasDatabaseName("ix_users_normalized_email").IsUnique();
+            user.Property(u => u.TermsVersion).HasMaxLength(32);
         });
         // The passkey set exists on the base context for every schema version; schema 2 has no table for it.
         builder.Ignore<IdentityUserPasskey<Guid>>();

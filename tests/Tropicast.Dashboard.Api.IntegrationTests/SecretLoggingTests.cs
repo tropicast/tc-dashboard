@@ -18,7 +18,7 @@ public sealed class SecretLoggingTests(DashboardFactory factory) : IClassFixture
         const string password = "log check passphrase 1";
         secrets.Add(password);
 
-        (await browser.Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password }, token)).Status(HttpStatusCode.Accepted);
+        (await browser.Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password, acceptTerms = true }, token)).Status(HttpStatusCode.Accepted);
         var confirm = QueryHelpers.ParseQuery(Browser.LinkIn(factory.Emails.Last(email).TextBody).Query);
         secrets.Add(confirm["code"].ToString());
         (await browser.Http.PostAsJsonAsync("/api/v1/auth/confirm-email",

@@ -36,6 +36,7 @@ before accepting a source. Epic: [#1](https://github.com/tropicast/tc-dashboard/
 - Live listener stats, usage (listener-hours, egress) and an audit log.
 - Public station pages, an embeddable player, and RadioBrowser listing.
 - Subscriptions with Stripe Checkout and the Billing Portal.
+- Privacy Policy, Terms of Service and cookie notice; data export and account deletion.
 
 ## Quick start
 
@@ -103,6 +104,7 @@ layer references an outer one, or EF Core / ASP.NET Core.
 | [RadioBrowser listing](docs/reference/radiobrowser.md)                                                  | Directory listing and updates                                             |
 | [Observability and security](docs/reference/observability-and-security.md)                              | Health, logs, telemetry, rate limits, headers, audit, tenant isolation    |
 | [Billing](docs/reference/billing.md)                                                                    | Stripe Checkout, Billing Portal, webhooks, plan changes                   |
+| [Privacy and data retention](docs/reference/data-retention.md)                                          | Legal texts, cookies, retention periods, export and account deletion      |
 | [Runbook](docs/runbook.md)                                                                              | Production setup, deploy, releases, rollback, backups, secrets, alerts    |
 | ADRs: [desktop sign-in](docs/adr/0001-desktop-sign-in.md), [payments](docs/adr/0002-payments-stripe.md) | Architecture decisions                                                    |
 | [Changelog](CHANGELOG.md)                                                                               | Changes per release                                                       |
