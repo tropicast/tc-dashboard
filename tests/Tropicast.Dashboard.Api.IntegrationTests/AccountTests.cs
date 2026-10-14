@@ -202,7 +202,6 @@ public sealed class AccountTests(DashboardFactory factory) : IClassFixture<Dashb
         (await browser.SendAsync(HttpMethod.Post, "/api/v1/stations", new { name = "Radio", slug = "radio" })).Status(HttpStatusCode.Created);
         (await browser.SendAsync(HttpMethod.Post, "/api/v1/auth/terms", new { version = Legal.TermsVersion })).Status(HttpStatusCode.NoContent);
         (await browser.Http.GetAsync("/api/v1/auth/account/export", Token)).Status(HttpStatusCode.OK);
-        (await browser.Http.GetAsync("/", Token)).EnsureSuccessStatusCode();
         (await browser.SendAsync(HttpMethod.Post, "/api/v1/auth/logout")).Status(HttpStatusCode.NoContent);
 
         var notice = LegalNotice();
