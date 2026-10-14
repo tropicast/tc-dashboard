@@ -9,12 +9,14 @@ COPY web/ ./
 RUN npm run build -- --outDir /out/wwwroot --emptyOutDir
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api
+# Release builds pass the tag's version (release.yml); other builds keep the 0.0.0 placeholder.
+ARG VERSION=0.0.0
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/ src/
 # The OpenAPI document is generated in CI, not in the image build.
 RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet publish src/Tropicast.Dashboard.Api -c Release -o /out -p:OpenApiGenerateDocuments=false
+    dotnet publish src/Tropicast.Dashboard.Api -c Release -o /out -p:OpenApiGenerateDocuments=false -p:Version="$VERSION"
 
 # Migration bundle image: deploys run it against the database before swapping the API (deploy/deploy.sh).
 # It reads ConnectionStrings__Default (direct connection, not the pooler).

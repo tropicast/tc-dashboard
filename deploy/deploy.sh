@@ -56,7 +56,9 @@ install_bundle() {
 load_release() {
     local sha=$1
     DASHBOARD_IMAGE_TAG=$(sed -n 's/^DASHBOARD_IMAGE_TAG=//p' "releases/$sha/release.env")
-    [[ $DASHBOARD_IMAGE_TAG =~ ^sha-[0-9a-f]{40}$ ]] || { log "release $sha has no valid image tag"; exit 1; }
+    # sha-<commit> from image.yml, or a release version from release.yml.
+    [[ $DASHBOARD_IMAGE_TAG =~ ^(sha-[0-9a-f]{40}|[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]] ||
+        { log "release $sha has no valid image tag"; exit 1; }
     export DASHBOARD_IMAGE_TAG
 }
 

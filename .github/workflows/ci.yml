@@ -133,6 +133,8 @@ jobs:
           context: .
           load: true
           tags: tropicast-dashboard:ci
+          # A fixed fake version: checks the VERSION build arg reaches the API (release.yml) and stays cached.
+          build-args: VERSION=9.9.9-ci
           cache-from: type=gha,scope=dashboard
           cache-to: type=gha,mode=max,scope=dashboard
 
@@ -143,6 +145,7 @@ jobs:
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/health/live > /dev/null && break; sleep 1; done
           test "$(curl -fsS http://127.0.0.1:8080/health/live)" = Healthy
           curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="root">'
+          test "$(curl -fsS http://127.0.0.1:8080/api/v1/version | jq -r .version)" = 9.9.9-ci
 
       # Vulnerabilities with a fix available, high or critical, in the OS packages and .NET runtime of the image.
       - name: Image vulnerability scan (Trivy)

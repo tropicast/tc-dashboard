@@ -19,7 +19,8 @@ public sealed class ApiTests(DashboardFactory factory) : IClassFixture<Dashboard
     public async Task Version_returns_the_build_version()
     {
         var version = await _client.GetFromJsonAsync<VersionInfo>("/api/v1/version", TestContext.Current.CancellationToken);
-        Assert.Matches(@"^\d+\.\d+\.\d+", version!.Version);
+        // Development placeholder: only release builds (release.yml) carry the tag's version.
+        Assert.Equal("0.0.0", version!.Version);
     }
 
     [Fact]

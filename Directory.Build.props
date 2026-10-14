@@ -12,6 +12,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <Company>Tropicast</Company>
     <Product>Tropicast Dashboard</Product>
-    <Version>0.1.0</Version>
+    <!-- Development placeholder: release builds take the version from the git tag (release.yml, Dockerfile VERSION). -->
+    <Version>0.0.0</Version>
   </PropertyGroup>
 </Project>

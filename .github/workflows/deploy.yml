@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit on main to deploy (SHA, or "main"). Use an older SHA to roll back.
+        description: Commit on main to deploy (SHA, "main", or a release tag such as v0.2.0). Use an older SHA or tag to roll back.
         type: string
         default: main
 
@@ -46,6 +46,8 @@ jobs:
 
       - name: Resolve the release
         id: release
+        env:
+          REF: ${{ inputs.ref }}
         run: |
           sha=$(git rev-parse HEAD)
           git fetch --quiet origin main
@@ -54,7 +56,12 @@ jobs:
             exit 1
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "image_tag=sha-$sha" >> "$GITHUB_OUTPUT"
+          # A release tag deploys the versioned images from release.yml; anything else the image.yml ones.
+          if [[ "$REF" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]] && git show-ref --verify --quiet "refs/tags/$REF"; then
+            echo "image_tag=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=sha-$sha" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check the images exist
         env:
