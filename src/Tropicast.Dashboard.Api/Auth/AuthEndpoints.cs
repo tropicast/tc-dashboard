@@ -11,7 +11,11 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Auth;
 
-internal sealed record RegisterRequest([property: Required, EmailAddress, MaxLength(256)] string Email, [property: Required] string Password);
+/// <param name="Email">Address to confirm; it becomes the sign-in name.</param>
+/// <param name="Password">At least 12 characters.</param>
+/// <param name="AcceptTerms">The user ticked "I accept the Terms of Service and the Privacy Policy"; required to be true.</param>
+internal sealed record RegisterRequest([property: Required, EmailAddress, MaxLength(256)] string Email, [property: Required] string Password,
+    bool AcceptTerms);
 internal sealed record ConfirmEmailRequest([property: Required] Guid UserId, [property: Required] string Code);
 internal sealed record EmailRequest([property: Required, MaxLength(256)] string Email);
 internal sealed record LoginRequest([property: Required, MaxLength(256)] string Email, [property: Required] string Password);
@@ -22,7 +26,13 @@ internal sealed record TokenRequest([property: Required, MaxLength(256)] string 
     [property: Required, MaxLength(64)] string DeviceName);
 internal sealed record RefreshRequest([property: Required, MaxLength(256)] string RefreshToken);
 internal sealed record MembershipResponse(Guid TenantId, string TenantName, string TenantSlug, MembershipRole Role);
-internal sealed record MeResponse(Guid Id, string Email, IReadOnlyList<MembershipResponse> Memberships);
+/// <param name="Id">Account ID.</param>
+/// <param name="Email">Sign-in address.</param>
+/// <param name="Memberships">The user's workspaces and roles.</param>
+/// <param name="TermsVersion">The current version of the Terms of Service and Privacy Policy.</param>
+/// <param name="TermsAccepted">Whether the user accepted that version; if not, the SPA asks before going on.</param>
+internal sealed record MeResponse(Guid Id, string Email, IReadOnlyList<MembershipResponse> Memberships, string TermsVersion,
+    bool TermsAccepted);
 /// <summary>An account security event.</summary>
 /// <param name="Action">What happened: <c>signin.succeeded</c>, <c>signin.failed</c>, <c>device.signed_in</c>, <c>device.approved</c>,
 /// <c>device.signed_out</c>, <c>device.token_reuse</c> (a copied refresh token: the device was signed out),
@@ -90,6 +100,10 @@ internal static class AuthEndpoints
     private static async Task<Results<Accepted, ValidationProblem>> RegisterAsync(RegisterRequest request,
         UserManager<AppUser> users, IEmailSender email, IOptions<AppOptions> app, TimeProvider time, CancellationToken cancellationToken)
     {
+        if (!request.AcceptTerms)
+        {
+            return Invalid("acceptTerms", "Accept the Terms of Service and the Privacy Policy to create an account.");
+        }
         var existing = await users.FindByEmailAsync(request.Email);
         if (existing is not null)
         {
@@ -97,6 +111,7 @@ internal static class AuthEndpoints
             return TypedResults.Accepted((string?)null);
         }
         var user = new AppUser { UserName = request.Email, Email = request.Email, CreatedAt = time.GetUtcNow() };
+        user.AcceptTerms(Legal.TermsVersion, time.GetUtcNow());
         var result = await users.CreateAsync(user, request.Password);
         if (!result.Succeeded)
         {
@@ -215,7 +230,8 @@ internal static class AuthEndpoints
                 select new { t.Id, t.Name, t.Slug, m.Role })
             .ToListAsync(cancellationToken);
         return TypedResults.Ok(new MeResponse(user.Id, user.Email!,
-            [.. memberships.Select(m => new MembershipResponse(m.Id, m.Name, m.Slug, m.Role))]));
+            [.. memberships.Select(m => new MembershipResponse(m.Id, m.Name, m.Slug, m.Role))],
+            Legal.TermsVersion, user.TermsVersion == Legal.TermsVersion));
     }
 
     private static async Task<Results<Ok<TokenResponse>, ProblemHttpResult, ValidationProblem>> IssueTokenAsync(TokenRequest request,
@@ -341,7 +357,8 @@ internal static class AuthEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task RevokeAllDevicesAsync(AppDbContext db, Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>Signs every desktop device of the user out and revokes the broadcast credentials they got for themselves.</summary>
+    internal static async Task RevokeAllDevicesAsync(AppDbContext db, Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var sessions = await db.DeviceSessions.Where(s => s.UserId == userId && s.RevokedAt == null).ToListAsync(cancellationToken);
         sessions.ForEach(s => s.Revoke(now));

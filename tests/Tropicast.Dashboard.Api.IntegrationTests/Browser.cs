@@ -11,7 +11,9 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 namespace Tropicast.Dashboard.Api.IntegrationTests;
 
 /// <summary>Drives the API the way the SPA does: cookie session plus the antiforgery header.</summary>
-public sealed partial class Browser(DashboardFactory factory)
+/// <param name="factory">The API under test.</param>
+/// <param name="http">A browser client of <paramref name="factory"/>; by default <see cref="DashboardFactory.CreateBrowser"/>.</param>
+public sealed partial class Browser(DashboardFactory factory, HttpClient? http = null)
 {
     public const string Password = "correct horse battery staple";
 
@@ -21,13 +23,13 @@ public sealed partial class Browser(DashboardFactory factory)
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
-    public HttpClient Http { get; } = factory.CreateBrowser();
+    public HttpClient Http { get; } = http ?? factory.CreateBrowser();
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     /// <summary>Signs up and confirms with the emailed link; returns the user ID.</summary>
     public async Task<Guid> SignUpAsync(string email, string password = Password)
     {
-        (await Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password }, Token)).EnsureSuccessStatusCode();
+        (await Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password, acceptTerms = true }, Token)).EnsureSuccessStatusCode();
         var link = LinkIn(factory.Emails.Last(email).TextBody);
         var query = QueryHelpers.ParseQuery(link.Query);
         var userId = Guid.Parse(query["userId"]!);

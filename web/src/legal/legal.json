@@ -1,0 +1,12 @@
+{
+  "termsVersion": "2026-10-14",
+  "draft": true,
+  "cookies": [
+    { "name": "__Host-tropicast", "kind": "cookie", "lifetime": "14d" },
+    { "name": "__Host-tropicast-af", "kind": "cookie", "lifetime": "session" },
+    { "name": "XSRF-TOKEN", "kind": "cookie", "lifetime": "session" },
+    { "name": "tenant-id", "kind": "localStorage", "lifetime": "persistent" },
+    { "name": "language", "kind": "localStorage", "lifetime": "persistent" },
+    { "name": "theme", "kind": "localStorage", "lifetime": "persistent" }
+  ]
+}

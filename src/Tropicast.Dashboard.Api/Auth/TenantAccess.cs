@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +38,19 @@ internal sealed class TenantAccessMiddleware(RequestDelegate next)
             && Guid.TryParse(context.RequestServices.GetRequiredService<UserManager<AppUser>>().GetUserId(context.User), out var userId))
         {
             var db = context.RequestServices.GetRequiredService<AppDbContext>();
-            var memberships = db.Memberships.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(m => m.UserId == userId);
+            // A deleted account's cookie or bearer token is still valid until it is next checked: refuse it now.
+            if (!await db.Users.AnyAsync(u => u.Id == userId, context.RequestAborted))
+            {
+                if (!AuthSetup.IsBearer(context.Request))
+                {
+                    await context.SignOutAsync(IdentityConstants.ApplicationScheme);
+                }
+                await TypedResults.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "This account no longer exists.")
+                    .ExecuteAsync(context);
+                return;
+            }
+            // Read only (no tracking): an endpoint that deletes memberships in bulk must not meet a stale tracked one.
+            var memberships = db.Memberships.IgnoreQueryFilters([AppDbContext.TenantFilter]).AsNoTracking().Where(m => m.UserId == userId);
             var requested = context.Request.Headers[TenantAccess.Header].ToString();
             var membership = Guid.TryParse(requested, out var tenantId)
                 ? await memberships.FirstOrDefaultAsync(m => m.TenantId == tenantId, context.RequestAborted)

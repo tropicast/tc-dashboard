@@ -172,8 +172,45 @@ export const fr: Locale = {
       hoursMinutes: '{{hours}} h {{minutes}} min',
     },
   },
+  legal: {
+    privacy: 'Politique de confidentialité',
+    terms: 'Conditions d’utilisation',
+    cookies: 'Cookies',
+    links: 'Mentions légales',
+    version: 'Version du {{date}}',
+    draft:
+      'Brouillon : ce texte n’est pas définitif et n’a aucune valeur juridique tant qu’il n’est pas publié.',
+    storageTitle: 'Ce que nous enregistrons dans votre navigateur',
+    name: 'Nom',
+    type: 'Type',
+    purpose: 'Finalité',
+    duration: 'Durée',
+    cookie: 'Cookie',
+    localStorage: 'Stockage local',
+    acceptLabel: 'J’accepte les Conditions d’utilisation et la Politique de confidentialité',
+    mustAccept:
+      'Acceptez les Conditions d’utilisation et la Politique de confidentialité pour créer un compte.',
+    readBoth:
+      'Lire les <terms>Conditions d’utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.',
+    updatedTitle: 'Nos conditions ont changé',
+    updatedBody:
+      'Lisez les Conditions d’utilisation et la Politique de confidentialité mises à jour, puis acceptez-les pour continuer à utiliser Tropicast.',
+    accept: 'Accepter et continuer',
+    reload: 'Recharger pour lire la nouvelle version',
+    manageAccount: 'Télécharger mes données ou supprimer mon compte',
+    back: 'Retour à Tropicast',
+  },
   account: {
     title: 'Compte',
+    yourData: 'Vos données',
+    yourDataHint:
+      'Téléchargez tout ce que Tropicast enregistre à votre sujet, ou supprimez votre compte.',
+    exportData: 'Télécharger mes données',
+    deleteAccount: 'Supprimer le compte',
+    deleteTitle: 'Supprimer votre compte ?',
+    deleteBody:
+      'Vous serez déconnecté partout et votre compte sera supprimé définitivement. Les espaces partagés restent à leurs autres membres. Un espace dont vous êtes le dernier propriétaire ne doit plus avoir d’autres membres, de stations ni d’abonnement payant.',
+    currentPassword: 'Votre mot de passe',
     usage: 'Utilisation',
     stationsUsed: 'Stations utilisées',
     stationsUsedValue_one: '{{used}} sur {{count}} station',

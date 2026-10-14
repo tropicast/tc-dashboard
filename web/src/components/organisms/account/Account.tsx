@@ -14,6 +14,7 @@ import { Card } from '../../molecules/Card';
 import { PageHeader } from '../../molecules/PageHeader';
 import { Notice } from '../../atoms/Notice';
 import { BillingPanel } from './BillingPanel';
+import { YourDataPanel } from './YourDataPanel';
 import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import type { Tenant } from '../../../lib/types';
@@ -166,6 +167,7 @@ export function Account() {
           </Table.Body>
         </Table>
       </Card>
+      <YourDataPanel />
     </section>
   );
 }

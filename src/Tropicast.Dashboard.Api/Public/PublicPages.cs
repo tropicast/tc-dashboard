@@ -69,7 +69,7 @@ internal static class PublicPages
         .menu{position:absolute;right:0;top:48px;z-index:1;min-width:200px;margin:0;padding:4px;list-style:none;border:1px solid var(--line);
         border-radius:12px;background:var(--card);box-shadow:var(--shadow)}
         .menu a{display:block;padding:10px 12px;border-radius:8px;color:var(--fg);text-decoration:none}.menu a:hover{background:var(--line)}
-        .desc{white-space:pre-line;margin:24px 4px 0}footer{color:var(--muted);font-size:.8125rem;margin:32px 4px 0}
+        .desc{white-space:pre-line;margin:24px 4px 0}footer{color:var(--muted);font-size:.8125rem;margin:32px 4px 0}footer a{color:inherit}
         body.embed{min-height:0;background:transparent}body.embed main{max-width:none;padding:6px}
         body.embed .card{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"play top sound" "bar bar bar";gap:0 12px;padding:10px 12px;border-radius:12px}
         .embed .controls{display:contents}.embed .play{grid-area:play;width:48px;height:48px}.embed .play svg{width:22px;height:22px}
@@ -144,6 +144,7 @@ internal static class PublicPages
         ["play"] = "Play", ["stop"] = "Stop", ["live"] = "Live", ["offline"] = "Offline", ["reconnecting"] = "Reconnecting…",
         ["listen"] = "Listen live", ["website"] = "Website", ["mute"] = "Mute", ["unmute"] = "Unmute", ["volume"] = "Volume",
         ["share"] = "Share", ["copied"] = "Link copied", ["copy"] = "Copy this link", ["more"] = "More options", ["stream"] = "Open the {0} stream",
+        ["privacy"] = "Privacy", ["terms"] = "Terms",
     };
 
     private static readonly Dictionary<string, string> French = new()
@@ -151,7 +152,7 @@ internal static class PublicPages
         ["play"] = "Écouter", ["stop"] = "Arrêter", ["live"] = "En direct", ["offline"] = "Hors antenne", ["reconnecting"] = "Reconnexion…",
         ["listen"] = "Écouter en direct", ["website"] = "Site web", ["mute"] = "Couper le son", ["unmute"] = "Rétablir le son",
         ["volume"] = "Volume", ["share"] = "Partager", ["copied"] = "Lien copié", ["copy"] = "Copiez ce lien", ["more"] = "Plus d’options",
-        ["stream"] = "Ouvrir le flux {0}",
+        ["stream"] = "Ouvrir le flux {0}", ["privacy"] = "Confidentialité", ["terms"] = "Conditions",
     };
 
     internal static string Station(PublicStationResponse station, string statusUrl, string nonce, bool embed)
@@ -184,7 +185,7 @@ internal static class PublicPages
         var body = embed ? "" : $"""
             {(station.Description.Length > 0 ? $"""<p class="desc">{Html.Encode(station.Description)}</p>""" : "")}
             {(station.Website is { } site ? $"""<p><a href="{Html.Encode(site.AbsoluteUri)}" rel="noopener nofollow ugc">{t["website"]}</a></p>""" : "")}
-            <footer>Tropicast</footer>
+            <footer>Tropicast · <a href="/privacy">{t["privacy"]}</a> · <a href="/terms">{t["terms"]}</a></footer>
             """;
         return $"""
             <!doctype html>

@@ -1113,6 +1113,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accepts the current version of the Terms of Service and the Privacy Policy. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AcceptTermsRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/account/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Downloads everything stored about the signed-in user, as JSON. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes the signed-in account after checking the password. Refused (409) while the user is the last Owner of a workspace that still has other members, stations or a paid subscription. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeleteAccountRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/device/code": {
         parameters: {
             query?: never;
@@ -2365,6 +2484,9 @@ export interface components {
         AcceptInvitationRequest: {
             token: string;
         };
+        AcceptTermsRequest: {
+            version: string;
+        };
         /**
          * @description A stream format, as in the mount `/stations/{id}/live.{mp3,opus}`.
          * @enum {unknown}
@@ -2570,6 +2692,9 @@ export interface components {
              * @description When it was revoked; null while active.
              */
             revokedAt: null | string;
+        };
+        DeleteAccountRequest: {
+            password: string;
         };
         DeviceCodeRequest: {
             deviceName: string;
@@ -2791,10 +2916,19 @@ export interface components {
         /** @enum {unknown} */
         MembershipRole: "Owner" | "Admin" | "Broadcaster";
         MeResponse: {
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Account ID.
+             */
             id: string;
+            /** @description Sign-in address. */
             email: string;
+            /** @description The user's workspaces and roles. */
             memberships: components["schemas"]["MembershipResponse"][];
+            /** @description The current version of the Terms of Service and Privacy Policy. */
+            termsVersion: string;
+            /** @description Whether the user accepted that version; if not, the SPA asks before going on. */
+            termsAccepted: boolean;
         };
         /** @description A station the signed-in user can broadcast to. */
         MyStationResponse: {
@@ -3011,8 +3145,12 @@ export interface components {
             refreshToken: string;
         };
         RegisterRequest: {
+            /** @description Address to confirm; it becomes the sign-in name. */
             email: string;
+            /** @description At least 12 characters. */
             password: string;
+            /** @description The user ticked "I accept the Terms of Service and the Privacy Policy"; required to be true. */
+            acceptTerms: boolean;
         };
         ResetPasswordRequest: {
             email: string;

@@ -37,7 +37,7 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
     {
         var browser = new Browser(factory);
         var email = Browser.Unique("unconfirmed");
-        (await browser.Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password = Browser.Password }, Token))
+        (await browser.Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password = Browser.Password, acceptTerms = true }, Token))
             .Status(HttpStatusCode.Accepted);
         (await browser.LoginAsync(email)).Status(HttpStatusCode.Unauthorized);
         (await browser.Http.PostAsJsonAsync("/api/v1/auth/token",
@@ -52,7 +52,7 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
         var email = Browser.Unique("existing");
         await browser.SignUpAsync(email);
 
-        (await browser.Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password = Browser.Password }, Token))
+        (await browser.Http.PostAsJsonAsync("/api/v1/auth/register", new { email, password = Browser.Password, acceptTerms = true }, Token))
             .Status(HttpStatusCode.Accepted);
         Assert.Contains("already has an account", factory.Emails.Last(email).TextBody, StringComparison.Ordinal);
 
@@ -70,7 +70,7 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
     {
         var browser = new Browser(factory);
         var response = await browser.Http.PostAsJsonAsync("/api/v1/auth/register",
-            new { email = Browser.Unique("weak"), password = "short" }, Token);
+            new { email = Browser.Unique("weak"), password = "short", acceptTerms = true }, Token);
         response.Status(HttpStatusCode.BadRequest);
         Assert.Contains("password", await response.Content.ReadAsStringAsync(Token), StringComparison.Ordinal);
     }
@@ -319,7 +319,7 @@ public sealed class AuthTests(DashboardFactory factory) : IClassFixture<Dashboar
     {
         var browser = new Browser(factory);
         (await browser.Http.PostAsJsonAsync("/api/v1/auth/register",
-            new { email = Browser.Unique("repeat"), password = new string('a', 12) }, Token)).Status(HttpStatusCode.Accepted);
+            new { email = Browser.Unique("repeat"), password = new string('a', 12), acceptTerms = true }, Token)).Status(HttpStatusCode.Accepted);
     }
 
     [Fact]
