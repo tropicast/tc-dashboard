@@ -25,6 +25,7 @@ up and restored. Issue #15. The streaming node has its own runbook:
 | Hardening, Docker, deploy user, backup timer | the node | `infra/ansible` |
 | API + Caddy | `/opt/tc-dashboard` on the node | `deploy/compose.yaml`, `deploy/deploy.sh` |
 | Images | `ghcr.io/tropicast/dashboard`, `dashboard-migrations` (`sha-<commit>`; `<version>` for releases) | `.github/workflows/image.yml`, `release.yml` |
+| Deploy | manual, by commit or release tag: migrate, swap, health check, automatic return to the running release | `.github/workflows/deploy.yml` |
 | Database | Neon | connection URIs in secrets |
 | Backups | `s3://<bucket>/db/*.dump.age` | `deploy/backup.sh`, `deploy/restore-test.sh` |
 
