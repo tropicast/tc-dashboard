@@ -1,43 +1,55 @@
-# Tropicast dashboard
+<p align="center">
+  <img src="web/public/tropicast-logo.svg" alt="Tropicast logo" width="120" height="120">
+</p>
 
-Control plane for Tropicast: REST API, PostgreSQL and the React station
-dashboard. Station owners create an account, manage stations, get broadcast
-credentials for the desktop app and see live status. Audio never passes
-through this service; it is served by
-[tc-streaming](https://github.com/tropicast/tc-streaming). Epic:
-[#1](https://github.com/tropicast/tc-dashboard/issues/1).
+<h1 align="center">Tropicast Dashboard</h1>
 
-## Layout
+<p align="center">
+  Control plane for Tropicast: accounts, stations, billing, desktop sign-in and Icecast source auth.
+</p>
 
-| Path                                     | Contents                                                                         |
-| ---------------------------------------- | -------------------------------------------------------------------------------- |
-| `src/Tropicast.Dashboard.Domain`         | Entities, value objects, domain errors. No framework references                  |
-| `src/Tropicast.Dashboard.Application`    | Use cases, ports (`IClock`, …), validation (FluentValidation)                    |
-| `src/Tropicast.Dashboard.Infrastructure` | Adapters for the ports: EF Core, Identity, email, background services            |
-| `src/Tropicast.Dashboard.Api`            | Minimal API under `/api/v1`, OpenAPI, Problem Details, `/health`; serves the SPA |
-| `web/`                                   | React 19 + TypeScript + Vite SPA, typed API client generated from OpenAPI        |
-| `tests/`                                 | Domain, Application, architecture and API integration tests                      |
+<p align="center">
+  <a href="https://github.com/tropicast/tc-dashboard/actions/workflows/ci.yml"><img src="https://github.com/tropicast/tc-dashboard/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/tropicast/tc-dashboard/actions/workflows/e2e.yml"><img src="https://github.com/tropicast/tc-dashboard/actions/workflows/e2e.yml/badge.svg?branch=main" alt="E2E"></a>
+  <a href="https://github.com/tropicast/tc-dashboard/actions/workflows/image.yml"><img src="https://github.com/tropicast/tc-dashboard/actions/workflows/image.yml/badge.svg?branch=main" alt="Image"></a>
+  <a href="https://github.com/tropicast/tc-dashboard/releases"><img src="https://img.shields.io/github/v/release/tropicast/tc-dashboard?include_prereleases&sort=semver" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/tropicast/tc-dashboard" alt="License: Apache-2.0"></a>
+  <a href="global.json"><img src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white" alt=".NET 10"></a>
+  <a href="web/package.json"><img src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" alt="React 19"></a>
+  <a href=".github/dependabot.yml"><img src="https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot&logoColor=white" alt="Dependabot enabled"></a>
+</p>
 
-Dependencies point inward (Domain ← Application ← Infrastructure ← Api).
-`tests/Tropicast.Dashboard.Architecture.Tests` fails the build when an inner
-layer references an outer one, or EF Core / ASP.NET Core.
+A REST API, PostgreSQL and the React station dashboard. Station owners create an
+account, manage stations, get broadcast credentials for the desktop app
+([tc-station](https://github.com/tropicast/tc-station)) and see live status.
+Audio never passes through this service; it is served by
+[tc-streaming](https://github.com/tropicast/tc-streaming), which asks this API
+before accepting a source. Epic: [#1](https://github.com/tropicast/tc-dashboard/issues/1).
 
-## Prerequisites
+## Features
 
-- .NET 10 SDK **with the ASP.NET Core targeting pack** (the Microsoft
-  installers include it; on Arch Linux also install `aspnet-targeting-pack`)
-- Node.js 24 and npm
-- Docker with Compose, for PostgreSQL and the image
+- Accounts with email confirmation, tenants, members and invitations, with role-based access.
+- Stations and per-device broadcast credentials (shown once, stored hashed, revocable).
+- Desktop sign-in with the device authorization flow, and the desktop broadcast contract.
+- Icecast source auth: plan, format and bitrate checks for every source that connects.
+- Provisioning: station limits pushed to the streaming node with no Icecast restart.
+- Live listener stats, usage (listener-hours, egress) and an audit log.
+- Public station pages, an embeddable player, and RadioBrowser listing.
+- Subscriptions with Stripe Checkout and the Billing Portal.
 
-## Run
+## Quick start
 
-Step by step, with a walkthrough from sign-up to a station credential:
-[docs/how-to/run-locally.md](docs/how-to/run-locally.md).
+Prerequisites: Docker with Compose. To build without Docker: the .NET 10 SDK
+**with the ASP.NET Core targeting pack** (on Arch Linux, also install
+`aspnet-targeting-pack`), Node.js 24 and npm.
 
 ```sh
 docker compose up --build          # PostgreSQL 17 + API serving the SPA: http://localhost:8080
 docker compose --profile dev up    # plus the Vite dev server with hot reload: http://localhost:5173
 ```
+
+Mailpit catches every email at http://localhost:8025. Walkthrough from sign-up
+to a station credential: [docs/how-to/run-locally.md](docs/how-to/run-locally.md).
 
 Without Docker for the API:
 
@@ -51,377 +63,64 @@ cd web && npm ci && npm run dev                      # proxies /api to :5080
 ```sh
 dotnet build Tropicast.Dashboard.slnx   # also writes web/openapi/openapi.json
 dotnet test --solution Tropicast.Dashboard.slnx
-cd web
-npm run generate:api   # regenerate src/api/schema.d.ts from openapi/openapi.json
-npm run lint && npm run format:check && npm test && npm run build
+cd web && npm run generate:api && npm run lint && npm run format:check && npm test && npm run build
 ```
 
-After changing an endpoint, build the API and run `npm run generate:api`,
-then commit both files: CI fails when the OpenAPI document or the generated
-client is stale. In development the document is also served at
-`/openapi/v1.json`.
+After changing an endpoint, commit the regenerated `web/openapi/openapi.json`
+and `web/src/api/schema.d.ts`: CI fails when they are stale. Browser checks, the
+sign-up to live broadcast E2E test and CI:
+[docs/how-to/build-and-test.md](docs/how-to/build-and-test.md).
 
-### Browser checks
+## Layout
 
-```sh
-cd web
-npm run test:e2e:install  # install Chromium once
-npm run test:e2e           # SPA E2E: mocked API contract responses only
-npm run test:lighthouse    # accessibility score >= 95 for sign-in and sign-up routes
-```
+| Path                                     | Contents                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `src/Tropicast.Dashboard.Domain`         | Entities, value objects, domain errors. No framework references                  |
+| `src/Tropicast.Dashboard.Application`    | Use cases, ports (`IClock`, …), validation (FluentValidation)                    |
+| `src/Tropicast.Dashboard.Infrastructure` | Adapters for the ports: EF Core, Identity, email, background services            |
+| `src/Tropicast.Dashboard.Api`            | Minimal API under `/api/v1`, OpenAPI, Problem Details, `/health`; serves the SPA |
+| `web/`                                   | React 19 + TypeScript + Vite SPA, typed API client generated from OpenAPI        |
+| `tests/`                                 | Domain, Application, architecture and API integration tests; E2E in `tests/e2e`  |
+| `deploy/`, `infra/`                      | Production Compose file and scripts, Terraform and Ansible                       |
 
-The Playwright smoke test exercises browser navigation and client request
-payloads while intercepting `/api/v1` responses. It does **not** prove API or
-PostgreSQL behavior; .NET integration tests own that coverage.
+Dependencies point inward (Domain ← Application ← Infrastructure ← Api).
+`tests/Tropicast.Dashboard.Architecture.Tests` fails the build when an inner
+layer references an outer one, or EF Core / ASP.NET Core.
 
-For the opt-in real browser/API/PostgreSQL journey, start Compose first, then
-run the dedicated command:
+## Documentation
 
-```sh
-docker compose up --build -d  # API at http://localhost:8080; Mailpit at http://localhost:8025
-cd web
-npm run test:e2e:real
-```
-
-This test creates a unique account, tenant, and station; it retrieves the
-confirmation link from Mailpit and leaves this test data in the local Compose
-database. Override the dashboard URL with `REAL_E2E_BASE_URL`; override
-Mailpit with `REAL_E2E_MAILPIT_URL`.
-
-### Sign-up to live broadcast
-
-`tests/e2e/run.sh` runs the whole path against the real streaming node: it
-builds `tests/e2e/compose.yaml` (this API from the checkout, PostgreSQL,
-Mailpit, and the tc-streaming Icecast image and exporter, no auth stub) with
-fresh secrets, then runs `web/e2e/live-broadcast.spec.ts`:
-
-1. sign up in the UI, confirm through Mailpit, create the workspace and station;
-2. sign a desktop device in (`/auth/token`) and get its broadcast target;
-3. publish MP3 with FFmpeg: Icecast asks source-auth, which allows it;
-4. play the mount, and see the station page show Live and 1 listener;
-5. refusals, each checked against the API's logged reason: bitrate above the
-   plan, another station's credential, a replaced credential, a format outside
-   the plan (Free narrowed to MP3 in the database, since every plan sells both),
-   and a signed-out device;
-6. no source password in any container log.
-
-```sh
-TC_STREAMING_DIR=../tc-streaming tests/e2e/run.sh  # needs Docker, Node, ffmpeg (libmp3lame, libopus)
-```
-
-`E2E_KEEP=1` keeps the stack for debugging. Caddy is not in the stack: the
-TLS gateway is tested in tc-streaming (`tests/gateway.sh`). CI runs it in
-`.github/workflows/e2e.yml` on API and SPA changes, and nightly against
-tc-streaming's main.
-
-## Database
-
-EF Core 10 + Npgsql, PostgreSQL 17, snake_case names, `timestamptz`
-timestamps, optimistic concurrency on `xmin`. Code-first migrations live in
-`src/Tropicast.Dashboard.Infrastructure/Persistence/Migrations`.
-
-```sh
-dotnet tool restore
-dotnet ef migrations add <Name> --project src/Tropicast.Dashboard.Infrastructure --output-dir Persistence/Migrations
-dotnet ef migrations bundle --project src/Tropicast.Dashboard.Infrastructure --self-contained -r linux-x64 -o efbundle
-./efbundle --connection "<connection string>"   # how deploys migrate
-```
-
-The API never migrates in production. `docker compose up` sets
-`Database__MigrateOnStartup=true`, which is honoured only in Development.
-Only the plan catalogue is seeded.
-
-Two named query filters protect the default query path: `tenant` returns
-only the current tenant's rows (none when no tenant is set), and `deleted`
-hides soft-deleted stations. Their sessions, stats and credentials stay in the
-database. Cross them explicitly with
-`IgnoreQueryFilters([AppDbContext.TenantFilter])` or `[AppDbContext.DeletedFilter]`.
-
-`tests/Tropicast.Dashboard.Infrastructure.Tests` runs against PostgreSQL 17
-in Docker (Testcontainers).
-
-## Authentication
-
-ASP.NET Core Identity on the same database (`users`, `user_claims`,
-`user_logins`, `user_tokens`), endpoints under `/api/v1/auth`:
-
-- **SPA:** `POST /login` sets the session cookie `__Host-tropicast`
-  (HttpOnly, Secure, SameSite=Strict, 14 days sliding). Unsafe requests that
-  carry it must send the antiforgery token. `GET /antiforgery` sets the
-  readable `XSRF-TOKEN` cookie, and the client echoes it in `X-XSRF-TOKEN`
-  (`web/src/api/client.ts` does this). Fetch a new token after signing in.
-  Local HTTP Compose explicitly uses non-secure, non-`__Host-` cookie names;
-  production retains the secure defaults.
-- **Desktop app:** signs in with the device authorization flow
-  (`/device/code`, the user approves the code on the web, `/device/token`;
-  [ADR 0001](docs/adr/0001-desktop-sign-in.md)), or with `POST /token` (email
-  and password, for scripts). Both return a 15-minute bearer access token and a
-  refresh token for one named device. `POST /token/refresh` rotates the pair;
-  presenting an old refresh token again ends that device's session.
-  `POST /token/revoke` or `DELETE /devices/{id}` signs one device out on its
-  next refresh, and revokes the broadcast credentials it got for itself. A
-  password change or reset signs every device out. The desktop contract
-  (`/me/stations`, `/stations/{id}/broadcast-target`) is in
-  [docs/desktop-api.md](docs/desktop-api.md).
-- **Accounts:** sign up, email confirmation (required before signing in),
-  password reset and change, lockout after 5 failures (15 minutes), and
-  passwords of at least 12 characters. Credential endpoints are rate limited
-  per IP (`RateLimits:Auth`, default 10 per minute). Answers do not reveal
-  whether an email address has an account.
-- **Tenants:** requests choose a tenant with the `X-Tenant-Id` header
-  (optional when the user has one membership). Endpoints authorize with
-  `TenantPolicies`:
-
-    | Policy                  | Roles                     |
-    | ----------------------- | ------------------------- |
-    | `Member`, `Broadcaster` | Owner, Admin, Broadcaster |
-    | `Admin`                 | Owner, Admin              |
-    | `Owner`                 | Owner                     |
-
-- **Invitations:** `POST /api/v1/tenants/current/invitations` (Admin; only an
-  Owner can invite an Owner) emails a 7-day link.
-  `POST /api/v1/invitations/accept` joins with the invited, confirmed address.
-- **Email:** the `IEmailSender` port with an SMTP adapter (`Email` section;
-  Brevo or Resend SMTP in production). Compose runs Mailpit, which catches
-  every email at http://localhost:8025.
-- **Logs:** passwords, tokens and email codes are never logged. A test runs
-  every flow at Trace level and checks this.
-
-## REST API
-
-All under `/api/v1`. Errors are RFC 9457 Problem Details, with field errors for
-validation (FluentValidation in Application). In Development, the OpenAPI
-document is at `/openapi/v1.json`, and an interactive reference with examples
-is at `/scalar`.
-
-| Endpoint                                           | Policy    | Notes                                                                                               |
-| -------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------- |
-| `POST /tenants`                                    | signed in | Creates a tenant on the Free plan; the caller is Owner                                              |
-| `GET /tenants/current`                             | Member    | Plan, limits and station count; `ETag`                                                              |
-| `PATCH /tenants/current`                           | Admin     | Needs `If-Match`                                                                                    |
-| `GET /tenants/current/members`                     | Member    |                                                                                                     |
-| `DELETE /tenants/current/members/{userId}`         | Admin     | Only an Owner removes an Owner; the last Owner stays                                                |
-| `POST /tenants/current/invitations`                | Admin     | How members are added                                                                               |
-| `GET /stations?page=&pageSize=`                    | Member    | Paged (1-100 per page)                                                                              |
-| `POST /stations`                                   | Admin     | Within the plan's station limit; assigns the stream and returns listener URLs                       |
-| `GET /stations/{id}`                               | Member    | `ETag`                                                                                              |
-| `PATCH /stations/{id}`                             | Admin     | Needs `If-Match` (428 without, 412 when stale)                                                      |
-| `DELETE /stations/{id}`                            | Admin     | Soft delete; optional `If-Match`                                                                    |
-| `GET /stations/{id}/credentials`                   | Admin     | Per-device broadcast credentials, active first; never the secret                                    |
-| `POST /stations/{id}/credentials`                  | Admin     | Issues a 256-bit secret for one device; the only response that shows it (`Cache-Control: no-store`) |
-| `DELETE /stations/{id}/credentials/{credentialId}` | Admin     | Revokes that device only; idempotent                                                                |
-
-Stations of other tenants answer 404. Broadcast credentials are stored as
-SHA-256 hashes; the Icecast username is the station's public ID. Credential
-creation and revocation are recorded in `audit_entries` (actor, action,
-target; never secrets). Listener URLs come from `Streaming`
-settings (`Node`, `ListenerBaseUrl`). A station change is saved together with
-an `outbox_messages` row (`StationCreated`, `StationChanged`,
-`StationDeleted`). A background dispatcher hands these rows to the
-`IOutboxConsumer` implementations (provisioning #8, RadioBrowser #13), at least
-once, retrying failures with backoff (`Outbox` settings).
-
-## Source auth for Icecast
-
-`POST /internal/icecast/source-auth` implements tc-streaming's
-[source-auth contract](https://github.com/tropicast/tc-streaming/blob/main/docs/source-auth.md):
-Icecast asks it before accepting audio from a source.
-
-- **Internal port only.** It is served on port 8081 (`SourceAuth:Port`) and
-  answers 404 on the public port 8080, so the public gateway never routes it.
-  Only the streaming node, on the private network, reaches it.
-- **Node credentials.** Icecast authenticates with HTTP Basic
-  (`SourceAuth:NodeUsername` / `NodePassword`, the node's
-  `ICECAST_SOURCE_AUTH_USER` / `_PASSWORD`), compared in constant time. When
-  they are not set, every call gets 401.
-- **Allow** (`200` with `icecast-auth-user: 1`) only when all of these hold:
-  the mount is `/stations/{public id}/live.(mp3|opus)`, the user is that
-  station, the password matches one of its active (unrevoked) credentials,
-  the tenant is active, the plan allows the format, and a declared bitrate
-  (`Ice-Bitrate`, else `Ice-Audio-Info`) is within the plan.
-- **Deny** returns `200` with `icecast-auth-message: <reason>`. A reason never
-  contains the credential. A database timeout (2 s) or any error also denies.
-- **On allow,** it records the credential's `last_used_at` and opens a
-  `LiveSession`.
-
-To try it with a real Icecast, run tc-streaming's `icecast` service with
-`ICECAST_SOURCE_AUTH_URL=http://api:8081/internal/icecast/source-auth` and
-matching node credentials, and attach it to this stack's network
-(`docker network connect tc-dashboard_default tc-streaming-icecast-1`).
-
-## Provisioning (station limits on the streaming node)
-
-The database is the desired state of the streaming node. A background worker
-renders it as tc-streaming's `stations.json` (one entry per station: plan,
-listener cap, bitrate, formats). When its version differs from the one last
-applied, the worker sends it over SSH to the node, where `deploy.sh
-apply-stations` reloads Icecast with no restart.
-
-- **When it runs:** on station create or delete and on plan changes (through
-  the outbox, within seconds), and at least every 30 s
-  (`Provisioning:Interval`).
-- **Failures:** retried with exponential backoff from 15 s, up to 10 min.
-  They never block the dashboard. The operator view
-  (`GET /api/v1/operator/streaming-nodes`) shows desired and applied versions,
-  failures and the next try. `POST …/{node}/reconcile` retries at once.
-  Operators are the accounts listed in `Operators:Emails`.
-- **One applier:** a PostgreSQL advisory lock keeps it to one API instance at
-  a time.
-- **Capacity guard:** creating a station returns 503, and logs a critical
-  "node is full" error, when the node would exceed Icecast's `<sources>`
-  (`Streaming:MaxSources`, 50; every allowed format of a station counts) or
-  the oversubscribed sum of listener caps (`Streaming:MaxListenerCaps`,
-  15,000).
-
-Production settings (`Provisioning:Ssh`):
-
-| Setting         | Value                                                                                                                                                                                   |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Host`, `Port`  | The streaming node over the private network, `22`                                                                                                                                       |
-| `Username`      | `deploy`                                                                                                                                                                                |
-| `PrivateKey`    | An ed25519 key used only for this (secret). On the node, its public key is installed with the forced command `deploy.sh apply-stations` (tc-streaming Ansible `provisioning_ssh_keys`). |
-| `HostKeySha256` | The node's ed25519 host key: `ssh-keyscan -t ed25519 <host> \| ssh-keygen -lf -`                                                                                                        |
-
-Compose sets `Provisioning__Enabled=false`: locally there is no node.
-
-## Public station page and embed
-
-Each station of an active tenant has a public page and, on plans with
-embedding (Growth, Pro), an embeddable player. The API renders them as plain
-HTML: no SPA bundle, inline CSS, and a player script of a few kilobytes. A page
-is about 10 KB before audio, and search engines and link previews see its
-title and Open Graph tags.
-
-| Address | What |
-|---|---|
-| `/listen/{tenant-slug}/{station-slug}` | Public page: name, logo, genre, description, live state, player. Station slugs are unique per tenant only, so the address names both. |
-| `/embed/{tenant-slug}/{station-slug}` | Compact player for an `<iframe>`; `403` when the plan has no embedding. |
-| `/embed.js` | `<script src="…/embed.js" data-station="{tenant}/{station}" async>` inserts the iframe after itself. |
-| `GET /api/v1/public/stations/{tenant}/{station}` | Public data, live state and stream URLs; `Cache-Control: public, max-age=15`, readable from any origin. No tenant, plan or listener data. |
-
-The player plays the HTTPS listener URL directly (audio never goes through the
-API). It picks Ogg Opus when the browser supports it, else MP3, and reconnects
-with backoff (1 s doubling to 30 s). A strict Content-Security-Policy allows
-only the page's own inline code (nonce), audio from the listener host and
-images over HTTPS. Only `/embed/*` may be framed. The dashboard's station page
-has the copy-ready links and snippets.
-
-Browser check against a running stack with a live station (MP3 and Opus):
-`REAL_E2E_PLAYER=1 PUBLIC_STATION_PATH=/listen/<tenant>/<station> npx playwright test e2e/public-player.spec.ts`
-(in `web/`).
-
-## RadioBrowser listing
-
-Station owners opt in per station (*List on RadioBrowser*, Starter plan and
-above). The station must have a country, which RadioBrowser requires.
-
-- **Add once.** `DirectoryWorker` (when `Directory:Enabled`, production only)
-  adds an opted-in station the first time it is live: `POST /json/add` on a
-  RadioBrowser server, found from `all.api.radio-browser.info` and tried in
-  random order. It sends the public MP3 listener URL, name, tags, country,
-  language, logo and homepage (the website, else the public page). It stores
-  the returned UUID and never adds that station again.
-- **Updates through the stream.** RadioBrowser's API cannot edit or delete an
-  entry. The listing metadata goes into the node's `stations.json` instead.
-  The node sends it as `icy-*` headers with `icy-index-metadata: 1`, which
-  RadioBrowser applies at its next check of the stream. Opting out sends
-  `icy-do-not-index: 1`; RadioBrowser then marks the entry broken, which hides
-  it from most apps (its API cannot delete it).
-- **Never blocking.** Failures are retried with backoff (1 minute doubling to
-  6 hours) and shown on the station page
-  (`GET /api/v1/stations/{id}/directory`). Broadcasting and editing never wait
-  for RadioBrowser.
-- Only public data is sent: never ingest URLs, credentials or internal host
-  names.
-
-## Observability and security
-
-- **Health**: `/health/live` (the process answers) and `/health/ready` (the
-  database answers). Deploys wait for `ready`. `/health` remains as `live`.
-- **Logs**: JSON lines in production. Every value passes a redaction filter
-  (`Api/Logging/Redaction.cs`: bearer and Basic credentials, `password=`,
-  URL credentials, refresh tokens, 256-bit secrets), and stack traces are not
-  shipped. `SecretLoggingTests` runs every credential flow at Trace level and
-  checks no secret reaches any log.
-- **Telemetry**: OpenTelemetry traces (ASP.NET Core, HttpClient, Npgsql) and
-  metrics (runtime, HTTP, and meter `Tropicast.Dashboard`: `tropicast.up`,
-  source-auth decisions and latency, provisioning, stats and directory
-  results) are exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
-  In production they go to Alloy, then Grafana Cloud. Alert rules are in
-  `monitoring/rules.yaml`, unit-tested with promtool.
-- **Rate limits** per client address: sign-in and credential endpoints
-  (10/min), public pages and API (120/min), desktop sign-in polling
-  (120/min), and source auth (1,200/min).
-- **Headers**: HSTS, a Content-Security-Policy for the SPA (`'self'` only),
-  Permissions-Policy and COOP, all set by Caddy. Public pages keep their own
-  nonce-based policy.
-- **Data Protection keys** in the database: cookies and tokens survive
-  redeploys and are shared by every API instance.
-- **Audit**: the tenant audit log (`GET /api/v1/tenants/current/audit`,
-  Admin) records stations, credentials, members and plan changes. Each user's
-  account activity (`GET /api/v1/auth/activity`) lists sign-ins, failed
-  sign-ins, device sign-ins and sign-outs, refresh-token reuse and password
-  changes, kept for 90 days.
-- **Tenant isolation**: `TenantIsolationTests` finds every tenant-scoped
-  endpoint in the routing table. It calls each one as another tenant's member
-  with tenant A's IDs, and checks there is no success and no data from A.
-- **CI scanning**: vulnerable NuGet packages (including transitive ones) and
-  production npm packages fail the build, and so does Trivy for high or
-  critical fixable issues in the image.
-
-## Billing
-
-Stripe Checkout and the Billing Portal ([ADR 0002](docs/adr/0002-payments-stripe.md)),
-behind the `IPaymentProvider` port; no card data reaches the API.
-
-- `GET /api/v1/billing` gives the plan, subscription and plans on offer.
-  `POST /checkout` and `/portal` (Owner) return Stripe URLs.
-  `GET /usage?month=` (Admin) gives the month's peak listeners,
-  listener-hours and egress per station. Operators read
-  `GET /api/v1/operator/usage`.
-- `POST /api/v1/billing/webhook`: the Stripe signature is verified, and each
-  event is applied once (event IDs are recorded) and in order (late events are
-  ignored). The plan follows the subscription: trial and active give the paid
-  plan, past due keeps it for 7 days, and anything else is Free.
-- A plan change raises `TenantPlanChanged`: provisioning applies the new
-  caps, and the audit log records it. After a downgrade, stations beyond the
-  plan's count (newest first) are refused at source auth.
-- Configuration: the `Billing` section (`SecretKey`, `WebhookSecret`,
-  `Prices:{plan}`, `DisplayPrices:{plan}`, `TrialDays` 14, `GracePeriod`
-  7 days). Without a secret key billing is off. Stripe setup:
-  [docs/runbook.md](docs/runbook.md#10-billing-stripe).
-
-## CI
-
-`.github/workflows/ci.yml` runs on GitHub-hosted runners: .NET build and
-tests plus the stale-client check, web format/lint/test/build, and a Docker
-image build with a `/health`, SPA and version smoke test. Pull request runs are
-cancelled when superseded; runs on `main` always finish.
-
-Releases are tag-driven: pushing `v1.2.3` (or `v1.2.3-rc.1`) on `main` builds
-versioned images and drafts a GitHub Release from [`CHANGELOG.md`](CHANGELOG.md).
-The tag is the only place the version is set; the repository holds a `0.0.0`
-placeholder. Steps: [Releasing](docs/runbook.md#releasing).
+| Topic                                                                                                   | Covers                                                                    |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [Run locally](docs/how-to/run-locally.md)                                                               | Compose services, ports and settings, sign-up walkthrough                 |
+| [Build and test](docs/how-to/build-and-test.md)                                                         | Tests, browser checks, sign-up to live broadcast E2E, CI, releases        |
+| [Database](docs/reference/database.md)                                                                  | EF Core, migrations, tenant and soft-delete query filters                 |
+| [Authentication](docs/reference/authentication.md)                                                      | SPA cookie, desktop tokens, accounts, tenant policies, invitations, email |
+| [REST API](docs/reference/rest-api.md)                                                                  | Tenants, members, stations and credentials endpoints, outbox              |
+| [Desktop API](docs/desktop-api.md)                                                                      | Contract used by tc-station                                               |
+| [Source auth for Icecast](docs/reference/source-auth.md)                                                | Internal endpoint the streaming node calls before accepting audio         |
+| [Provisioning](docs/reference/provisioning.md)                                                          | Station limits on the streaming node, capacity guard, SSH settings        |
+| [Public station page and embed](docs/reference/public-pages.md)                                         | Public pages, embeddable player, public API                               |
+| [RadioBrowser listing](docs/reference/radiobrowser.md)                                                  | Directory listing and updates                                             |
+| [Observability and security](docs/reference/observability-and-security.md)                              | Health, logs, telemetry, rate limits, headers, audit, tenant isolation    |
+| [Billing](docs/reference/billing.md)                                                                    | Stripe Checkout, Billing Portal, webhooks, plan changes                   |
+| [Runbook](docs/runbook.md)                                                                              | Production setup, deploy, releases, rollback, backups, secrets, alerts    |
+| ADRs: [desktop sign-in](docs/adr/0001-desktop-sign-in.md), [payments](docs/adr/0002-payments-stripe.md) | Architecture decisions                                                    |
+| [Changelog](CHANGELOG.md)                                                                               | Changes per release                                                       |
 
 ## Production
 
-One Hetzner CX23 (`tc-app-1`) runs the API and Caddy for
-`app.tropicastradio.com`. It shares a private network with the streaming
-node, which calls source auth over it. The database is Neon PostgreSQL, with
-nightly encrypted dumps to object storage, a daily backup check, and a monthly
-restore test run offline.
+One Hetzner server runs the API and Caddy for `app.tropicastradio.com`, next to
+the streaming node on a private network. The database is Neon PostgreSQL, with
+nightly encrypted backups. Every commit on `main` builds images; deploys are
+manual, with automatic return to the running release when the new one is
+unhealthy. Releases are tag-driven, and the tag is the only place the version is
+set. Details: [docs/runbook.md](docs/runbook.md).
 
-| Path                            | What                                                                                                        |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `infra/terraform`               | server, firewall, primary IPs, private network, Cloudflare DNS                                              |
-| `infra/ansible`                 | hardening, Docker, deploy user, backup timer                                                                |
-| `deploy/`                       | production Compose file, Caddyfile, `deploy.sh`, `backup.sh`, `restore-test.sh`                             |
-| `.github/workflows/image.yml`   | images `ghcr.io/tropicast/dashboard{,-migrations}:sha-<commit>` for each commit on `main`                   |
-| `.github/workflows/release.yml` | on a `v*` tag: images `:<version>`, draft GitHub Release from `CHANGELOG.md`                                |
-| `.github/workflows/deploy.yml`  | manual deploy (commit or release tag): migrate, swap, health check, automatic return to the running release |
+## Contributing
 
-Setup, deploy, rollback, restore and secret rotation:
-[docs/runbook.md](docs/runbook.md).
+One issue, one branch (`feat/…`, `fix/…`, `docs/…`, `ci/…`) and one pull
+request. CI must pass before review. Add user-facing changes to the
+`Unreleased` section of [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
