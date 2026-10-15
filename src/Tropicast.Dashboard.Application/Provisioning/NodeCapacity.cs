@@ -30,20 +30,23 @@ public static class NodeCapacity
     }
 
     /// <summary>Null when <paramref name="adding"/> fits next to <paramref name="assigned"/>; otherwise why not.</summary>
-    public static string? WhyNot(IEnumerable<Plan> assigned, Plan adding, NodeLimits limits)
+    public static string? WhyNot(IEnumerable<Plan> assigned, Plan adding, NodeLimits limits, int autoDjSources = 0)
     {
         ArgumentNullException.ThrowIfNull(assigned);
         ArgumentNullException.ThrowIfNull(adding);
-        return WhyNot(assigned.Append(adding), limits);
+        return WhyNot(assigned.Append(adding), limits, autoDjSources);
     }
 
-    /// <summary>Null when the node can carry one station per plan in <paramref name="stations"/>; otherwise why not.</summary>
-    public static string? WhyNot(IEnumerable<Plan> stations, NodeLimits limits)
+    /// <summary>
+    /// Null when the node can carry one station per plan in <paramref name="stations"/>, plus
+    /// <paramref name="autoDjSources"/> AutoDJ mounts (sources without listeners of their own); otherwise why not.
+    /// </summary>
+    public static string? WhyNot(IEnumerable<Plan> stations, NodeLimits limits, int autoDjSources = 0)
     {
         ArgumentNullException.ThrowIfNull(stations);
         ArgumentNullException.ThrowIfNull(limits);
         var plans = stations.ToList();
-        var sources = plans.Sum(SourcesOf);
+        var sources = plans.Sum(SourcesOf) + autoDjSources;
         if (sources > limits.MaxSources)
         {
             return $"the node would need {sources} sources, above its limit of {limits.MaxSources}";

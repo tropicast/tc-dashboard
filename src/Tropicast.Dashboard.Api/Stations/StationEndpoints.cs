@@ -202,7 +202,8 @@ internal static partial class StationEndpoints
     {
         await NodeLoad.LockAsync(db, streaming.Node, cancellationToken);
         var load = await NodeLoad.ReadAsync(db, streaming.Node, cancellationToken);
-        var reason = NodeCapacity.WhyNot(load.Select(s => s.Plan), plan, streaming.Limits);
+        var reason = NodeCapacity.WhyNot(load.Select(s => s.Plan), plan, streaming.Limits,
+            await NodeLoad.AutoDjSourcesAsync(db, streaming.Node, cancellationToken));
         if (reason is not null)
         {
             NodeLoad.LogNodeFull(logger, streaming.Node, reason);

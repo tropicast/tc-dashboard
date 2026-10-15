@@ -228,7 +228,7 @@ internal static partial class SourceAuthEndpoint
     }
 
     /// <summary>HTTP Basic with the node credentials, compared in constant time over fixed-length hashes.</summary>
-    private static bool NodeAuthenticated(HttpRequest request, SourceAuthOptions options)
+    internal static bool NodeAuthenticated(HttpRequest request, SourceAuthOptions options)
     {
         if (string.IsNullOrEmpty(options.NodeUsername) || string.IsNullOrEmpty(options.NodePassword))
         {

@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.Stations;
+using Tropicast.Dashboard.Application.Provisioning;
 using Tropicast.Dashboard.Application.Media;
 using Tropicast.Dashboard.Domain.Media;
 using Tropicast.Dashboard.Domain.Plans;
@@ -77,6 +80,7 @@ internal static class PlaylistEndpoints
             .WithSummary("Whether AutoDJ is on, its playlist, and whether the plan includes it.");
         station.MapPut("/autodj", UpdateAutoDjAsync).RequireAuthorization(TenantPolicies.Admin)
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .WithSummary("Turns AutoDJ on or off and picks its playlist.");
     }
 
@@ -221,7 +225,8 @@ internal static class PlaylistEndpoints
 
     private static async Task<Results<Ok<AutoDjResponse>, NotFound, ValidationProblem, ProblemHttpResult>> UpdateAutoDjAsync(
         Guid stationId, UpdateAutoDjCommand command, HttpContext context, AppDbContext db, TenantAccess access,
-        IDataProtectionProvider protection, TimeProvider time, CancellationToken cancellationToken)
+        IDataProtectionProvider protection, IOptions<StreamingOptions> streaming, ILoggerFactory loggers, TimeProvider time,
+        CancellationToken cancellationToken)
     {
         if (!await db.Stations.AnyAsync(s => s.Id == stationId, cancellationToken))
         {
@@ -247,7 +252,14 @@ internal static class PlaylistEndpoints
             return Conflict(AutoDjRules.NeedsPlaylist);
         }
         var now = time.GetUtcNow();
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var settings = await db.AutoDjSettings.SingleOrDefaultAsync(a => a.StationId == stationId, cancellationToken);
+        if (command.Enabled && settings is not { Enabled: true }
+            && await NodeFullAsync(db, streaming.Value, plan, loggers.CreateLogger(typeof(PlaylistEndpoints)), cancellationToken))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "No streaming capacity is free for AutoDJ right now. The operator has been alerted; try again later.");
+        }
         if (settings is null)
         {
             settings = AutoDjSettings.For(stationId, now);
@@ -278,7 +290,26 @@ internal static class PlaylistEndpoints
         {
             return stale;
         }
+        await transaction.CommitAsync(cancellationToken);
         return TypedResults.Ok(await ResponseAsync(db, stationId, settings, plan, cancellationToken));
+    }
+
+    /// <summary>
+    /// Whether the node lacks the sources for this station's AutoDJ mounts (one per format: they count toward Icecast's
+    /// <c>&lt;sources&gt;</c> like live mounts). Locks the node for the transaction, as station creation does.
+    /// </summary>
+    private static async Task<bool> NodeFullAsync(AppDbContext db, StreamingOptions streaming, Plan plan, ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        await NodeLoad.LockAsync(db, streaming.Node, cancellationToken);
+        var load = await NodeLoad.ReadAsync(db, streaming.Node, cancellationToken);
+        var autoDj = await NodeLoad.AutoDjSourcesAsync(db, streaming.Node, cancellationToken) + NodeCapacity.SourcesOf(plan);
+        var reason = NodeCapacity.WhyNot(load.Select(s => s.Plan), streaming.Limits, autoDj);
+        if (reason is not null)
+        {
+            NodeLoad.LogNodeFull(logger, streaming.Node, reason);
+        }
+        return reason is not null;
     }
 
     /// <summary>Whether AutoDJ is on and plays this playlist.</summary>
