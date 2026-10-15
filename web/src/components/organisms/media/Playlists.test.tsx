@@ -43,8 +43,12 @@ function fakeApi(
   options: {
     available?: boolean;
     live?: boolean;
+    stale?: boolean;
     deleteConflict?: boolean;
     enableConflict?: boolean;
+    tracksConflict?: boolean;
+    playlistsError?: boolean;
+    role?: 'Owner' | 'Admin' | 'Broadcaster';
   } = {},
 ) {
   const calls: Call[] = [];
@@ -87,14 +91,18 @@ function fakeApi(
       const body = text ? (JSON.parse(text) as Record<string, unknown>) : undefined;
       calls.push({ method: request.method, path, body });
       const playlistMatch = /^\/api\/v1\/stations\/s1\/playlists\/(\w+)(\/tracks)?$/.exec(path);
-      if (path === '/api/v1/auth/me') return Response.json(me);
+      if (path === '/api/v1/auth/me')
+        return Response.json({
+          ...me,
+          memberships: me.memberships.map((m) => ({ ...m, role: options.role ?? m.role })),
+        });
       if (path === '/api/v1/auth/antiforgery') return new Response(null, { status: 204 });
       if (path === '/api/v1/stations/s1')
         return Response.json(station, { headers: { ETag: '"1"' } });
       if (path === '/api/v1/stations/s1/status')
         return Response.json({
           live: options.live ?? false,
-          stale: false,
+          stale: options.stale ?? false,
           listeners: 0,
           outputs: [],
         });
@@ -124,6 +132,12 @@ function fakeApi(
           })),
           storage: { usedBytes: 3000, quotaBytes: 1024 ** 3 },
         });
+      if (
+        path === '/api/v1/stations/s1/playlists' &&
+        request.method === 'GET' &&
+        options.playlistsError
+      )
+        return Response.json({ title: 'The playlists could not be read.' }, { status: 500 });
       if (path === '/api/v1/stations/s1/playlists' && request.method === 'GET')
         return Response.json(
           playlists.map((p) => {
@@ -152,6 +166,11 @@ function fakeApi(
         const playlist = playlists.find((p) => p.id === playlistMatch[1]);
         if (!playlist) return Response.json({ title: 'Not found' }, { status: 404 });
         if (request.method === 'GET') return Response.json(full(playlist));
+        if (request.method === 'PUT' && options.tracksConflict)
+          return Response.json(
+            { title: 'AutoDJ plays this playlist: it cannot be emptied.' },
+            { status: 409 },
+          );
         if (request.method === 'PUT') playlist.trackIds = body?.trackIds as string[];
         if (request.method === 'PATCH') Object.assign(playlist, body);
         if (request.method === 'DELETE') {
@@ -220,6 +239,48 @@ test('the station page turns AutoDJ on with a playlist and shows it on air', asy
   );
   expect(await within(panel).findByText('On air: AutoDJ')).toBeInTheDocument();
   expect(within(panel).getByRole('switch', { name: /Play AutoDJ/ })).toBeChecked();
+  // While on, AutoDJ cannot be left without a playlist.
+  expect(within(panel).getByRole('option', { name: 'Choose a playlist' })).toBeDisabled();
+});
+
+test('AutoDJ cannot be turned on before a playlist with tracks is chosen', async () => {
+  const calls = fakeApi();
+  renderAt('/stations/s1');
+  const panel = (await screen.findByRole('heading', { name: 'AutoDJ' })).closest(
+    'div.rounded-xl',
+  ) as HTMLElement;
+
+  expect(
+    await within(panel).findByText('Choose a playlist with at least one track to turn AutoDJ on.'),
+  ).toBeInTheDocument();
+  expect(within(panel).getByRole('switch', { name: /Play AutoDJ/ })).toBeDisabled();
+  fireEvent.click(within(panel).getByRole('switch', { name: /Play AutoDJ/ }));
+  expect(lastPut(calls, '/autodj')).toBeUndefined();
+});
+
+test('members who are not Admins see AutoDJ read-only', async () => {
+  fakeApi({ role: 'Broadcaster' });
+  renderAt('/stations/s1');
+  const panel = (await screen.findByRole('heading', { name: 'AutoDJ' })).closest(
+    'div.rounded-xl',
+  ) as HTMLElement;
+
+  expect(
+    await within(panel).findByText('Only Owners and Admins can change AutoDJ.'),
+  ).toBeInTheDocument();
+  expect(within(panel).getByRole('switch', { name: /Play AutoDJ/ })).toBeDisabled();
+  expect(within(panel).getByLabelText('Playlist')).toBeDisabled();
+});
+
+test('a stale station status does not claim what is on air', async () => {
+  fakeApi({ live: true, stale: true });
+  renderAt('/stations/s1');
+  const panel = (await screen.findByRole('heading', { name: 'AutoDJ' })).closest(
+    'div.rounded-xl',
+  ) as HTMLElement;
+
+  expect(await within(panel).findByText('On air: status unavailable')).toBeInTheDocument();
+  expect(within(panel).queryByText('On air: live DJ')).not.toBeInTheDocument();
 });
 
 test('a live DJ is shown as the source, and a refusal shows its reason', async () => {
@@ -229,6 +290,10 @@ test('a live DJ is shown as the source, and a refusal shows its reason', async (
     'div.rounded-xl',
   ) as HTMLElement;
   expect(await within(panel).findByText('On air: live DJ')).toBeInTheDocument();
+  fireEvent.change(await within(panel).findByLabelText('Playlist'), { target: { value: 'p1' } });
+  await waitFor(() =>
+    expect(within(panel).getByRole('switch', { name: /Play AutoDJ/ })).toBeEnabled(),
+  );
 
   fireEvent.click(within(panel).getByRole('switch', { name: /Play AutoDJ/ }));
 
@@ -311,4 +376,36 @@ test('deleting the playlist AutoDJ plays shows why it is refused', async () => {
       'AutoDJ plays this playlist: turn AutoDJ off or choose another playlist before deleting it.',
     ),
   ).toBeInTheDocument();
+});
+
+test('a shuffle change keeps a name being typed', async () => {
+  const calls = fakeApi();
+  renderAt('/stations/s1/playlists');
+  const name = await screen.findByLabelText('Name');
+  fireEvent.change(name, { target: { value: 'Night rotation' } });
+
+  fireEvent.click(screen.getByRole('switch', { name: /Shuffle/ }));
+
+  await waitFor(() => expect(lastPut(calls, '/playlists/p1')).toEqual({ shuffle: true }));
+  await waitFor(() => expect(screen.getByRole('switch', { name: /Shuffle/ })).toBeChecked());
+  expect(screen.getByLabelText('Name')).toHaveValue('Night rotation');
+});
+
+test('a refused change is not announced as done', async () => {
+  fakeApi({ tracksConflict: true });
+  renderAt('/stations/s1/playlists');
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Remove Morning from the playlist' }));
+
+  expect(
+    await screen.findByText('AutoDJ plays this playlist: it cannot be emptied.'),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('Morning removed.')).not.toBeInTheDocument();
+});
+
+test('a playlists error is shown, not an empty list', async () => {
+  fakeApi({ playlistsError: true });
+  renderAt('/stations/s1/playlists');
+
+  expect(await screen.findByText('The playlists could not be read.')).toBeInTheDocument();
 });

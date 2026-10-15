@@ -29,6 +29,7 @@ import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
 import type { Credential, Station, Status } from '../../../lib/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { useStation } from '@/hooks/use-station';
 
 const StationStats = lazy(() => import('../../../StationStats'));
 
@@ -37,14 +38,7 @@ export function StationDetail() {
   const { id = '' } = useParams();
   const tenantId = localStorage.getItem('tenant-id');
   const queryClient = useQueryClient();
-  const station = useQuery({
-    queryKey: ['station', tenantId, id],
-    queryFn: async () => {
-      const result = await api.GET('/api/v1/stations/{id}', { params: { path: { id } } });
-      if (result.error) throw result.error;
-      return { station: result.data as Station, etag: result.response.headers.get('ETag') ?? '' };
-    },
-  });
+  const station = useStation(id);
   useDocumentTitle(station.data?.station.name, t('stations.title'));
   const status = useQuery({
     queryKey: ['status', tenantId, id],
@@ -178,7 +172,10 @@ export function StationDetail() {
           {item.listenerUrls.opus && <CopyField label="Opus" value={item.listenerUrls.opus} />}
         </Card>
       </div>
-      <AutoDjPanel stationId={id} live={status.data?.live ?? false} />
+      <AutoDjPanel
+        stationId={id}
+        live={status.data && !status.data.stale ? status.data.live : null}
+      />
       <SharePanel stationSlug={item.slug} />
       <Card title={t('station.settings')}>
         <form

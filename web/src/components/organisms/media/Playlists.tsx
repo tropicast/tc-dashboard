@@ -8,9 +8,10 @@ import { ButtonUtility } from '@/components/base/buttons/button-utility';
 import { Input } from '@/components/base/input/input';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { useStation } from '@/hooks/use-station';
 import { cx } from '@/utils/cx';
 import { api } from '../../../api/client';
-import { Alert } from '../../atoms/Alert';
+import { AutoDjUpgrade } from '../../atoms/AutoDjUpgrade';
 import { Notice } from '../../atoms/Notice';
 import { Card } from '../../molecules/Card';
 import { ConfirmDialog } from '../../molecules/ConfirmDialog';
@@ -18,7 +19,7 @@ import { Loading } from '../../molecules/Loading';
 import { PageHeader } from '../../molecules/PageHeader';
 import { formatTrackDuration } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
-import type { AutoDj, Playlist, PlaylistSummary, Station, TrackLibrary } from '../../../lib/types';
+import type { AutoDj, Playlist, PlaylistSummary, TrackLibrary } from '../../../lib/types';
 
 /** The playlist editor (#109): create, rename, shuffle, add from the library, reorder by keyboard, delete. */
 export function Playlists() {
@@ -26,14 +27,7 @@ export function Playlists() {
   const { id = '' } = useParams();
   const tenantId = localStorage.getItem('tenant-id');
   const queryClient = useQueryClient();
-  const station = useQuery({
-    queryKey: ['station', tenantId, id],
-    queryFn: async () => {
-      const result = await api.GET('/api/v1/stations/{id}', { params: { path: { id } } });
-      if (result.error) throw result.error;
-      return { station: result.data as Station, etag: result.response.headers.get('ETag') ?? '' };
-    },
-  });
+  const station = useStation(id);
   const autoDj = useQuery({
     queryKey: ['autodj', tenantId, id],
     queryFn: () =>
@@ -47,7 +41,8 @@ export function Playlists() {
       data<PlaylistSummary[]>(
         api.GET('/api/v1/stations/{stationId}/playlists', { params: { path: { stationId: id } } }),
       ),
-    enabled: autoDj.data?.available === true,
+    // Fetched with the AutoDJ settings, not after: without AutoDJ, the upgrade notice replaces its answer.
+    retry: false,
   });
   useDocumentTitle(t('playlists.title'), station.data?.station.name);
   const [selected, setSelected] = useState<string | null>(null);
@@ -87,11 +82,7 @@ export function Playlists() {
         description={t('playlists.intro')}
       />
       {!autoDj.data.available ? (
-        <Alert color="gray" title={t('autodj.notIncluded')}>
-          <Link to="/account" className="font-semibold underline">
-            {t('media.upgrade')}
-          </Link>
-        </Alert>
+        <AutoDjUpgrade title={t('autodj.notIncluded')} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
           <Card title={t('playlists.list')}>
@@ -109,12 +100,12 @@ export function Playlists() {
                 {t('playlists.create')}
               </Button>
             </form>
-            <Notice error={create.error} />
-            {playlists.data?.length === 0 ? (
+            <Notice error={create.error ?? playlists.error} />
+            {!playlists.data ? null : playlists.data.length === 0 ? (
               <p className="text-sm text-tertiary">{t('playlists.none')}</p>
             ) : (
               <ul className="flex flex-col gap-1" aria-label={t('playlists.list')}>
-                {playlists.data?.map((playlist) => (
+                {playlists.data.map((playlist) => (
                   <li key={playlist.id}>
                     <button
                       type="button"
@@ -203,27 +194,40 @@ function PlaylistEditor({
     await queryClient.invalidateQueries({ queryKey: ['playlists', tenantId, stationId] });
   };
   const setTracks = useMutation({
-    mutationFn: (trackIds: string[]) =>
+    // `announce` is said once the server accepted the change, never before.
+    mutationFn: ({ trackIds }: { trackIds: string[]; announce: string }) =>
       data<Playlist>(
         api.PUT('/api/v1/stations/{stationId}/playlists/{playlistId}/tracks', {
           params: { path: { stationId, playlistId } },
           body: { trackIds },
         }),
       ),
-    onSuccess: saved,
+    onSuccess: async (result, { announce }) => {
+      await saved(result);
+      setAnnouncement(announce);
+    },
+    onError: () => {
+      focusAfter.current = null;
+    },
   });
-  const patch = useMutation({
-    mutationFn: (body: { name?: string; shuffle?: boolean }) =>
-      data<Playlist>(
-        api.PATCH('/api/v1/stations/{stationId}/playlists/{playlistId}', {
-          params: { path: { stationId, playlistId } },
-          body,
-        }),
-      ),
+  const patch = (body: { name?: string; shuffle?: boolean }) =>
+    data<Playlist>(
+      api.PATCH('/api/v1/stations/{stationId}/playlists/{playlistId}', {
+        params: { path: { stationId, playlistId } },
+        body,
+      }),
+    );
+  // Apart, so that a shuffle change keeps a name being typed.
+  const rename = useMutation({
+    mutationFn: (value: string) => patch({ name: value }),
     onSuccess: async (result) => {
       setName(null);
       await saved(result);
     },
+  });
+  const shuffle = useMutation({
+    mutationFn: (value: boolean) => patch({ shuffle: value }),
+    onSuccess: saved,
   });
   const remove = useMutation({
     mutationFn: () =>
@@ -240,13 +244,16 @@ function PlaylistEditor({
     },
   });
 
-  // Keeps keyboard focus on the button that moved its track, in the track's new place.
+  const busy = setTracks.isPending || rename.isPending || shuffle.isPending;
+
+  // Keeps keyboard focus on the button that moved its track, in the track's new place: once the save is over, as
+  // the buttons are disabled (and cannot take focus) until then.
   useEffect(() => {
-    if (focusAfter.current && list.current) {
+    if (!busy && focusAfter.current && list.current) {
       list.current.querySelector<HTMLElement>(`[data-focus="${focusAfter.current}"]`)?.focus();
       focusAfter.current = null;
     }
-  }, [playlist.data]);
+  }, [playlist.data, busy]);
 
   if (!playlist.data)
     return playlist.error ? (
@@ -256,7 +263,6 @@ function PlaylistEditor({
     );
   const tracks = playlist.data.tracks;
   const ids = tracks.map((track) => track.trackId);
-  const busy = setTracks.isPending || patch.isPending;
 
   const move = (index: number, by: -1 | 1) => {
     const next = [...ids];
@@ -267,14 +273,14 @@ function PlaylistEditor({
       // The button in that direction disappears at the ends: stay on the other one.
       focusAfter.current = `${by < 0 ? 'down' : 'up'}-${position}`;
     }
-    setAnnouncement(
-      t('playlists.moved', {
+    setTracks.mutate({
+      trackIds: next,
+      announce: t('playlists.moved', {
         title: tracks[index].title,
         position: position + 1,
         count: ids.length,
       }),
-    );
-    setTracks.mutate(next);
+    });
   };
 
   return (
@@ -302,7 +308,7 @@ function PlaylistEditor({
         className="flex items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          if (name?.trim()) patch.mutate({ name: name.trim() });
+          if (name?.trim()) rename.mutate(name.trim());
         }}
       >
         <div className="min-w-0 flex-1">
@@ -321,9 +327,9 @@ function PlaylistEditor({
         hint={t('playlists.shuffleHint')}
         isSelected={playlist.data.shuffle}
         isDisabled={busy}
-        onChange={(shuffle) => patch.mutate({ shuffle })}
+        onChange={(value) => shuffle.mutate(value)}
       />
-      <Notice error={setTracks.error ?? patch.error} />
+      <Notice error={setTracks.error ?? rename.error ?? shuffle.error} />
       <h3 className="text-md font-semibold text-primary">{t('playlists.inPlaylist')}</h3>
       {tracks.length === 0 ? (
         <p className="text-sm text-tertiary">{t('playlists.empty')}</p>
@@ -338,14 +344,7 @@ function PlaylistEditor({
               className="flex items-center gap-3 px-3 py-2 text-sm"
             >
               <span className="w-6 text-right text-quaternary">{index + 1}</span>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium text-primary">{track.title}</span>
-                <span className="truncate text-tertiary">
-                  {[track.artist, formatTrackDuration(Number(track.durationMs))]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </div>
+              <TrackMeta {...track} />
               {index > 0 && (
                 <ButtonUtility
                   color="tertiary"
@@ -374,16 +373,19 @@ function PlaylistEditor({
                 isDisabled={busy}
                 aria-label={t('playlists.remove', { title: track.title })}
                 tooltip={t('playlists.remove', { title: track.title })}
-                onPress={() => {
-                  setAnnouncement(t('playlists.removed', { title: track.title }));
-                  setTracks.mutate(ids.filter((_, i) => i !== index));
-                }}
+                onPress={() =>
+                  setTracks.mutate({
+                    trackIds: ids.filter((_, i) => i !== index),
+                    announce: t('playlists.removed', { title: track.title }),
+                  })
+                }
               />
             </li>
           ))}
         </ol>
       )}
       <h3 className="text-md font-semibold text-primary">{t('playlists.addFromLibrary')}</h3>
+      <Notice error={library.error} />
       {library.data?.tracks.length === 0 ? (
         <p className="text-sm text-tertiary">
           {t('playlists.libraryEmpty')}{' '}
@@ -398,24 +400,19 @@ function PlaylistEditor({
         <ul className="flex flex-col divide-y divide-secondary rounded-lg ring-1 ring-secondary">
           {library.data?.tracks.map((track) => (
             <li key={track.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium text-primary">{track.title}</span>
-                <span className="truncate text-tertiary">
-                  {[track.artist, formatTrackDuration(Number(track.durationMs))]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </div>
+              <TrackMeta {...track} />
               <ButtonUtility
                 color="tertiary"
                 icon={Plus}
                 isDisabled={busy}
                 aria-label={t('playlists.add', { title: track.title })}
                 tooltip={t('playlists.add', { title: track.title })}
-                onPress={() => {
-                  setAnnouncement(t('playlists.added', { title: track.title }));
-                  setTracks.mutate([...ids, track.id]);
-                }}
+                onPress={() =>
+                  setTracks.mutate({
+                    trackIds: [...ids, track.id],
+                    announce: t('playlists.added', { title: track.title }),
+                  })
+                }
               />
             </li>
           ))}
@@ -434,5 +431,25 @@ function PlaylistEditor({
         </ConfirmDialog>
       )}
     </Card>
+  );
+}
+
+/** A track's title, then its artist and duration. */
+function TrackMeta({
+  title,
+  artist,
+  durationMs,
+}: {
+  title: string;
+  artist: string;
+  durationMs: number | string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate font-medium text-primary">{title}</span>
+      <span className="truncate text-tertiary">
+        {[artist, formatTrackDuration(Number(durationMs))].filter(Boolean).join(' · ')}
+      </span>
+    </div>
   );
 }

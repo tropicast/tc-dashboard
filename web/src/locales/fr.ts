@@ -209,6 +209,7 @@ export const fr: Locale = {
     sourceLive: 'À l’antenne : DJ en direct',
     sourceAutoDj: 'À l’antenne : AutoDJ',
     sourceNone: 'Hors antenne',
+    sourceUnknown: 'À l’antenne : statut indisponible',
     enable: 'Diffuser l’AutoDJ quand aucun DJ n’est en direct',
     enableHint:
       'Les auditeurs passent à l’AutoDJ quand le DJ se déconnecte, et reviennent au direct à son retour.',
@@ -217,6 +218,8 @@ export const fr: Locale = {
     playlistOption_one: '{{name}} ({{count}} titre)',
     playlistOption_other: '{{name}} ({{count}} titres)',
     noPlaylist: 'Créez d’abord une playlist d’au moins un titre.',
+    choosePlaylistFirst: 'Choisissez une playlist d’au moins un titre pour activer l’AutoDJ.',
+    adminOnly: 'Seuls les propriétaires et les administrateurs peuvent modifier l’AutoDJ.',
     encoding: 'L’AutoDJ encode comme votre direct : {{encoding}}.',
     encodingItem: '{{format}} {{bitrate}} kbit/s, {{rate}} kHz',
     editPlaylists: 'Modifier les playlists',
