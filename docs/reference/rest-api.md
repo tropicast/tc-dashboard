@@ -25,6 +25,9 @@ is at `/scalar`.
 | `POST /stations/{id}/tracks/uploads`               | Member    | Presigned PUT URL; AutoDJ plans only (403), within the storage quota (403), 503 without a bucket    |
 | `POST /stations/{id}/tracks`                       | Member    | Confirms an upload from the stored file (422 not audio, 403 over quota, 409 not arrived yet)        |
 | `DELETE /stations/{id}/tracks/{trackId}`           | Member    | Deletes the stored file and the track                                                               |
+| `/stations/{id}/playlists…`                        | Member    | Playlists of the station's tracks ([AutoDJ](autodj.md))                                             |
+| `GET /stations/{id}/autodj`                        | Member    | AutoDJ on or off, its playlist, whether the plan includes it                                        |
+| `PUT /stations/{id}/autodj`                        | Admin     | 403 on a plan without AutoDJ, 409 without a non-empty playlist; audited                             |
 
 Stations of other tenants answer 404. Broadcast credentials are stored as
 SHA-256 hashes; the Icecast username is the station's public ID. Credential

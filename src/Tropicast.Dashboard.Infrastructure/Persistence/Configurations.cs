@@ -149,6 +149,41 @@ internal sealed class TrackConfiguration : IEntityTypeConfiguration<Domain.Media
     }
 }
 
+internal sealed class PlaylistConfiguration : IEntityTypeConfiguration<Domain.Media.Playlist>
+{
+    public void Configure(EntityTypeBuilder<Domain.Media.Playlist> builder)
+    {
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => new { e.StationId, e.Name });
+        builder.Property(e => e.Name).HasMaxLength(100);
+        builder.HasMany(e => e.Items).WithOne().HasForeignKey(i => i.PlaylistId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(e => e.Items).HasField("_items").UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class PlaylistItemConfiguration : IEntityTypeConfiguration<Domain.Media.PlaylistItem>
+{
+    public void Configure(EntityTypeBuilder<Domain.Media.PlaylistItem> builder)
+    {
+        // Deleting a track takes it out of every playlist.
+        builder.HasOne(e => e.Track).WithMany().HasForeignKey(e => e.TrackId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(e => new { e.PlaylistId, e.Position });
+        builder.HasIndex(e => e.TrackId);
+    }
+}
+
+internal sealed class AutoDjSettingsConfiguration : IEntityTypeConfiguration<Domain.Media.AutoDjSettings>
+{
+    public void Configure(EntityTypeBuilder<Domain.Media.AutoDjSettings> builder)
+    {
+        builder.ToTable("auto_dj_settings");
+        builder.HasKey(e => e.StationId);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        // Deleting the default playlist leaves no playlist chosen (the API refuses it while AutoDJ is on).
+        builder.HasOne<Domain.Media.Playlist>().WithMany().HasForeignKey(e => e.DefaultPlaylistId).OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
 internal sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
 {
     public void Configure(EntityTypeBuilder<Invitation> builder)
