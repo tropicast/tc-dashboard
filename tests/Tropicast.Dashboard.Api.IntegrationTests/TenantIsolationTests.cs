@@ -22,7 +22,7 @@ public sealed partial class TenantIsolationTests(DashboardFactory factory) : ICl
     private static readonly HashSet<string> TenantPolicyNames =
         [TenantPolicies.Member, TenantPolicies.Broadcaster, TenantPolicies.Admin, TenantPolicies.Owner];
 
-    private sealed record Victim(Guid TenantId, Guid OwnerId, StationResponse Station, Guid CredentialId, Guid TrackId);
+    private sealed record Victim(Guid TenantId, Guid OwnerId, StationResponse Station, Guid CredentialId, Guid TrackId, Guid PlaylistId);
 
     private async Task<Victim> VictimAsync()
     {
@@ -39,8 +39,10 @@ public sealed partial class TenantIsolationTests(DashboardFactory factory) : ICl
         var track = Domain.Media.Track.StartUpload(station.Id, "victim.mp3", 1000, DateTimeOffset.UtcNow, TimeSpan.FromMinutes(5));
         track.Confirm(Domain.Media.TrackFormat.Mp3, TimeSpan.FromSeconds(30), 1000, "Victim track", "");
         db.Tracks.Add(track);
+        var playlist = Domain.Media.Playlist.Create(station.Id, "Victim playlist", false, DateTimeOffset.UtcNow);
+        db.Playlists.Add(playlist);
         await db.SaveChangesAsync(Token);
-        return new Victim(tenantId, ownerId, station, credential!.Credential.Id, track.Id);
+        return new Victim(tenantId, ownerId, station, credential!.Credential.Id, track.Id, playlist.Id);
     }
 
     private List<(string Method, string Template)> TenantEndpoints()
@@ -59,6 +61,7 @@ public sealed partial class TenantIsolationTests(DashboardFactory factory) : ICl
         "id" or "stationId" => victim.Station.Id.ToString(),
         "credentialId" => victim.CredentialId.ToString(),
         "trackId" => victim.TrackId.ToString(),
+        "playlistId" => victim.PlaylistId.ToString(),
         "userId" => victim.OwnerId.ToString(),
         var other => throw new InvalidOperationException($"Unknown route parameter {{{other}}} in {template}: teach the isolation test."),
     });
@@ -92,6 +95,8 @@ public sealed partial class TenantIsolationTests(DashboardFactory factory) : ICl
         Assert.Null((await db.BroadcastCredentials.IgnoreQueryFilters().SingleAsync(c => c.Id == victim.CredentialId, Token)).RevokedAt);
         Assert.True(await db.Memberships.IgnoreQueryFilters().AnyAsync(m => m.UserId == victim.OwnerId && m.TenantId == victim.TenantId, Token));
         Assert.True(await db.Tracks.IgnoreQueryFilters().AnyAsync(t => t.Id == victim.TrackId, Token));
+        Assert.Equal("Victim playlist", (await db.Playlists.IgnoreQueryFilters().SingleAsync(p => p.Id == victim.PlaylistId, Token)).Name);
+        Assert.False(await db.AutoDjSettings.IgnoreQueryFilters().AnyAsync(a => a.StationId == victim.Station.Id, Token));
     }
 
     private static async Task CheckAsync(Browser attacker, string method, string path, string label, List<string> failures, Victim victim,

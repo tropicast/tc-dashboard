@@ -2403,7 +2403,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Deletes the track and its stored file. */
+        /** Deletes the track, its stored file and its playlist entries. AutoDJ turns off if its playlist ends up empty. */
         delete: {
             parameters: {
                 query?: never;
@@ -2441,6 +2441,411 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{stationId}/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The station's playlists. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaylistSummaryResponse"][];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Creates an empty playlist. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreatePlaylistCommand"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        /** @description Address of the created resource. */
+                        Location?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaylistResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{stationId}/playlists/{playlistId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A playlist and its tracks in play order. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                    playlistId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaylistResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Deletes a playlist (not the one AutoDJ is playing). */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match"?: string;
+                };
+                path: {
+                    stationId: string;
+                    playlistId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Renames a playlist or changes its order mode. */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match"?: string;
+                };
+                path: {
+                    stationId: string;
+                    playlistId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdatePlaylistCommand"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaylistResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Precondition Failed */
+                412: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/stations/{stationId}/playlists/{playlistId}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replaces the playlist's tracks, in play order (add, remove and reorder in one call). */
+        put: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description The ETag from your last read. Missing: 428; stale: 412. */
+                    "If-Match"?: string;
+                };
+                path: {
+                    stationId: string;
+                    playlistId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetPlaylistTracksCommand"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        /** @description Version of the resource; send it back as If-Match to change it. */
+                        ETag?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaylistResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Precondition Failed */
+                412: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{stationId}/autodj": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether AutoDJ is on, its playlist, and whether the plan includes it. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutoDjResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** Turns AutoDJ on or off and picks its playlist. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateAutoDjCommand"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutoDjResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2735,6 +3140,22 @@ export interface components {
              */
             occurredAt: string;
         };
+        /** @description A station's AutoDJ. */
+        AutoDjResponse: {
+            /** @description Turned on (it plays only while Available). */
+            enabled: boolean;
+            /**
+             * Format: uuid
+             * @description The playlist it plays.
+             */
+            defaultPlaylistId: null | string;
+            /** @description The plan includes AutoDJ. */
+            available: boolean;
+            /** @description Enabled and available: plays when no DJ is live. */
+            active: boolean;
+            /** @description The plan includes scheduled playlists (not offered yet). */
+            scheduling: boolean;
+        };
         /** @description The tenant's plan and subscription. */
         BillingResponse: {
             /** @description Current plan (what the tenant gets now). */
@@ -2849,6 +3270,16 @@ export interface components {
         CreateCredentialCommand: {
             /** @description Names the device, e.g. "Studio PC"; unique among the station's active credentials. */
             deviceLabel: string;
+        };
+        /** @description Creates a playlist on a station. */
+        CreatePlaylistCommand: {
+            /** @description e.g. "Night rotation". */
+            name: string;
+            /**
+             * @description Play in random order.
+             * @default false
+             */
+            shuffle: boolean;
         };
         /**
          * @description Creates a station in the current tenant.
@@ -3322,6 +3753,74 @@ export interface components {
              */
             storageQuotaBytes: number | string;
         };
+        /** @description A playlist with its entries in play order. */
+        PlaylistResponse: {
+            /**
+             * Format: uuid
+             * @description Playlist ID.
+             */
+            id: string;
+            /** @description Display name. */
+            name: string;
+            /** @description Plays in random order. */
+            shuffle: boolean;
+            /** @description Entries in play order. */
+            tracks: components["schemas"]["PlaylistTrackResponse"][];
+            /**
+             * Format: int64
+             * @description Playing time of all entries.
+             */
+            durationMs: number | string;
+            /**
+             * Format: date-time
+             * @description Last change.
+             */
+            updatedAt: string;
+        };
+        /** @description A playlist in a list. */
+        PlaylistSummaryResponse: {
+            /**
+             * Format: uuid
+             * @description Playlist ID.
+             */
+            id: string;
+            /** @description Display name. */
+            name: string;
+            /** @description Plays in random order. */
+            shuffle: boolean;
+            /**
+             * Format: int32
+             * @description Entries.
+             */
+            trackCount: number | string;
+            /**
+             * Format: int64
+             * @description Playing time of all entries.
+             */
+            durationMs: number | string;
+            /**
+             * Format: date-time
+             * @description Last change.
+             */
+            updatedAt: string;
+        };
+        /** @description An entry of a playlist. */
+        PlaylistTrackResponse: {
+            /**
+             * Format: uuid
+             * @description The track.
+             */
+            trackId: string;
+            /** @description Its title. */
+            title: string;
+            /** @description Its artist; may be empty. */
+            artist: string;
+            /**
+             * Format: int64
+             * @description Its playing time.
+             */
+            durationMs: number | string;
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -3422,6 +3921,11 @@ export interface components {
              * @description When.
              */
             occurredAt: string;
+        };
+        /** @description Replaces a playlist's entries, in play order. A track may appear more than once. */
+        SetPlaylistTracksCommand: {
+            /** @description Confirmed tracks of the same station. */
+            trackIds: string[];
         };
         /** @description Starts an upload: the server answers with a presigned URL the browser PUTs the file to. */
         StartTrackUploadCommand: {
@@ -3756,6 +4260,21 @@ export interface components {
              * @description The PUT must start by then; confirm within an hour after.
              */
             expiresAt: string;
+        };
+        /** @description Turns AutoDJ on or off and picks the playlist it plays. */
+        UpdateAutoDjCommand: {
+            /** @description Play when no DJ is live. */
+            enabled: boolean;
+            /**
+             * Format: uuid
+             * @description The playlist to play; needed (and not empty) to turn AutoDJ on.
+             */
+            defaultPlaylistId?: null | string;
+        };
+        /** @description Renames a playlist or changes its order mode; omitted fields keep their value. */
+        UpdatePlaylistCommand: {
+            name?: null | string;
+            shuffle?: null | boolean;
         };
         /**
          * @description Changes station settings; omitted (null) fields keep their value.

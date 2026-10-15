@@ -59,8 +59,8 @@ internal static class TrackEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .WithSummary("Confirms an upload: the server reads the stored file's format, duration and size, then keeps or deletes it.");
-        tracks.MapDelete("/{trackId:guid}", DeleteAsync).ProducesProblem(StatusCodes.Status503ServiceUnavailable)
-            .WithSummary("Deletes the track and its stored file.");
+        tracks.MapDelete("/{trackId:guid}", DeleteAsync)
+            .WithSummary("Deletes the track, its stored file and its playlist entries. AutoDJ turns off if its playlist ends up empty.");
     }
 
     private static async Task<Results<Ok<TrackLibraryResponse>, NotFound>> ListAsync(Guid stationId, AppDbContext db,
@@ -187,8 +187,8 @@ internal static class TrackEndpoints
         return TypedResults.Created($"/api/v1/stations/{stationId}/tracks/{track.Id}", ToResponse(track));
     }
 
-    private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> DeleteAsync(Guid stationId, Guid trackId, AppDbContext db,
-        IObjectStorage storage, CancellationToken cancellationToken)
+    private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> DeleteAsync(Guid stationId, Guid trackId, HttpContext context,
+        AppDbContext db, TenantAccess access, IObjectStorage storage, TimeProvider time, CancellationToken cancellationToken)
     {
         if (!storage.IsConfigured)
         {
@@ -200,8 +200,20 @@ internal static class TrackEndpoints
             return TypedResults.NotFound();
         }
         // The object first: a failure leaves the row, so the delete can be retried.
-        await storage.DeleteAsync(track.ObjectKey, cancellationToken);
+        if (storage.IsConfigured)
+        {
+            await storage.DeleteAsync(track.ObjectKey, cancellationToken);
+        }
         db.Tracks.Remove(track);
+        // Its playlist entries cascade. AutoDJ with nothing left to play turns off rather than going silent.
+        var autoDj = await db.AutoDjSettings.SingleOrDefaultAsync(a => a.StationId == stationId && a.Enabled, cancellationToken);
+        if (autoDj is not null && !await db.PlaylistItems.AnyAsync(i => i.PlaylistId == autoDj.DefaultPlaylistId && i.TrackId != trackId,
+                cancellationToken))
+        {
+            var now = time.GetUtcNow();
+            autoDj.Set(false, autoDj.DefaultPlaylistId, now);
+            Audit.Record(db, access, context.User, "autodj.disabled", "Station", stationId.ToString(), "its playlist became empty", now);
+        }
         await db.SaveChangesAsync(cancellationToken);
         return TypedResults.NoContent();
     }

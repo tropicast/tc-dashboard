@@ -51,6 +51,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<LiveSession> LiveSessions => Set<LiveSession>();
     public DbSet<StationStatsRollup> StationStatsRollups => Set<StationStatsRollup>();
     public DbSet<Domain.Media.Track> Tracks => Set<Domain.Media.Track>();
+    public DbSet<Domain.Media.Playlist> Playlists => Set<Domain.Media.Playlist>();
+    public DbSet<Domain.Media.PlaylistItem> PlaylistItems => Set<Domain.Media.PlaylistItem>();
+    public DbSet<Domain.Media.AutoDjSettings> AutoDjSettings => Set<Domain.Media.AutoDjSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -85,6 +88,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
         builder.Entity<LiveSession>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
         builder.Entity<StationStatsRollup>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
         builder.Entity<Domain.Media.Track>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
+        builder.Entity<Domain.Media.Playlist>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
+        builder.Entity<Domain.Media.PlaylistItem>().HasQueryFilter(TenantFilter, e => e.Track.Station.TenantId == CurrentTenantId);
+        builder.Entity<Domain.Media.AutoDjSettings>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
 
         foreach (var entity in builder.Model.GetEntityTypes().Where(e => !e.IsOwned()).ToList())
         {
