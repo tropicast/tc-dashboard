@@ -36,7 +36,11 @@ internal sealed partial class Reconciler(AppDbContext db, IStreamingNodeClient c
             .ToListAsync(cancellationToken);
         // Directory metadata travels to the node too: RadioBrowser updates a listing from the stream's headers.
         var entries = await Directories.DirectoryEntries.ForAsync(db, directory.Value, [.. rows.Select(r => r.Id)], cancellationToken);
-        var stations = rows.Select(r => new StationLimits(r.PublicId, r.Plan, entries.GetValueOrDefault(r.Id))).ToList();
+        // AutoDJ fallback mounts for stations with AutoDJ on, while the plan includes it (#107).
+        var autoDj = (await db.AutoDjSettings.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(a => a.Enabled)
+            .Select(a => a.StationId).ToListAsync(cancellationToken)).ToHashSet();
+        var stations = rows.Select(r => new StationLimits(r.PublicId, r.Plan, entries.GetValueOrDefault(r.Id),
+            r.Plan.AutoDj && autoDj.Contains(r.Id))).ToList();
         var defaultCap = (await db.Plans.SingleAsync(p => p.Id == Domain.Plans.Plan.Free.Id, cancellationToken)).MaxListeners;
         var desired = StationLimitsDocument.Render(stations, defaultCap);
 

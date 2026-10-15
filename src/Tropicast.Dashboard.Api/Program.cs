@@ -14,6 +14,7 @@ using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
 using Tropicast.Dashboard.Api.Auth;
 using Tropicast.Dashboard.Api.Operator;
+using Tropicast.Dashboard.Api.Playout;
 using Tropicast.Dashboard.Api.Public;
 using Tropicast.Dashboard.Api.SourceAuth;
 using Tropicast.Dashboard.Api.Stations;
@@ -129,6 +130,7 @@ app.MapPublicStations();
 app.MapDirectory();
 app.MapBilling();
 app.MapSourceAuth();
+app.MapPlayout();
 app.MapOperator();
 
 // The React SPA is built into wwwroot; client-side routes fall back to index.html.

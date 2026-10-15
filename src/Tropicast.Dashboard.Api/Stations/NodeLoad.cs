@@ -24,6 +24,19 @@ internal static partial class NodeLoad
         return [.. rows.Select(r => (r.TenantId, r.Plan))];
     }
 
+    /// <summary>Sources the AutoDJ mounts on <paramref name="node"/> take: one per format of each station with AutoDJ on.</summary>
+    public static async Task<int> AutoDjSourcesAsync(AppDbContext db, string node, CancellationToken cancellationToken)
+    {
+        var onNode = db.StreamAssignments.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(s => s.Node == node);
+        var plans = await db.AutoDjSettings.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .Where(a => a.Enabled && a.Station.DeletedAt == null && onNode.Any(s => s.StationId == a.StationId))
+            .Join(db.Tenants.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.Status == TenantStatus.Active),
+                a => a.Station.TenantId, t => t.Id, (_, t) => t.PlanId)
+            .Join(db.Plans, id => id, p => p.Id, (_, p) => p)
+            .ToListAsync(cancellationToken);
+        return plans.Where(p => p.AutoDj).Sum(NodeCapacity.SourcesOf);
+    }
+
     /// <summary>Serialises capacity decisions on one node for the rest of the current transaction.</summary>
     public static Task LockAsync(AppDbContext db, string node, CancellationToken cancellationToken)
         => db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"node:" + node}))", cancellationToken);

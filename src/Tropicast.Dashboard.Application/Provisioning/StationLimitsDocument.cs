@@ -7,14 +7,19 @@ using Tropicast.Dashboard.Domain.Plans;
 namespace Tropicast.Dashboard.Application.Provisioning;
 
 /// <summary>One station's limits on a node, and its directory metadata when it is (or was) listed.</summary>
-public sealed record StationLimits(string PublicId, Plan Plan, Directories.DirectoryEntry? Directory = null);
+/// <param name="PublicId">The station's public ID.</param>
+/// <param name="Plan">Its tenant's plan.</param>
+/// <param name="Directory">Directory metadata, when listed (or withdrawn).</param>
+/// <param name="AutoDj">AutoDJ is on (and in the plan): the node renders its hidden <c>autodj.&lt;fmt&gt;</c> fallback mounts.</param>
+public sealed record StationLimits(string PublicId, Plan Plan, Directories.DirectoryEntry? Directory = null, bool AutoDj = false);
 
 /// <summary>A rendered <c>stations.json</c> and its version (hash of the content).</summary>
 public sealed record RenderedStations(string Json, string Version);
 
 /// <summary>
 /// Renders the desired state of a streaming node as tc-streaming's <c>stations.json</c> (README, "Station limits"):
-/// <c>{"default": {"max_listeners": N}, "stations": {"&lt;id&gt;": {plan, max_listeners, max_bitrate_kbps, formats, directory?}}}</c>.
+/// <c>{"default": {"max_listeners": N}, "stations": {"&lt;id&gt;": {plan, max_listeners, max_bitrate_kbps, formats, directory?, autodj?}}}</c>.
+/// <c>autodj: true</c> (only written when on) makes the node add the station's AutoDJ fallback mounts (#107, tc-streaming#61).
 /// <c>directory</c> makes the node send the station's metadata as <c>icy-*</c> headers, which directories such as
 /// RadioBrowser read to update a listing (tc-streaming docs/reference/icecast.md, "Station limits").
 /// Deterministic: the same stations and plans always give the same bytes and version.
@@ -51,6 +56,10 @@ public static class StationLimitsDocument
                 if (station.Directory is { } directory)
                 {
                     WriteDirectory(json, directory);
+                }
+                if (station.AutoDj)
+                {
+                    json.WriteBoolean("autodj", true);
                 }
                 json.WriteEndObject();
             }
