@@ -13,8 +13,10 @@ namespace Tropicast.Dashboard.Infrastructure.Media;
 
 /// <summary>
 /// A deleted station keeps its history, not its uploaded audio: every object under its prefix goes, then its track
-/// rows, playlists and AutoDJ settings. Idempotent (outbox delivery is at least once). Deleting an account needs its stations deleted first, so
-/// this also covers <c>DELETE /auth/account</c>.
+/// rows, playlists and AutoDJ settings. Idempotent (outbox delivery is at least once). Deleting an account needs its
+/// stations deleted first, so this also covers <c>DELETE /auth/account</c>. Uploads still pending stay until
+/// <see cref="PendingUploadCleanup"/> takes them: their URL may still PUT a file after the prefix is cleared, and that
+/// cleanup deletes it.
 /// </summary>
 internal sealed class StationTracksCleanup(IServiceScopeFactory scopes, TimeProvider time) : IOutboxConsumer
 {

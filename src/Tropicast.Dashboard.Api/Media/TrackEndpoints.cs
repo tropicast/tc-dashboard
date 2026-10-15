@@ -59,7 +59,7 @@ internal static class TrackEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .WithSummary("Confirms an upload: the server reads the stored file's format, duration and size, then keeps or deletes it.");
-        tracks.MapDelete("/{trackId:guid}", DeleteAsync)
+        tracks.MapDelete("/{trackId:guid}", DeleteAsync).ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .WithSummary("Deletes the track, its stored file and its playlist entries. AutoDJ turns off if its playlist ends up empty.");
     }
 
@@ -200,10 +200,7 @@ internal static class TrackEndpoints
             return TypedResults.NotFound();
         }
         // The object first: a failure leaves the row, so the delete can be retried.
-        if (storage.IsConfigured)
-        {
-            await storage.DeleteAsync(track.ObjectKey, cancellationToken);
-        }
+        await storage.DeleteAsync(track.ObjectKey, cancellationToken);
         db.Tracks.Remove(track);
         // Its playlist entries cascade. AutoDJ with nothing left to play turns off rather than going silent.
         var autoDj = await db.AutoDjSettings.SingleOrDefaultAsync(a => a.StationId == stationId && a.Enabled, cancellationToken);
