@@ -75,6 +75,8 @@ services:
     environment:
       APP_HOST: ${APP_HOST:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
+      # The CSP's connect-src: the browser uploads tracks to the bucket.
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}
     ports:
       - "80:80"
       - "443:443"

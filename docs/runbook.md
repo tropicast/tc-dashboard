@@ -423,6 +423,8 @@ nothing in the bucket is public.
 2. Create an S3 key for it. Set `STORAGE_S3_ACCESS_KEY` and
    `STORAGE_S3_SECRET_KEY` (secrets), `STORAGE_S3_ENDPOINT`
    (`https://fsn1.your-objectstorage.com`) and `STORAGE_S3_BUCKET` (variables).
+   Caddy adds the endpoint to the dashboard's Content-Security-Policy
+   (`connect-src`) so the browser may upload there; a deploy applies it.
 3. Allow the dashboard to PUT from the browser (CORS), from your machine with
    the AWS CLI:
 
