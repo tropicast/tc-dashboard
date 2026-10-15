@@ -1853,6 +1853,222 @@
         }
       }
     },
+    "/api/v1/stations/{stationId}/tracks": {
+      "get": {
+        "tags": [
+          "Media library"
+        ],
+        "summary": "The station's tracks and the tenant's audio storage use.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackLibraryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Media library"
+        ],
+        "summary": "Confirms an upload: the server reads the stored file's format, duration and size, then keeps or deletes it.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTrackCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{stationId}/tracks/uploads": {
+      "post": {
+        "tags": [
+          "Media library"
+        ],
+        "summary": "Starts an upload: PUT the file to the returned URL with the returned headers, then confirm it.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartTrackUploadCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackUploadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{stationId}/tracks/{trackId}": {
+      "delete": {
+        "tags": [
+          "Media library"
+        ],
+        "summary": "Deletes the track and its stored file.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/billing": {
       "get": {
         "tags": [
@@ -2328,6 +2544,34 @@
             "type": "string"
           }
         }
+      },
+      "ConfirmTrackCommand": {
+        "required": [
+          "uploadId"
+        ],
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "description": "The `trackId` the upload started with.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Shown in playlists; the file's tags (else its name) when omitted."
+          },
+          "artist": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The file's tags when omitted."
+          }
+        },
+        "description": "Confirms an upload once the browser has PUT the file: the server checks the stored object."
       },
       "CreateCredentialCommand": {
         "examples": [
@@ -3332,7 +3576,10 @@
           "formats",
           "directoryListing",
           "embed",
-          "analytics"
+          "analytics",
+          "autoDj",
+          "autoDjScheduling",
+          "storageQuotaBytes"
         ],
         "type": "object",
         "properties": {
@@ -3389,6 +3636,23 @@
           "analytics": {
             "type": "boolean",
             "description": "Listener statistics included."
+          },
+          "autoDj": {
+            "type": "boolean",
+            "description": "AutoDJ: uploaded tracks play when no DJ is live."
+          },
+          "autoDjScheduling": {
+            "type": "boolean",
+            "description": "Scheduled AutoDJ playlists; without it, one fallback playlist."
+          },
+          "storageQuotaBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Uploaded audio the tenant may store, across its stations.",
+            "format": "int64"
           }
         },
         "description": "A plan's limits and features."
@@ -3652,6 +3916,29 @@
           }
         },
         "description": "An account security event."
+      },
+      "StartTrackUploadCommand": {
+        "required": [
+          "fileName",
+          "size"
+        ],
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "The file's name, e.g. \"jingle.mp3\". Its extension picks the content type."
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The file's size in bytes.",
+            "format": "int64"
+          }
+        },
+        "description": "Starts an upload: the server answers with a presigned URL the browser PUTs the file to."
       },
       "StationResponse": {
         "examples": [
@@ -3965,6 +4252,34 @@
         },
         "description": "One period of statistics."
       },
+      "StorageUsageResponse": {
+        "required": [
+          "usedBytes",
+          "quotaBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "usedBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Stored tracks and uploads in progress.",
+            "format": "int64"
+          },
+          "quotaBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The plan's quota; 0 when the plan has no AutoDJ.",
+            "format": "int64"
+          }
+        },
+        "description": "Audio storage of the tenant, across its stations."
+      },
       "StreamingNodeResponse": {
         "required": [
           "node",
@@ -4061,7 +4376,8 @@
           "slug",
           "status",
           "plan",
-          "stationCount"
+          "stationCount",
+          "storageUsedBytes"
         ],
         "type": "object",
         "properties": {
@@ -4094,6 +4410,15 @@
             ],
             "description": "Stations in use, out of Plan.MaxStations.",
             "format": "int32"
+          },
+          "storageUsedBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Uploaded audio stored, out of Plan.StorageQuotaBytes.",
+            "format": "int64"
           }
         },
         "description": "A tenant (customer account)."
@@ -4206,6 +4531,130 @@
         },
         "description": "Tokens for the desktop app: string TokenResponse.AccessToken lasts 15 minutes; refresh to get a new pair."
       },
+      "TrackFormat": {
+        "enum": [
+          "Mp3",
+          "Flac",
+          "OggOpus",
+          "OggVorbis"
+        ],
+        "description": "The container and codec of an uploaded track, as read from the file (never from the client)."
+      },
+      "TrackLibraryResponse": {
+        "required": [
+          "tracks",
+          "storage"
+        ],
+        "type": "object",
+        "properties": {
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackResponse"
+            },
+            "description": "Confirmed tracks, newest first."
+          },
+          "storage": {
+            "description": "Used and allowed bytes.",
+            "$ref": "#/components/schemas/StorageUsageResponse"
+          }
+        },
+        "description": "A station's tracks and the tenant's storage use."
+      },
+      "TrackResponse": {
+        "required": [
+          "id",
+          "fileName",
+          "title",
+          "artist",
+          "format",
+          "durationMs",
+          "sizeBytes",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Track ID.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "The uploaded file's name."
+          },
+          "title": {
+            "type": "string",
+            "description": "Shown in playlists."
+          },
+          "artist": {
+            "type": "string",
+            "description": "May be empty."
+          },
+          "format": {
+            "description": "Read from the file: Mp3, Flac, OggOpus or OggVorbis.",
+            "$ref": "#/components/schemas/TrackFormat"
+          },
+          "durationMs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Playing time.",
+            "format": "int64"
+          },
+          "sizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Stored size.",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the upload started.",
+            "format": "date-time"
+          }
+        },
+        "description": "An uploaded track."
+      },
+      "TrackUploadResponse": {
+        "required": [
+          "trackId",
+          "uploadUrl",
+          "headers",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "trackId": {
+            "type": "string",
+            "description": "Confirm the upload with it (`uploadId`).",
+            "format": "uuid"
+          },
+          "uploadUrl": {
+            "type": "string",
+            "description": "Presigned bucket URL: PUT the file's bytes there.",
+            "format": "uri"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Headers the PUT must carry, exactly (the URL is signed for them). The body must be exactly the declared size, and\nthe URL works once: a second PUT to it is refused."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The PUT must start by then; confirm within an hour after.",
+            "format": "date-time"
+          }
+        },
+        "description": "Where and how the browser sends the file."
+      },
       "UpdateStationCommand": {
         "examples": [
           {
@@ -4304,7 +4753,8 @@
           "peakListeners",
           "listenerHours",
           "egressBytes",
-          "stations"
+          "stations",
+          "storage"
         ],
         "type": "object",
         "properties": {
@@ -4349,6 +4799,10 @@
               "$ref": "#/components/schemas/StationUsageResponse"
             },
             "description": "Per station, including deleted ones that streamed that month."
+          },
+          "storage": {
+            "description": "Uploaded audio stored now (not monthly), out of the plan's quota.",
+            "$ref": "#/components/schemas/StorageUsageResponse"
           }
         },
         "description": "A tenant's use of a month, for fair-use review: from the daily statistics."
@@ -4407,6 +4861,9 @@
     },
     {
       "name": "Credentials"
+    },
+    {
+      "name": "Media library"
     },
     {
       "name": "Billing"

@@ -2221,6 +2221,231 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stations/{stationId}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The station's tracks and the tenant's audio storage use. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TrackLibraryResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Confirms an upload: the server reads the stored file's format, duration and size, then keeps or deletes it. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConfirmTrackCommand"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TrackResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unprocessable Entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{stationId}/tracks/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Starts an upload: PUT the file to the returned URL with the returned headers, then confirm it. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartTrackUploadCommand"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TrackUploadResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stations/{stationId}/tracks/{trackId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes the track and its stored file. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stationId: string;
+                    trackId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing": {
         parameters: {
             query?: never;
@@ -2602,6 +2827,18 @@ export interface components {
             /** Format: uuid */
             userId: string;
             code: string;
+        };
+        /** @description Confirms an upload once the browser has PUT the file: the server checks the stored object. */
+        ConfirmTrackCommand: {
+            /**
+             * Format: uuid
+             * @description The `trackId` the upload started with.
+             */
+            uploadId: string;
+            /** @description Shown in playlists; the file's tags (else its name) when omitted. */
+            title?: null | string;
+            /** @description The file's tags when omitted. */
+            artist?: null | string;
         };
         /**
          * @description Issues a broadcast credential for one device of a station.
@@ -3075,6 +3312,15 @@ export interface components {
             embed: boolean;
             /** @description Listener statistics included. */
             analytics: boolean;
+            /** @description AutoDJ: uploaded tracks play when no DJ is live. */
+            autoDj: boolean;
+            /** @description Scheduled AutoDJ playlists; without it, one fallback playlist. */
+            autoDjScheduling: boolean;
+            /**
+             * Format: int64
+             * @description Uploaded audio the tenant may store, across its stations.
+             */
+            storageQuotaBytes: number | string;
         };
         ProblemDetails: {
             type?: null | string;
@@ -3176,6 +3422,16 @@ export interface components {
              * @description When.
              */
             occurredAt: string;
+        };
+        /** @description Starts an upload: the server answers with a presigned URL the browser PUTs the file to. */
+        StartTrackUploadCommand: {
+            /** @description The file's name, e.g. "jingle.mp3". Its extension picks the content type. */
+            fileName: string;
+            /**
+             * Format: int64
+             * @description The file's size in bytes.
+             */
+            size: number | string;
         };
         /**
          * @description A station.
@@ -3325,6 +3581,19 @@ export interface components {
              */
             egressBytes: number | string;
         };
+        /** @description Audio storage of the tenant, across its stations. */
+        StorageUsageResponse: {
+            /**
+             * Format: int64
+             * @description Stored tracks and uploads in progress.
+             */
+            usedBytes: number | string;
+            /**
+             * Format: int64
+             * @description The plan's quota; 0 when the plan has no AutoDJ.
+             */
+            quotaBytes: number | string;
+        };
         /** @description A streaming node's provisioning state. */
         StreamingNodeResponse: {
             /** @description Node name. */
@@ -3380,6 +3649,11 @@ export interface components {
              * @description Stations in use, out of Plan.MaxStations.
              */
             stationCount: number | string;
+            /**
+             * Format: int64
+             * @description Uploaded audio stored, out of Plan.StorageQuotaBytes.
+             */
+            storageUsedBytes: number | string;
         };
         /** @enum {unknown} */
         TenantStatus: "Active" | "Suspended";
@@ -3414,6 +3688,74 @@ export interface components {
             expiresIn: number | string;
             /** @description One-time: each refresh returns a new one. Revoke it to sign the device out. */
             refreshToken: string;
+        };
+        /**
+         * @description The container and codec of an uploaded track, as read from the file (never from the client).
+         * @enum {unknown}
+         */
+        TrackFormat: "Mp3" | "Flac" | "OggOpus" | "OggVorbis";
+        /** @description A station's tracks and the tenant's storage use. */
+        TrackLibraryResponse: {
+            /** @description Confirmed tracks, newest first. */
+            tracks: components["schemas"]["TrackResponse"][];
+            /** @description Used and allowed bytes. */
+            storage: components["schemas"]["StorageUsageResponse"];
+        };
+        /** @description An uploaded track. */
+        TrackResponse: {
+            /**
+             * Format: uuid
+             * @description Track ID.
+             */
+            id: string;
+            /** @description The uploaded file's name. */
+            fileName: string;
+            /** @description Shown in playlists. */
+            title: string;
+            /** @description May be empty. */
+            artist: string;
+            /** @description Read from the file: Mp3, Flac, OggOpus or OggVorbis. */
+            format: components["schemas"]["TrackFormat"];
+            /**
+             * Format: int64
+             * @description Playing time.
+             */
+            durationMs: number | string;
+            /**
+             * Format: int64
+             * @description Stored size.
+             */
+            sizeBytes: number | string;
+            /**
+             * Format: date-time
+             * @description When the upload started.
+             */
+            createdAt: string;
+        };
+        /** @description Where and how the browser sends the file. */
+        TrackUploadResponse: {
+            /**
+             * Format: uuid
+             * @description Confirm the upload with it (`uploadId`).
+             */
+            trackId: string;
+            /**
+             * Format: uri
+             * @description Presigned bucket URL: PUT the file's bytes there.
+             */
+            uploadUrl: string;
+            /**
+             * @description Headers the PUT must carry, exactly (the URL is signed for them). The body must be exactly the declared size, and
+             *     the URL works once: a second PUT to it is refused.
+             */
+            headers: {
+                [key: string]: string;
+            };
+            /**
+             * Format: date-time
+             * @description The PUT must start by then; confirm within an hour after.
+             */
+            expiresAt: string;
         };
         /**
          * @description Changes station settings; omitted (null) fields keep their value.
@@ -3468,6 +3810,8 @@ export interface components {
             egressBytes: number | string;
             /** @description Per station, including deleted ones that streamed that month. */
             stations: components["schemas"]["StationUsageResponse"][];
+            /** @description Uploaded audio stored now (not monthly), out of the plan's quota. */
+            storage: components["schemas"]["StorageUsageResponse"];
         };
         UserCodeRequest: {
             userCode: string;

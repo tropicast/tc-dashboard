@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Tropicast.Dashboard.Application\Tropicast.Dashboard.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />

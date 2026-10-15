@@ -50,6 +50,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<BroadcastCredential> BroadcastCredentials => Set<BroadcastCredential>();
     public DbSet<LiveSession> LiveSessions => Set<LiveSession>();
     public DbSet<StationStatsRollup> StationStatsRollups => Set<StationStatsRollup>();
+    public DbSet<Domain.Media.Track> Tracks => Set<Domain.Media.Track>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -83,6 +84,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
         builder.Entity<BroadcastCredential>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
         builder.Entity<LiveSession>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
         builder.Entity<StationStatsRollup>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
+        builder.Entity<Domain.Media.Track>().HasQueryFilter(TenantFilter, e => e.Station.TenantId == CurrentTenantId);
 
         foreach (var entity in builder.Model.GetEntityTypes().Where(e => !e.IsOwned()).ToList())
         {

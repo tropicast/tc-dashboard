@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.Tenants;
 using Tropicast.Dashboard.Application.Provisioning;
 using Tropicast.Dashboard.Application.Stations;
 using Tropicast.Dashboard.Domain;
@@ -68,7 +69,7 @@ internal static partial class StationEndpoints
         {
             return TypedResults.ValidationProblem(errors);
         }
-        var plan = await CurrentPlanAsync(db, cancellationToken);
+        var plan = await TenantPlans.CurrentAsync(db, cancellationToken);
         var query = db.Stations.OrderByDescending(s => s.CreatedAt);
         var total = await query.CountAsync(cancellationToken);
         var items = await query
@@ -87,9 +88,7 @@ internal static partial class StationEndpoints
         var logger = loggers.CreateLogger(typeof(StationEndpoints));
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         // Locks the tenant row: concurrent creates cannot both pass the station limit.
-        var tenant = await db.Tenants.FromSql($"SELECT *, xmin FROM tenants WHERE id = {access.TenantId} FOR UPDATE")
-            .SingleAsync(cancellationToken);
-        var plan = await db.Plans.SingleAsync(p => p.Id == tenant.PlanId, cancellationToken);
+        var plan = await TenantPlans.LockPlanAsync(db, access, cancellationToken);
         if (!StationQuota.AllowsAnother(plan, await db.Stations.CountAsync(cancellationToken)))
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: StationQuota.LimitMessage(plan),
@@ -101,7 +100,7 @@ internal static partial class StationEndpoints
                 title: "No streaming capacity is free right now. The operator has been alerted; try again later.");
         }
 
-        var station = Station.Create(tenant.Id, command.Name, command.Slug, now);
+        var station = Station.Create(access.TenantId!.Value, command.Name, command.Slug, now);
         station.Describe(command.Description, command.Genre, command.Country, command.Language, command.LogoUrl, command.Website, now);
         station.SetDirectoryListing(command.ListInDirectory, plan, now);
         var assignment = StreamAssignment.Create(station, streaming.Value.Node, now);
@@ -156,7 +155,7 @@ internal static partial class StationEndpoints
         }
         if (command.ListInDirectory is { } listed)
         {
-            station.SetDirectoryListing(listed, await CurrentPlanAsync(db, cancellationToken), now);
+            station.SetDirectoryListing(listed, await TenantPlans.CurrentAsync(db, cancellationToken), now);
         }
         Audit.Record(db, access, context.User, "station.updated", nameof(Station), station.Id.ToString(), Changed(command), now);
         if (await SaveAsync(db, cancellationToken) is { } failed)
@@ -223,14 +222,11 @@ internal static partial class StationEndpoints
         }
     }
 
-    private static async Task<Plan> CurrentPlanAsync(AppDbContext db, CancellationToken cancellationToken)
-        => await db.Tenants.Join(db.Plans, t => t.PlanId, p => p.Id, (_, p) => p).SingleAsync(cancellationToken);
-
     private static async Task<StationResponse> ResponseAsync(AppDbContext db, Station station, StreamingOptions streaming,
         CancellationToken cancellationToken)
     {
         var assignment = await db.StreamAssignments.SingleOrDefaultAsync(a => a.StationId == station.Id, cancellationToken);
-        return ToResponse(station, assignment, await CurrentPlanAsync(db, cancellationToken), streaming);
+        return ToResponse(station, assignment, await TenantPlans.CurrentAsync(db, cancellationToken), streaming);
     }
 
     private static StationResponse ToResponse(Station station, StreamAssignment? assignment, Plan plan, StreamingOptions streaming)

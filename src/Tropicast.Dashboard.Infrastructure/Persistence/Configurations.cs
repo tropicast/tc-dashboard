@@ -133,6 +133,22 @@ internal sealed class StationStatsRollupConfiguration : IEntityTypeConfiguration
     }
 }
 
+internal sealed class TrackConfiguration : IEntityTypeConfiguration<Domain.Media.Track>
+{
+    public void Configure(EntityTypeBuilder<Domain.Media.Track> builder)
+    {
+        // Deleted with their station's objects by StationTracksCleanup, never by a cascade (the station stays).
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => new { e.StationId, e.CreatedAt });
+        builder.HasIndex(e => e.UploadExpiresAt).HasFilter("status = 'Pending'");
+        builder.HasIndex(e => e.ObjectKey).IsUnique();
+        builder.Property(e => e.ObjectKey).HasMaxLength(128);
+        builder.Property(e => e.FileName).HasMaxLength(255);
+        builder.Property(e => e.Title).HasMaxLength(Domain.Media.Track.MaxTextLength);
+        builder.Property(e => e.Artist).HasMaxLength(Domain.Media.Track.MaxTextLength);
+    }
+}
+
 internal sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
 {
     public void Configure(EntityTypeBuilder<Invitation> builder)

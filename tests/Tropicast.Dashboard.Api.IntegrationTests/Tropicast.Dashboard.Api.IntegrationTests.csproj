@@ -12,6 +12,10 @@
     <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The audio tones of the Application tests, as uploads. -->
+    <None Include="..\Tropicast.Dashboard.Application.Tests\Fixtures\*" LinkBase="Fixtures" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

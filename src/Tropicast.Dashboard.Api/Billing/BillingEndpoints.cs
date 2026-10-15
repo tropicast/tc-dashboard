@@ -61,8 +61,9 @@ internal sealed record StationUsageResponse(Guid StationId, string PublicId, str
 /// <param name="ListenerHours">Listening time of all stations.</param>
 /// <param name="EgressBytes">Estimated traffic of all stations.</param>
 /// <param name="Stations">Per station, including deleted ones that streamed that month.</param>
+/// <param name="Storage">Uploaded audio stored now (not monthly), out of the plan's quota.</param>
 internal sealed record UsageResponse(string Month, string PlanId, int PeakListeners, double ListenerHours, long EgressBytes,
-    IReadOnlyList<StationUsageResponse> Stations);
+    IReadOnlyList<StationUsageResponse> Stations, Media.StorageUsageResponse Storage);
 
 /// <summary>One tenant's use of a month (operator report).</summary>
 internal sealed record TenantUsageResponse(Guid TenantId, string TenantName, string PlanId, int PeakListeners, double ListenerHours, long EgressBytes);
@@ -243,8 +244,11 @@ internal static partial class BillingEndpoints
             .Join(db.Stations.IgnoreQueryFilters([AppDbContext.DeletedFilter]), u => u.StationId, s => s.Id,
                 (u, s) => new StationUsageResponse(s.Id, s.PublicId, s.Name, u.Peak, u.Hours, u.Egress))
             .ToListAsync(cancellationToken);
+        var plan = await db.Plans.SingleAsync(p => p.Id == tenant.PlanId, cancellationToken);
+        var storage = new Media.StorageUsageResponse(await Media.TrackEndpoints.UsedBytesAsync(db, time.GetUtcNow(), null, cancellationToken),
+            plan.StorageQuotaBytes);
         return TypedResults.Ok(new UsageResponse(range.Label, tenant.PlanId, rows.Count == 0 ? 0 : rows.Max(r => r.PeakListeners),
-            rows.Sum(r => r.ListenerHours), rows.Sum(r => r.EgressBytes), [.. rows.OrderByDescending(r => r.EgressBytes)]));
+            rows.Sum(r => r.ListenerHours), rows.Sum(r => r.EgressBytes), [.. rows.OrderByDescending(r => r.EgressBytes)], storage));
     }
 
     private static async Task<Results<Ok<List<TenantUsageResponse>>, ValidationProblem>> OperatorUsageAsync(string? month, AppDbContext db,

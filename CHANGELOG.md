@@ -7,6 +7,12 @@ When releasing, rename `Unreleased` to the version (for example `## [0.2.0] - 20
 new empty `Unreleased` section. The release workflow requires that section and publishes it above the
 auto-generated list of merged pull requests. See [Releasing](docs/runbook.md#releasing).
 
+## [Unreleased]
+
+### Added
+
+- AutoDJ media library API (#104): stations on Starter and above upload MP3, FLAC or Ogg tracks to a private S3-compatible bucket through presigned URLs; the server checks each stored file's format, duration and size. Upload URLs are signed for the declared size and work once, so the quota counts what is stored and a checked file cannot be replaced. Per-plan storage quota (1 GB Starter, 5 GB Growth, 20 GB Pro), shown in the workspace and billing usage. Deleting a station deletes its files. Local development runs RustFS in `compose.yaml`.
+
 ## [0.1.1] - 2026-10-14
 
 ### Added
