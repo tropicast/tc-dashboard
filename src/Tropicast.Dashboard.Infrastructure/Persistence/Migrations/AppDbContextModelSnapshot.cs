@@ -211,6 +211,120 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_entries", (string)null);
                 });
 
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.AutoDjSettings", b =>
+                {
+                    b.Property<Guid>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<Guid?>("DefaultPlaylistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("default_playlist_id");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("StationId")
+                        .HasName("pk_auto_dj_settings");
+
+                    b.HasIndex("DefaultPlaylistId")
+                        .HasDatabaseName("ix_auto_dj_settings_default_playlist_id");
+
+                    b.ToTable("auto_dj_settings", (string)null);
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Playlist", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("Shuffle")
+                        .HasColumnType("boolean")
+                        .HasColumnName("shuffle");
+
+                    b.Property<Guid>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playlists");
+
+                    b.HasIndex("StationId", "Name")
+                        .HasDatabaseName("ix_playlists_station_id_name");
+
+                    b.ToTable("playlists", (string)null);
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.PlaylistItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("PlaylistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("playlist_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("TrackId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("track_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playlist_items");
+
+                    b.HasIndex("TrackId")
+                        .HasDatabaseName("ix_playlist_items_track_id");
+
+                    b.HasIndex("PlaylistId", "Position")
+                        .HasDatabaseName("ix_playlist_items_playlist_id_position");
+
+                    b.ToTable("playlist_items", (string)null);
+                });
+
             modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Track", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1483,6 +1597,55 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_audit_entries_tenants_tenant_id");
                 });
 
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.AutoDjSettings", b =>
+                {
+                    b.HasOne("Tropicast.Dashboard.Domain.Media.Playlist", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultPlaylistId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_auto_dj_settings_playlists_default_playlist_id");
+
+                    b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_auto_dj_settings_stations_station_id");
+
+                    b.Navigation("Station");
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Playlist", b =>
+                {
+                    b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playlists_stations_station_id");
+
+                    b.Navigation("Station");
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.PlaylistItem", b =>
+                {
+                    b.HasOne("Tropicast.Dashboard.Domain.Media.Playlist", null)
+                        .WithMany("Items")
+                        .HasForeignKey("PlaylistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_playlist_items_playlists_playlist_id");
+
+                    b.HasOne("Tropicast.Dashboard.Domain.Media.Track", "Track")
+                        .WithMany()
+                        .HasForeignKey("TrackId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_playlist_items_tracks_track_id");
+
+                    b.Navigation("Track");
+                });
+
             modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Track", b =>
                 {
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
@@ -1656,6 +1819,11 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_security_events_users_user_id");
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Playlist", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

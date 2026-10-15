@@ -2028,7 +2028,7 @@
         "tags": [
           "Media library"
         ],
-        "summary": "Deletes the track and its stored file.",
+        "summary": "Deletes the track, its stored file and its playlist entries. AutoDJ turns off if its playlist ends up empty.",
         "parameters": [
           {
             "name": "stationId",
@@ -2058,6 +2058,485 @@
           },
           "503": {
             "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{stationId}/playlists": {
+      "get": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "The station's playlists.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaylistSummaryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "Creates an empty playlist.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlaylistCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "Address of the created resource.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{stationId}/playlists/{playlistId}": {
+      "get": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "A playlist and its tracks in play order.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "Renames a playlist or changes its order mode.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The ETag from your last read. Missing: 428; stale: 412.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlaylistCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "Deletes a playlist (not the one AutoDJ is playing).",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The ETag from your last read. Missing: 428; stale: 412.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{stationId}/playlists/{playlistId}/tracks": {
+      "put": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "Replaces the playlist's tracks, in play order (add, remove and reorder in one call).",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The ETag from your last read. Missing: 428; stale: 412.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPlaylistTracksCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "Version of the resource; send it back as If-Match to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stations/{stationId}/autodj": {
+      "get": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "Whether AutoDJ is on, its playlist, and whether the plan includes it.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDjResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "AutoDJ"
+        ],
+        "summary": "Turns AutoDJ on or off and picks its playlist.",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAutoDjCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDjResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2326,6 +2805,43 @@
         },
         "description": "An audit log entry."
       },
+      "AutoDjResponse": {
+        "required": [
+          "enabled",
+          "defaultPlaylistId",
+          "available",
+          "active",
+          "scheduling"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Turned on (it plays only while Available)."
+          },
+          "defaultPlaylistId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The playlist it plays.",
+            "format": "uuid"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "The plan includes AutoDJ."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Enabled and available: plays when no DJ is live."
+          },
+          "scheduling": {
+            "type": "boolean",
+            "description": "The plan includes scheduled playlists (not offered yet)."
+          }
+        },
+        "description": "A station's AutoDJ."
+      },
       "BillingResponse": {
         "required": [
           "planId",
@@ -2590,6 +3106,24 @@
           }
         },
         "description": "Issues a broadcast credential for one device of a station."
+      },
+      "CreatePlaylistCommand": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "e.g. \"Night rotation\"."
+          },
+          "shuffle": {
+            "type": "boolean",
+            "description": "Play in random order.",
+            "default": false
+          }
+        },
+        "description": "Creates a playlist on a station."
       },
       "CreateStationCommand": {
         "examples": [
@@ -3657,6 +4191,138 @@
         },
         "description": "A plan's limits and features."
       },
+      "PlaylistResponse": {
+        "required": [
+          "id",
+          "name",
+          "shuffle",
+          "tracks",
+          "durationMs",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Playlist ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "shuffle": {
+            "type": "boolean",
+            "description": "Plays in random order."
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaylistTrackResponse"
+            },
+            "description": "Entries in play order."
+          },
+          "durationMs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Playing time of all entries.",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Last change.",
+            "format": "date-time"
+          }
+        },
+        "description": "A playlist with its entries in play order."
+      },
+      "PlaylistSummaryResponse": {
+        "required": [
+          "id",
+          "name",
+          "shuffle",
+          "trackCount",
+          "durationMs",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Playlist ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "shuffle": {
+            "type": "boolean",
+            "description": "Plays in random order."
+          },
+          "trackCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Entries.",
+            "format": "int32"
+          },
+          "durationMs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Playing time of all entries.",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Last change.",
+            "format": "date-time"
+          }
+        },
+        "description": "A playlist in a list."
+      },
+      "PlaylistTrackResponse": {
+        "required": [
+          "trackId",
+          "title",
+          "artist",
+          "durationMs"
+        ],
+        "type": "object",
+        "properties": {
+          "trackId": {
+            "type": "string",
+            "description": "The track.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title."
+          },
+          "artist": {
+            "type": "string",
+            "description": "Its artist; may be empty."
+          },
+          "durationMs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Its playing time.",
+            "format": "int64"
+          }
+        },
+        "description": "An entry of a playlist."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -3916,6 +4582,23 @@
           }
         },
         "description": "An account security event."
+      },
+      "SetPlaylistTracksCommand": {
+        "required": [
+          "trackIds"
+        ],
+        "type": "object",
+        "properties": {
+          "trackIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Confirmed tracks of the same station."
+          }
+        },
+        "description": "Replaces a playlist's entries, in play order. A track may appear more than once."
       },
       "StartTrackUploadCommand": {
         "required": [
@@ -4655,6 +5338,45 @@
         },
         "description": "Where and how the browser sends the file."
       },
+      "UpdateAutoDjCommand": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Play when no DJ is live."
+          },
+          "defaultPlaylistId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The playlist to play; needed (and not empty) to turn AutoDJ on.",
+            "format": "uuid"
+          }
+        },
+        "description": "Turns AutoDJ on or off and picks the playlist it plays."
+      },
+      "UpdatePlaylistCommand": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "shuffle": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "Renames a playlist or changes its order mode; omitted fields keep their value."
+      },
       "UpdateStationCommand": {
         "examples": [
           {
@@ -4864,6 +5586,9 @@
     },
     {
       "name": "Media library"
+    },
+    {
+      "name": "AutoDJ"
     },
     {
       "name": "Billing"
