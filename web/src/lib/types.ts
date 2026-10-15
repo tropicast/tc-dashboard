@@ -7,3 +7,6 @@ export type Station = components['schemas']['StationResponse'];
 export type Tenant = components['schemas']['TenantResponse'];
 export type Status = components['schemas']['StationStatusResponse'];
 export type Credential = components['schemas']['CredentialResponse'];
+export type Track = components['schemas']['TrackResponse'];
+export type TrackLibrary = components['schemas']['TrackLibraryResponse'];
+export type TrackUpload = components['schemas']['TrackUploadResponse'];

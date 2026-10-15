@@ -15,13 +15,18 @@ import { PageHeader } from '../../molecules/PageHeader';
 import { Notice } from '../../atoms/Notice';
 import { BillingPanel } from './BillingPanel';
 import { YourDataPanel } from './YourDataPanel';
-import { formatDateTime } from '../../../lib/i18n';
+import { formatDateTime, formatStorage } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import type { Tenant } from '../../../lib/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export function Account() {
   const { t } = useTranslation();
+  const storageLine = (value: Tenant) =>
+    t('media.storageUsed', {
+      used: formatStorage(Number(value.storageUsedBytes)),
+      quota: formatStorage(Number(value.plan.storageQuotaBytes)),
+    });
   useDocumentTitle(t('account.title'));
   const tenantId = localStorage.getItem('tenant-id');
   const tenant = useQuery({
@@ -70,6 +75,20 @@ export function Account() {
                   listeners: tenant.data.plan.maxListeners,
                 })}
               </p>
+            </div>
+          )}
+          {tenant.data && Number(tenant.data.plan.storageQuotaBytes) > 0 && (
+            <div className="flex flex-col gap-2">
+              <ProgressBarBase
+                value={Math.min(
+                  Number(tenant.data.storageUsedBytes),
+                  Number(tenant.data.plan.storageQuotaBytes),
+                )}
+                max={Number(tenant.data.plan.storageQuotaBytes)}
+                aria-label={t('account.storageUsed')}
+                aria-valuetext={storageLine(tenant.data)}
+              />
+              <p className="text-sm text-tertiary">{storageLine(tenant.data)}</p>
             </div>
           )}
         </Card>
