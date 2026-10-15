@@ -50,4 +50,23 @@ public sealed class ProvisioningRulesTests
         Assert.Null(NodeCapacity.WhyNot(Enumerable.Repeat(Plan.Pro, 10), limits));
         Assert.Contains("15000", NodeCapacity.WhyNot(Enumerable.Repeat(Plan.Pro, 10), Plan.Free, limits), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Autodj_stations_are_flagged_and_the_others_unchanged()
+    {
+        var rendered = Provisioning.StationLimitsDocument.Render(
+            [new("aaaaaaaaaa", Domain.Plans.Plan.Starter, AutoDj: true), new("bbbbbbbbbb", Domain.Plans.Plan.Starter)], 100);
+        var stations = System.Text.Json.JsonDocument.Parse(rendered.Json).RootElement.GetProperty("stations");
+
+        Assert.True(stations.GetProperty("aaaaaaaaaa").GetProperty("autodj").GetBoolean());
+        Assert.False(stations.GetProperty("bbbbbbbbbb").TryGetProperty("autodj", out _));
+    }
+
+    [Fact]
+    public void Autodj_mounts_count_as_sources_but_not_listeners()
+    {
+        var limits = new Provisioning.NodeLimits(MaxSources: 4, MaxListeners: 10_000);
+        Assert.Null(Provisioning.NodeCapacity.WhyNot([Domain.Plans.Plan.Starter], limits, autoDjSources: 2));
+        Assert.NotNull(Provisioning.NodeCapacity.WhyNot([Domain.Plans.Plan.Starter], limits, autoDjSources: 3));
+    }
 }
