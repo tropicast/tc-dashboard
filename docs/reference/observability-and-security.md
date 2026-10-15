@@ -16,7 +16,8 @@
 - **Rate limits** per client address: sign-in and credential endpoints
   (10/min), public pages and API (120/min), desktop sign-in polling
   (120/min), and source auth (1,200/min).
-- **Headers**: HSTS, a Content-Security-Policy for the SPA (`'self'` only),
+- **Headers**: HSTS, a Content-Security-Policy for the SPA (`'self'` only, plus
+  the tracks bucket for uploads),
   Permissions-Policy and COOP, all set by Caddy. Public pages keep their own
   nonce-based policy.
 - **Data Protection keys** in the database: cookies and tokens survive

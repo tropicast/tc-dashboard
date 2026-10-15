@@ -16,7 +16,9 @@
 		-Server
 		# The SPA and the API: only this origin's code. Public pages and the
 		# embed send their own, stricter policy (nonce-based); "?" keeps it.
-		?Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		# connect-src also allows the tracks bucket: the browser PUTs uploads
+		# there with presigned URLs (STORAGE_S3_ENDPOINT; empty when unset).
+		?Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src https:; connect-src 'self' {$STORAGE_S3_ENDPOINT}; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 	}
 
 	# Nothing may be framed except the embeddable player (#12), whose
