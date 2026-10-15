@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { en } from '../locales/en';
 import { fr } from '../locales/fr';
-import i18n, { formatBytes, formatListeningTime } from './i18n';
+import i18n, { formatBytes, formatListeningTime, formatStorage, formatTrackDuration } from './i18n';
 
 type Texts = { [key: string]: string | Texts };
 
@@ -72,3 +72,11 @@ test.each([
     expect(formatListeningTime(hours).replace(/\s/g, ' ')).toBe(french);
   },
 );
+
+test('stored audio and track lengths read naturally', () => {
+  expect(formatStorage(37 * 1024)).toBe('37 kB');
+  expect(formatStorage(512 * 1024 ** 2)).toBe('512 MB');
+  expect(formatStorage(1024 ** 3)).toBe('1 GB');
+  expect(formatTrackDuration(185_000)).toBe('3:05');
+  expect(formatTrackDuration(3_729_000)).toBe('1:02:09');
+});
