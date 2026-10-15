@@ -8,9 +8,11 @@ import { Button } from '@/components/base/buttons/button';
 import { ButtonUtility } from '@/components/base/buttons/button-utility';
 import { ProgressBarBase } from '@/components/base/progress-indicators/progress-indicators';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { useStation } from '@/hooks/use-station';
 import { cx } from '@/utils/cx';
 import { api } from '../../../api/client';
 import { Alert } from '../../atoms/Alert';
+import { AutoDjUpgrade } from '../../atoms/AutoDjUpgrade';
 import { Notice } from '../../atoms/Notice';
 import { Card } from '../../molecules/Card';
 import { ConfirmDialog } from '../../molecules/ConfirmDialog';
@@ -18,7 +20,7 @@ import { Loading } from '../../molecules/Loading';
 import { PageHeader } from '../../molecules/PageHeader';
 import { formatStorage, formatTrackDuration } from '../../../lib/i18n';
 import { data, problemMessage } from '../../../lib/request';
-import type { Station, Track, TrackLibrary, TrackUpload } from '../../../lib/types';
+import type { Track, TrackLibrary, TrackUpload } from '../../../lib/types';
 import { acceptedExtensions, isAccepted, maxTrackBytes, putFile } from '../../../lib/upload';
 
 type UploadState = 'waiting' | 'uploading' | 'checking' | 'done' | 'error';
@@ -37,14 +39,7 @@ export function MediaLibrary() {
   const { id = '' } = useParams();
   const tenantId = localStorage.getItem('tenant-id');
   const queryClient = useQueryClient();
-  const station = useQuery({
-    queryKey: ['station', tenantId, id],
-    queryFn: async () => {
-      const result = await api.GET('/api/v1/stations/{id}', { params: { path: { id } } });
-      if (result.error) throw result.error;
-      return { station: result.data as Station, etag: result.response.headers.get('ETag') ?? '' };
-    },
-  });
+  const station = useStation(id);
   const library = useQuery({
     queryKey: ['tracks', tenantId, id],
     queryFn: () =>
@@ -79,6 +74,9 @@ export function MediaLibrary() {
       queryClient.invalidateQueries({ queryKey: ['tracks', tenantId, id] }),
       queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] }),
       queryClient.invalidateQueries({ queryKey: ['autodj', tenantId, id] }),
+      // A deleted track leaves every playlist.
+      queryClient.invalidateQueries({ queryKey: ['playlists', tenantId, id] }),
+      queryClient.invalidateQueries({ queryKey: ['playlist', tenantId, id] }),
     ]);
 
   const update = (key: string, change: Partial<Upload>) =>
@@ -189,11 +187,7 @@ export function MediaLibrary() {
         {announcement}
       </p>
       {!available ? (
-        <Alert color="gray" title={t('media.notIncluded')}>
-          <Link to="/account" className="font-semibold text-brand-secondary underline">
-            {t('media.upgrade')}
-          </Link>
-        </Alert>
+        <AutoDjUpgrade title={t('media.notIncluded')} />
       ) : (
         <>
           <Alert color="warning" title={t('media.rights')}>

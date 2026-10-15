@@ -13,3 +13,10 @@ export function useMe() {
     },
   });
 }
+
+/** The signed-in user's role in the selected workspace; undefined while loading. */
+export function useTenantRole() {
+  const me = useMe();
+  const tenantId = localStorage.getItem('tenant-id');
+  return me.data?.memberships.find((m) => m.tenantId === tenantId)?.role;
+}
