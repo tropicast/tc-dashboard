@@ -140,14 +140,22 @@ internal static partial class SourceAuthEndpoint
             rank = siblings.Count(s => s.CreatedAt < station.CreatedAt || (s.CreatedAt == station.CreatedAt && s.Id.CompareTo(station.Id) < 0));
         }
         var credentials = station is null ? [] : await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
-            .Where(c => c.StationId == station.Id && c.RevokedAt == null)
+            .Where(c => c.StationId == station.Id && c.RevokedAt == null && c.Purpose == CredentialPurpose.Broadcast)
             // A desktop device's own credential ends with its device session: signed out, revoked or expired.
             .Where(c => c.DeviceSessionId == null
                 || db.DeviceSessions.Any(d => d.Id == c.DeviceSessionId && d.RevokedAt == null && d.ExpiresAt > now))
             .Select(c => new { c.Id, c.SecretHash })
             .ToListAsync(cancellationToken);
+        // The AutoDJ credential is checked only on AutoDJ mounts, and only while AutoDJ is on and in the plan (#106).
+        var autoDjCredentials = station is null ? [] : await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .Where(c => c.StationId == station.Id && c.RevokedAt == null && c.Purpose == CredentialPurpose.AutoDj)
+            .Select(c => new { c.Id, c.SecretHash })
+            .ToListAsync(cancellationToken);
+        var autoDjOn = station is not null && station.Plan.AutoDj && await db.AutoDjSettings.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .AnyAsync(a => a.StationId == station.Id && a.Enabled, cancellationToken);
         var decision = SourceAuthorizer.Decide(request, station is null ? null : new SourceAuthStation(station.PublicId,
-            station.Status == TenantStatus.Active, station.Plan, [.. credentials.Select(c => (c.Id, c.SecretHash))], rank));
+            station.Status == TenantStatus.Active, station.Plan, [.. credentials.Select(c => (c.Id, c.SecretHash))], rank,
+            [.. autoDjCredentials.Select(c => (c.Id, c.SecretHash))], autoDjOn));
         if (!decision.Allowed)
         {
             return decision;
@@ -162,6 +170,12 @@ internal static partial class SourceAuthEndpoint
         {
             return SourceAuthDecision.Deny("wrong or revoked credential");
         }
+        if (decision.AutoDj)
+        {
+            // AutoDJ is the fallback, not a live session.
+            await transaction.CommitAsync(cancellationToken);
+            return decision;
+        }
         // Icecast refuses a second source on a live mount, so an open session here is stale (e.g. after a node restart).
         var stale = await db.LiveSessions.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(s => s.StationId == station!.Id && s.Format == decision.Format && s.EndedAt == null)
@@ -175,11 +189,46 @@ internal static partial class SourceAuthEndpoint
         db.LiveSessions.Add(LiveSession.Start(station!.Id, decision.Format!.Value, now));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        try
+        {
+            await PinEncodingAsync(db, station.Id, decision.Format.Value, request, now, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Best effort: a concurrent pin of the same format won; the source is let in regardless.
+            db.ChangeTracker.Clear();
+        }
         return decision;
     }
 
+    /// <summary>
+    /// The live source's declared encoding becomes what AutoDJ encodes (#106), so Icecast's switch between them keeps
+    /// the format. A source declaring nothing (or something AutoDJ cannot reproduce) leaves the pinned one as it was.
+    /// </summary>
+    private static async Task PinEncodingAsync(AppDbContext db, Guid stationId, Domain.AudioFormat format, SourceAuthRequest request,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (SourceAuthorizer.DeclaredEncoding(request) is not { } declared
+            || !Domain.Media.EncodingProfile.IsValid(declared.Kbps, declared.SampleRate, declared.Channels))
+        {
+            return;
+        }
+        var profile = await db.EncodingProfiles.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .SingleOrDefaultAsync(e => e.StationId == stationId && e.Format == format, cancellationToken);
+        if (profile is null)
+        {
+            db.EncodingProfiles.Add(Domain.Media.EncodingProfile.Pin(stationId, format, declared.Kbps, declared.SampleRate,
+                declared.Channels, now));
+        }
+        else
+        {
+            profile.Update(declared.Kbps, declared.SampleRate, declared.Channels, now);
+        }
+    }
+
     /// <summary>HTTP Basic with the node credentials, compared in constant time over fixed-length hashes.</summary>
-    private static bool NodeAuthenticated(HttpRequest request, SourceAuthOptions options)
+    internal static bool NodeAuthenticated(HttpRequest request, SourceAuthOptions options)
     {
         if (string.IsNullOrEmpty(options.NodeUsername) || string.IsNullOrEmpty(options.NodePassword))
         {

@@ -4,7 +4,7 @@ import { lazy, Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import { ArrowLeft, Key01, Laptop01, Plus, Trash01 } from '@untitledui/icons';
+import { ArrowLeft, Key01, Laptop01, MusicNote01, Plus, Trash01 } from '@untitledui/icons';
 import { Table } from '@/components/application/table/table';
 import { BadgeWithDot } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
@@ -137,6 +137,16 @@ export function StationDetail() {
           </div>
         }
         title={item.name}
+        actions={
+          <Button
+            href={`/stations/${id}/library`}
+            color="secondary"
+            size="md"
+            iconLeading={MusicNote01}
+          >
+            {t('station.mediaLibrary')}
+          </Button>
+        }
         badge={
           <BadgeWithDot type="pill-color" color={badge.color} size="md">
             {badge.label}

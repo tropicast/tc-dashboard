@@ -209,6 +209,7 @@ internal static class TrackEndpoints
         {
             var now = time.GetUtcNow();
             autoDj.Set(false, autoDj.DefaultPlaylistId, now);
+            await AutoDjCredentials.RevokeAsync(db, stationId, now, cancellationToken);
             Audit.Record(db, access, context.User, "autodj.disabled", "Station", stationId.ToString(), "its playlist became empty", now);
         }
         await db.SaveChangesAsync(cancellationToken);

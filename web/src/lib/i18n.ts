@@ -83,6 +83,37 @@ export function formatBytes(bytes: number) {
   }).format(value);
 }
 
+/**
+ * Stored audio in binary units, as quotas are set (1 GB = 1024³ bytes), at most one decimal: 37 kB, 512 MB, 1 GB.
+ */
+export function formatStorage(bytes: number) {
+  const value = Math.max(0, bytes);
+  const [amount, unit] =
+    value >= 1024 ** 3
+      ? [value / 1024 ** 3, 'gigabyte']
+      : value >= 1024 ** 2
+        ? [value / 1024 ** 2, 'megabyte']
+        : [value / 1024, 'kilobyte'];
+  return new Intl.NumberFormat(i18n.language, {
+    style: 'unit',
+    unit,
+    unitDisplay: 'short',
+    maximumFractionDigits: 1,
+  }).format(amount);
+}
+
+/** A track's length: 3:05, or 1:02:09 past an hour. */
+export function formatTrackDuration(milliseconds: number) {
+  const total = Math.round(Math.max(0, milliseconds) / 1000);
+  const [hours, minutes, seconds] = [
+    Math.floor(total / 3600),
+    Math.floor(total / 60) % 60,
+    total % 60,
+  ];
+  const pad = (value: number) => value.toString().padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
 /** Listening time from hours: 15 min, 3 h 25 min, then whole hours past one day (1,251 h). */
 export function formatListeningTime(hours: number) {
   const number = (value: number) => new Intl.NumberFormat(i18n.language).format(value);

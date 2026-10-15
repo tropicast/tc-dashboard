@@ -1,6 +1,10 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.Stations;
+using Tropicast.Dashboard.Application.Provisioning;
 using Tropicast.Dashboard.Application.Media;
 using Tropicast.Dashboard.Domain.Media;
 using Tropicast.Dashboard.Domain.Plans;
@@ -40,7 +44,17 @@ internal sealed record PlaylistResponse(Guid Id, string Name, bool Shuffle, IRea
 /// <param name="Available">The plan includes AutoDJ.</param>
 /// <param name="Active">Enabled and available: plays when no DJ is live.</param>
 /// <param name="Scheduling">The plan includes scheduled playlists (not offered yet).</param>
-internal sealed record AutoDjResponse(bool Enabled, Guid? DefaultPlaylistId, bool Available, bool Active, bool Scheduling);
+/// <param name="Encoding">What AutoDJ encodes per format, pinned from the live source (or the defaults until one connected).</param>
+internal sealed record AutoDjResponse(bool Enabled, Guid? DefaultPlaylistId, bool Available, bool Active, bool Scheduling,
+    IReadOnlyList<EncodingResponse> Encoding);
+
+/// <summary>An encoding, as the live source declared it at its last connect.</summary>
+/// <param name="Format">mp3 or opus.</param>
+/// <param name="BitrateKbps">Bitrate, capped by the plan.</param>
+/// <param name="SampleRate">Hz.</param>
+/// <param name="Channels">1 or 2.</param>
+/// <param name="Pinned">From a live source; false for the defaults.</param>
+internal sealed record EncodingResponse(string Format, int BitrateKbps, int SampleRate, int Channels, bool Pinned);
 
 /// <summary>
 /// Playlists of a station and its AutoDJ settings (#105). Stations of other tenants answer 404. Playlist changes
@@ -66,6 +80,7 @@ internal static class PlaylistEndpoints
             .WithSummary("Whether AutoDJ is on, its playlist, and whether the plan includes it.");
         station.MapPut("/autodj", UpdateAutoDjAsync).RequireAuthorization(TenantPolicies.Admin)
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .WithSummary("Turns AutoDJ on or off and picks its playlist.");
     }
 
@@ -205,11 +220,12 @@ internal static class PlaylistEndpoints
             return TypedResults.NotFound();
         }
         var settings = await db.AutoDjSettings.SingleOrDefaultAsync(a => a.StationId == stationId, cancellationToken);
-        return TypedResults.Ok(ToResponse(settings, await CurrentPlanAsync(db, cancellationToken)));
+        return TypedResults.Ok(await ResponseAsync(db, stationId, settings, await CurrentPlanAsync(db, cancellationToken), cancellationToken));
     }
 
     private static async Task<Results<Ok<AutoDjResponse>, NotFound, ValidationProblem, ProblemHttpResult>> UpdateAutoDjAsync(
-        Guid stationId, UpdateAutoDjCommand command, HttpContext context, AppDbContext db, TenantAccess access, TimeProvider time,
+        Guid stationId, UpdateAutoDjCommand command, HttpContext context, AppDbContext db, TenantAccess access,
+        IDataProtectionProvider protection, IOptions<StreamingOptions> streaming, ILoggerFactory loggers, TimeProvider time,
         CancellationToken cancellationToken)
     {
         if (!await db.Stations.AnyAsync(s => s.Id == stationId, cancellationToken))
@@ -236,7 +252,14 @@ internal static class PlaylistEndpoints
             return Conflict(AutoDjRules.NeedsPlaylist);
         }
         var now = time.GetUtcNow();
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var settings = await db.AutoDjSettings.SingleOrDefaultAsync(a => a.StationId == stationId, cancellationToken);
+        if (command.Enabled && settings is not { Enabled: true }
+            && await NodeFullAsync(db, streaming.Value, plan, loggers.CreateLogger(typeof(PlaylistEndpoints)), cancellationToken))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "No streaming capacity is free for AutoDJ right now. The operator has been alerted; try again later.");
+        }
         if (settings is null)
         {
             settings = AutoDjSettings.For(stationId, now);
@@ -245,6 +268,15 @@ internal static class PlaylistEndpoints
         var wasEnabled = settings.Enabled;
         var previousPlaylist = settings.DefaultPlaylistId;
         settings.Set(command.Enabled, command.DefaultPlaylistId, now);
+        // The playout worker publishes with the station's AutoDJ credential while AutoDJ is on, and with none after.
+        if (settings.Enabled)
+        {
+            await AutoDjCredentials.EnsureAsync(db, protection, stationId, now, cancellationToken);
+        }
+        else
+        {
+            await AutoDjCredentials.RevokeAsync(db, stationId, now, cancellationToken);
+        }
         if (wasEnabled != settings.Enabled)
         {
             Audit.Record(db, access, context.User, settings.Enabled ? "autodj.enabled" : "autodj.disabled", "Station",
@@ -258,7 +290,26 @@ internal static class PlaylistEndpoints
         {
             return stale;
         }
-        return TypedResults.Ok(ToResponse(settings, plan));
+        await transaction.CommitAsync(cancellationToken);
+        return TypedResults.Ok(await ResponseAsync(db, stationId, settings, plan, cancellationToken));
+    }
+
+    /// <summary>
+    /// Whether the node lacks the sources for this station's AutoDJ mounts (one per format: they count toward Icecast's
+    /// <c>&lt;sources&gt;</c> like live mounts). Locks the node for the transaction, as station creation does.
+    /// </summary>
+    private static async Task<bool> NodeFullAsync(AppDbContext db, StreamingOptions streaming, Plan plan, ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        await NodeLoad.LockAsync(db, streaming.Node, cancellationToken);
+        var load = await NodeLoad.ReadAsync(db, streaming.Node, cancellationToken);
+        var autoDj = await NodeLoad.AutoDjSourcesAsync(db, streaming.Node, cancellationToken) + NodeCapacity.SourcesOf(plan);
+        var reason = NodeCapacity.WhyNot(load.Select(s => s.Plan), streaming.Limits, autoDj);
+        if (reason is not null)
+        {
+            NodeLoad.LogNodeFull(logger, streaming.Node, reason);
+        }
+        return reason is not null;
     }
 
     /// <summary>Whether AutoDJ is on and plays this playlist.</summary>
@@ -279,8 +330,22 @@ internal static class PlaylistEndpoints
         return new PlaylistResponse(playlist.Id, playlist.Name, playlist.Shuffle, entries, entries.Sum(e => e.DurationMs), playlist.UpdatedAt);
     }
 
-    private static AutoDjResponse ToResponse(AutoDjSettings? settings, Plan plan) => new(settings?.Enabled ?? false,
-        settings?.DefaultPlaylistId, plan.AutoDj, (settings?.Enabled ?? false) && plan.AutoDj, plan.AutoDjScheduling);
+    private static async Task<AutoDjResponse> ResponseAsync(AppDbContext db, Guid stationId, AutoDjSettings? settings, Plan plan,
+        CancellationToken cancellationToken)
+    {
+        var pinned = await db.EncodingProfiles.Where(e => e.StationId == stationId).ToListAsync(cancellationToken);
+        var encoding = new[] { Domain.AudioFormat.Mp3, Domain.AudioFormat.Opus }.Where(plan.Allows)
+            .Select(format => pinned.SingleOrDefault(e => e.Format == format) is { } profile
+                ? new EncodingResponse(Name(format), profile.BitrateFor(plan), profile.SampleRate, profile.Channels, true)
+                : Default(EncodingProfile.Default(stationId, format, plan)))
+            .ToList();
+        return new AutoDjResponse(settings?.Enabled ?? false, settings?.DefaultPlaylistId, plan.AutoDj,
+            (settings?.Enabled ?? false) && plan.AutoDj, plan.AutoDjScheduling, encoding);
+
+        static EncodingResponse Default(EncodingProfile profile)
+            => new(Name(profile.Format), profile.BitrateKbps, profile.SampleRate, profile.Channels, false);
+        static string Name(Domain.AudioFormat format) => format == Domain.AudioFormat.Mp3 ? "mp3" : "opus";
+    }
 
     private static async Task<Plan> CurrentPlanAsync(AppDbContext db, CancellationToken cancellationToken)
         => await db.Tenants.Join(db.Plans, t => t.PlanId, p => p.Id, (_, p) => p).SingleAsync(cancellationToken);

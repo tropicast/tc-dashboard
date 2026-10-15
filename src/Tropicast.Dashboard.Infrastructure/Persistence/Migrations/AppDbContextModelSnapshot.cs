@@ -244,6 +244,45 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.ToTable("auto_dj_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.EncodingProfile", b =>
+                {
+                    b.Property<Guid>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<string>("Format")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("format");
+
+                    b.Property<int>("BitrateKbps")
+                        .HasColumnType("integer")
+                        .HasColumnName("bitrate_kbps");
+
+                    b.Property<int>("Channels")
+                        .HasColumnType("integer")
+                        .HasColumnName("channels");
+
+                    b.Property<DateTimeOffset>("PinnedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pinned_at");
+
+                    b.Property<int>("SampleRate")
+                        .HasColumnType("integer")
+                        .HasColumnName("sample_rate");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("StationId", "Format")
+                        .HasName("pk_encoding_profiles");
+
+                    b.ToTable("encoding_profiles", (string)null);
+                });
+
             modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Playlist", b =>
                 {
                     b.Property<Guid>("Id")
@@ -658,6 +697,17 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_used_at");
 
+                    b.Property<string>("ProtectedSecret")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("protected_secret");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("purpose");
+
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
@@ -691,12 +741,17 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasIndex("StationId", "DeviceLabel")
                         .IsUnique()
                         .HasDatabaseName("ix_broadcast_credentials_station_id_device_label")
-                        .HasFilter("revoked_at IS NULL AND device_session_id IS NULL");
+                        .HasFilter("revoked_at IS NULL AND device_session_id IS NULL AND purpose = 'Broadcast'");
 
                     b.HasIndex("StationId", "DeviceSessionId")
                         .IsUnique()
                         .HasDatabaseName("ix_broadcast_credentials_station_id_device_session_id")
                         .HasFilter("revoked_at IS NULL AND device_session_id IS NOT NULL");
+
+                    b.HasIndex(new[] { "StationId" }, "ix_broadcast_credentials_station_id_autodj")
+                        .IsUnique()
+                        .HasDatabaseName("ix_broadcast_credentials_station_id_autodj")
+                        .HasFilter("revoked_at IS NULL AND purpose = 'AutoDj'");
 
                     b.ToTable("broadcast_credentials", (string)null);
                 });
@@ -1613,6 +1668,16 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_auto_dj_settings_stations_station_id");
 
                     b.Navigation("Station");
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.EncodingProfile", b =>
+                {
+                    b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", null)
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_encoding_profiles_stations_station_id");
                 });
 
             modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Playlist", b =>

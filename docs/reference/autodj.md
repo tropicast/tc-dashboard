@@ -44,3 +44,25 @@ with `enabled` and `defaultPlaylistId`:
 `scheduling` tells whether the plan includes scheduled playlists (Growth and
 up). Schedules are not offered yet: every AutoDJ plays its one default
 playlist.
+
+## Encoding and credential
+
+Icecast moves listeners between `live.<fmt>` and `autodj.<fmt>` without
+reconnecting them, so both must have the same codec, bitrate, sample rate and
+channels (#106).
+
+- **Pinned from the live source.** Each live connect that declares
+  `Ice-Audio-Info` (`bitrate`, `samplerate`, `channels`, as tc-station does)
+  pins that encoding for its format (`encoding_profiles`). Until a live source
+  connected, the defaults are what tc-station publishes for an account: MP3
+  128 kbps at 44.1 kHz, Opus 64 kbps at 48 kHz, stereo, capped by the plan.
+  `GET /stations/{id}/autodj` shows them (`encoding`, `pinned`); a downgrade
+  caps the bitrate. The desktop app keeps its plan limits; nothing is forced on
+  it.
+- **AutoDJ credential.** Turning AutoDJ on issues the station's AutoDJ source
+  credential (`broadcast_credentials.purpose = AutoDj`, one active per
+  station); turning it off revokes it, so the next turn-on rotates it. Deleting
+  the station revokes it too. It is not listed or revocable with the device
+  credentials. The secret is kept encrypted with the API's Data Protection keys
+  (cleared on revocation) so the playout worker can be given it (#107); source
+  auth only compares its hash ([source auth](source-auth.md)).

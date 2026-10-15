@@ -1,5 +1,14 @@
 namespace Tropicast.Dashboard.Domain.Stations;
 
+/// <summary>What a credential may publish to.</summary>
+public enum CredentialPurpose
+{
+    /// <summary>A DJ's device: the live mounts <c>live.(mp3|opus)</c> only.</summary>
+    Broadcast,
+    /// <summary>The system's AutoDJ playout: the station's <c>autodj.(mp3|opus)</c> mounts only (#106).</summary>
+    AutoDj,
+}
+
 /// <summary>
 /// A station's source password for one device (e.g. "Studio PC"). Only the SHA-256 hash is stored;
 /// revoking one device leaves the others working. Credentials the desktop app gets for itself are bound to its
@@ -22,6 +31,12 @@ public sealed class BroadcastCredential
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? LastUsedAt { get; private set; }
     public DateTimeOffset? RevokedAt { get; private set; }
+    public CredentialPurpose Purpose { get; private set; }
+    /// <summary>
+    /// AutoDJ only: the secret encrypted with the API's Data Protection keys, so the playout worker can be given it
+    /// (#107). Device secrets are never kept, only their hash.
+    /// </summary>
+    public string? ProtectedSecret { get; private set; }
 
     public bool IsActive => RevokedAt is null;
 
@@ -43,8 +58,24 @@ public sealed class BroadcastCredential
         return credential;
     }
 
+    /// <summary>The station's AutoDJ credential, issued by the system rather than a person.</summary>
+    public static BroadcastCredential CreateForAutoDj(Guid stationId, string secretHash, string protectedSecret, DateTimeOffset now)
+    {
+        var credential = Create(stationId, AutoDjLabel, secretHash, now);
+        credential.Purpose = CredentialPurpose.AutoDj;
+        credential.ProtectedSecret = Text.Required(protectedSecret, 1024, nameof(protectedSecret));
+        return credential;
+    }
+
+    public const string AutoDjLabel = "AutoDJ";
+
     public void RecordUse(DateTimeOffset now) => LastUsedAt = now;
 
     /// <summary>Idempotent; takes effect on the device's next connect.</summary>
-    public void Revoke(DateTimeOffset now) => RevokedAt ??= now;
+    public void Revoke(DateTimeOffset now)
+    {
+        RevokedAt ??= now;
+        // A revoked AutoDJ secret is of no use to anyone: do not keep it.
+        ProtectedSecret = null;
+    }
 }

@@ -12,14 +12,24 @@ Icecast asks it before accepting audio from a source.
   `ICECAST_SOURCE_AUTH_USER` / `_PASSWORD`), compared in constant time. When
   they are not set, every call gets 401.
 - **Allow** (`200` with `icecast-auth-user: 1`) only when all of these hold:
-  the mount is `/stations/{public id}/live.(mp3|opus)`, the user is that
-  station, the password matches one of its active (unrevoked) credentials,
-  the tenant is active, the plan allows the format, and a declared bitrate
-  (`Ice-Bitrate`, else `Ice-Audio-Info`) is within the plan.
+  the mount is `/stations/{public id}/live.(mp3|opus)` or
+  `/stations/{public id}/autodj.(mp3|opus)`, the user is that station, the
+  password matches one of its active (unrevoked) credentials of the mount's
+  kind, the tenant is active, the plan allows the format, and a declared
+  bitrate (`Ice-Bitrate`, else `Ice-Audio-Info`) is within the plan.
+- **Credential kinds** (#106). Device and admin-issued credentials
+  (`purpose = Broadcast`) publish to `live.*` only. The station's AutoDJ
+  credential (`purpose = AutoDj`, issued when AutoDJ turns on, revoked when it
+  turns off or the station is deleted) publishes to `autodj.*` only, and only
+  while AutoDJ is on and the plan includes it ("AutoDJ is off for this
+  station" otherwise). Neither works on another station.
 - **Deny** returns `200` with `icecast-auth-message: <reason>`. A reason never
   contains the credential. A database timeout (2 s) or any error also denies.
-- **On allow,** it records the credential's `last_used_at` and opens a
-  `LiveSession`.
+- **On allow,** it records the credential's `last_used_at`. On a live mount it
+  also opens a `LiveSession` and pins the source's declared encoding
+  (`Ice-Audio-Info`: bitrate, sample rate and channels) for that format, so
+  AutoDJ encodes the same ([AutoDJ](autodj.md#encoding-and-credential)).
+  AutoDJ mounts open no session.
 
 To try it with a real Icecast, run tc-streaming's `icecast` service with
 `ICECAST_SOURCE_AUTH_URL=http://api:8081/internal/icecast/source-auth` and
