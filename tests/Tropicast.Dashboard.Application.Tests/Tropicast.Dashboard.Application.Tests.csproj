@@ -12,6 +12,10 @@
 
   </ItemGroup>
   <ItemGroup>
+    <!-- Two-second tones made with ffmpeg (see AudioProbeTests). -->
+    <None Include="Fixtures\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

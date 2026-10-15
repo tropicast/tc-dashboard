@@ -211,6 +211,91 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_entries", (string)null);
                 });
 
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Track", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Artist")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("artist");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("DurationMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("Format")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("format");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("object_key");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<Guid>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset?>("UploadExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("upload_expires_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tracks");
+
+                    b.HasIndex("ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tracks_object_key");
+
+                    b.HasIndex("UploadExpiresAt")
+                        .HasDatabaseName("ix_tracks_upload_expires_at")
+                        .HasFilter("status = 'Pending'");
+
+                    b.HasIndex("StationId", "CreatedAt")
+                        .HasDatabaseName("ix_tracks_station_id_created_at");
+
+                    b.ToTable("tracks", (string)null);
+                });
+
             modelBuilder.Entity("Tropicast.Dashboard.Domain.Plans.Plan", b =>
                 {
                     b.Property<string>("Id")
@@ -221,6 +306,14 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Analytics")
                         .HasColumnType("boolean")
                         .HasColumnName("analytics");
+
+                    b.Property<bool>("AutoDj")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_dj");
+
+                    b.Property<bool>("AutoDjScheduling")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_dj_scheduling");
 
                     b.Property<bool>("DirectoryListing")
                         .HasColumnType("boolean")
@@ -258,6 +351,10 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("sort_order");
 
+                    b.Property<long>("StorageQuotaBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("storage_quota_bytes");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -274,6 +371,8 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         {
                             Id = "free",
                             Analytics = true,
+                            AutoDj = false,
+                            AutoDjScheduling = false,
                             DirectoryListing = false,
                             Embed = false,
                             Formats = "Mp3, Opus",
@@ -281,12 +380,15 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             MaxListeners = 100,
                             MaxStations = 1,
                             Name = "Free",
-                            SortOrder = 0
+                            SortOrder = 0,
+                            StorageQuotaBytes = 0L
                         },
                         new
                         {
                             Id = "starter",
                             Analytics = true,
+                            AutoDj = true,
+                            AutoDjScheduling = false,
                             DirectoryListing = true,
                             Embed = false,
                             Formats = "Mp3, Opus",
@@ -294,12 +396,15 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             MaxListeners = 500,
                             MaxStations = 1,
                             Name = "Starter",
-                            SortOrder = 1
+                            SortOrder = 1,
+                            StorageQuotaBytes = 1073741824L
                         },
                         new
                         {
                             Id = "growth",
                             Analytics = true,
+                            AutoDj = true,
+                            AutoDjScheduling = true,
                             DirectoryListing = true,
                             Embed = true,
                             Formats = "Mp3, Opus",
@@ -307,12 +412,15 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             MaxListeners = 5000,
                             MaxStations = 3,
                             Name = "Growth",
-                            SortOrder = 2
+                            SortOrder = 2,
+                            StorageQuotaBytes = 5368709120L
                         },
                         new
                         {
                             Id = "pro",
                             Analytics = true,
+                            AutoDj = true,
+                            AutoDjScheduling = true,
                             DirectoryListing = true,
                             Embed = true,
                             Formats = "Mp3, Opus",
@@ -320,7 +428,8 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                             MaxListeners = 25000,
                             MaxStations = 5,
                             Name = "Pro",
-                            SortOrder = 3
+                            SortOrder = 3,
+                            StorageQuotaBytes = 21474836480L
                         });
                 });
 
@@ -1372,6 +1481,18 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_audit_entries_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Tropicast.Dashboard.Domain.Media.Track", b =>
+                {
+                    b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tracks_stations_station_id");
+
+                    b.Navigation("Station");
                 });
 
             modelBuilder.Entity("Tropicast.Dashboard.Domain.Plans.Subscription", b =>

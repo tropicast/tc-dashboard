@@ -89,6 +89,8 @@ Secrets and variables → Actions**). Never commit them.
 | `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_GROWTH`, `STRIPE_PRICE_PRO` | variable | Stripe price IDs (`price_…`) of the monthly prices |
 | `PRICE_LABEL_STARTER`, `PRICE_LABEL_GROWTH`, `PRICE_LABEL_PRO` | variable | Prices shown in the app, e.g. `€9 / month` |
 | `ACME_EMAIL`, `OPERATOR_EMAIL` | variable | Let's Encrypt contact; your account email (operator pages) |
+| `STORAGE_S3_ENDPOINT`, `STORAGE_S3_BUCKET` | variable | AutoDJ uploads (section 11): `https://fsn1.your-objectstorage.com`, `tropicast-tracks`; empty: uploads off |
+| `STORAGE_S3_ACCESS_KEY`, `STORAGE_S3_SECRET_KEY` | secret | Object Storage key with access to the tracks bucket only |
 
 Optional variables: `APP_HOST` (default `app.tropicastradio.com`),
 `DEPLOY_SERVER` (`tc-app-1`), `PRIVATE_IP` (`10.20.1.10`), `SMTP_PORT`
@@ -409,3 +411,30 @@ Design: [ADR 0002](adr/0002-payments-stripe.md). Do it in **test mode** first
 **Fair use**: `GET /api/v1/operator/usage?month=2026-10` lists every tenant's
 peak listeners, listener-hours and estimated egress, heaviest first.
 
+
+## 11. AutoDJ storage (uploaded tracks)
+
+Uploaded tracks (#104) live in a **private** S3-compatible bucket, separate from
+the backup bucket. Browsers upload with presigned PUT URLs and never get keys;
+nothing in the bucket is public.
+
+1. Hetzner Console → Object Storage: create the bucket `tropicast-tracks` in
+   `fsn1`, visibility **private**.
+2. Create an S3 key for it. Set `STORAGE_S3_ACCESS_KEY` and
+   `STORAGE_S3_SECRET_KEY` (secrets), `STORAGE_S3_ENDPOINT`
+   (`https://fsn1.your-objectstorage.com`) and `STORAGE_S3_BUCKET` (variables).
+3. Allow the dashboard to PUT from the browser (CORS), from your machine with
+   the AWS CLI:
+
+   ```bash
+   aws --endpoint-url https://fsn1.your-objectstorage.com s3api put-bucket-cors \
+     --bucket tropicast-tracks --cors-configuration file://deploy/storage/cors.production.json
+   ```
+
+   Change the origin in that file if `APP_HOST` is not `app.tropicastradio.com`.
+4. Run the deploy workflow. Check: on a Starter workspace, upload an MP3 on the
+   station's media library; it appears with its duration.
+
+Deleting a station deletes its files (`StationTracksCleanup`, through the
+outbox); unconfirmed uploads go after 30 minutes (`PendingUploadCleanup`).
+Without the variables, uploads answer `503` and nothing else changes.

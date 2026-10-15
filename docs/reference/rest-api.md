@@ -8,7 +8,7 @@ is at `/scalar`.
 | Endpoint                                           | Policy    | Notes                                                                                               |
 | -------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------- |
 | `POST /tenants`                                    | signed in | Creates a tenant on the Free plan; the caller is Owner                                              |
-| `GET /tenants/current`                             | Member    | Plan, limits and station count; `ETag`                                                              |
+| `GET /tenants/current`                             | Member    | Plan, limits, station count and audio storage used; `ETag`                                          |
 | `PATCH /tenants/current`                           | Admin     | Needs `If-Match`                                                                                    |
 | `GET /tenants/current/members`                     | Member    |                                                                                                     |
 | `DELETE /tenants/current/members/{userId}`         | Admin     | Only an Owner removes an Owner; the last Owner stays                                                |
@@ -21,6 +21,10 @@ is at `/scalar`.
 | `GET /stations/{id}/credentials`                   | Admin     | Per-device broadcast credentials, active first; never the secret                                    |
 | `POST /stations/{id}/credentials`                  | Admin     | Issues a 256-bit secret for one device; the only response that shows it (`Cache-Control: no-store`) |
 | `DELETE /stations/{id}/credentials/{credentialId}` | Admin     | Revokes that device only; idempotent                                                                |
+| `GET /stations/{id}/tracks`                        | Member    | Confirmed tracks and the workspace's storage use ([media library](media-library.md))                |
+| `POST /stations/{id}/tracks/uploads`               | Member    | Presigned PUT URL; AutoDJ plans only (403), within the storage quota (403), 503 without a bucket    |
+| `POST /stations/{id}/tracks`                       | Member    | Confirms an upload from the stored file (422 not audio, 403 over quota, 409 not arrived yet)        |
+| `DELETE /stations/{id}/tracks/{trackId}`           | Member    | Deletes the stored file and the track                                                               |
 
 Stations of other tenants answer 404. Broadcast credentials are stored as
 SHA-256 hashes; the Icecast username is the station's public ID. Credential

@@ -20,6 +20,14 @@ public sealed class Plan
     public bool DirectoryListing { get; private set; }
     public bool Embed { get; private set; }
     public bool Analytics { get; private set; }
+    /// <summary>AutoDJ: uploaded tracks play when no DJ is live (#103).</summary>
+    public bool AutoDj { get; private set; }
+    /// <summary>Scheduled AutoDJ playlists (later); without it, AutoDJ plays one fallback playlist.</summary>
+    public bool AutoDjScheduling { get; private set; }
+    /// <summary>Uploaded audio the tenant may store, in bytes, across its stations.</summary>
+    public long StorageQuotaBytes { get; private set; }
+
+    private const long Gibibyte = 1024L * 1024 * 1024;
 
     public bool Allows(AudioFormat format) => Formats.HasFlag(format == AudioFormat.Mp3 ? AudioFormats.Mp3 : AudioFormats.Opus);
 
@@ -27,24 +35,28 @@ public sealed class Plan
     {
         Id = "free", Name = "Free", SortOrder = 0, MaxStations = 1, MaxListeners = 100, MaxBitrateKbps = 64,
         Formats = AudioFormats.Mp3 | AudioFormats.Opus, DirectoryListing = false, Embed = false, Analytics = true,
+        AutoDj = false, AutoDjScheduling = false, StorageQuotaBytes = 0,
     };
 
     public static Plan Starter { get; } = new()
     {
         Id = "starter", Name = "Starter", SortOrder = 1, MaxStations = 1, MaxListeners = 500, MaxBitrateKbps = 128,
         Formats = AudioFormats.Mp3 | AudioFormats.Opus, DirectoryListing = true, Embed = false, Analytics = true,
+        AutoDj = true, AutoDjScheduling = false, StorageQuotaBytes = 1 * Gibibyte,
     };
 
     public static Plan Growth { get; } = new()
     {
         Id = "growth", Name = "Growth", SortOrder = 2, MaxStations = 3, MaxListeners = 5_000, MaxBitrateKbps = 192,
         Formats = AudioFormats.Mp3 | AudioFormats.Opus, DirectoryListing = true, Embed = true, Analytics = true,
+        AutoDj = true, AutoDjScheduling = true, StorageQuotaBytes = 5 * Gibibyte,
     };
 
     public static Plan Pro { get; } = new()
     {
         Id = "pro", Name = "Pro", SortOrder = 3, MaxStations = 5, MaxListeners = 25_000, MaxBitrateKbps = 320,
         Formats = AudioFormats.Mp3 | AudioFormats.Opus, DirectoryListing = true, Embed = true, Analytics = true,
+        AutoDj = true, AutoDjScheduling = true, StorageQuotaBytes = 20 * Gibibyte,
     };
 
     /// <summary>Every plan, cheapest first. Seeded into the database.</summary>

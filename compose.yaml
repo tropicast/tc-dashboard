@@ -1,6 +1,7 @@
 # Local development. `docker compose up` runs PostgreSQL, Mailpit (catches all
-# email: http://localhost:8025) and the API (which also serves the built SPA on
-# http://localhost:8080). Add `--profile dev` for the Vite dev server with hot
+# email: http://localhost:8025), an S3-compatible bucket for AutoDJ uploads
+# (RustFS on http://localhost:9000) and the API (which also serves the built SPA
+# on http://localhost:8080). Add `--profile dev` for the Vite dev server with hot
 # reload on http://localhost:5173, proxying /api to the API.
 services:
   db:
@@ -36,6 +37,12 @@ services:
       SourceAuth__NodePassword: ${SOURCE_AUTH_PASSWORD:-source-auth-dev}
       # No streaming node to SSH to locally (see docs/reference/provisioning.md).
       Provisioning__Enabled: "false"
+      # AutoDJ uploads: the API reaches the bucket as storage:9000, browsers as localhost:9000.
+      Storage__Endpoint: http://storage:9000
+      Storage__PublicEndpoint: http://localhost:${STORAGE_PORT:-9000}
+      Storage__Bucket: tracks
+      Storage__AccessKey: tropicast
+      Storage__SecretKey: ${STORAGE_SECRET_KEY:-tropicast-dev-secret}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
       # Internal source-auth endpoint, for a local Icecast (tc-streaming).
@@ -45,6 +52,38 @@ services:
         condition: service_healthy
       mail:
         condition: service_started
+      storage-init:
+        condition: service_completed_successfully
+
+  # S3-compatible object storage (MinIO's community images are no longer published).
+  storage:
+    image: mirror.gcr.io/rustfs/rustfs:1.0.1
+    environment:
+      RUSTFS_ACCESS_KEY: tropicast
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:-tropicast-dev-secret}
+    ports:
+      - "127.0.0.1:${STORAGE_PORT:-9000}:9000"
+    volumes:
+      - storage-data:/data
+
+  # Creates the private bucket and lets the local SPA PUT to it (CORS), like production setup does.
+  storage-init:
+    image: mirror.gcr.io/amazon/aws-cli:2.31.18
+    environment:
+      AWS_ACCESS_KEY_ID: tropicast
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY:-tropicast-dev-secret}
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - ./deploy/storage:/storage:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        for i in $$(seq 1 30); do aws --endpoint-url http://storage:9000 s3api list-buckets > /dev/null 2>&1 && break; sleep 1; done;
+        aws --endpoint-url http://storage:9000 s3api head-bucket --bucket tracks 2> /dev/null
+        || aws --endpoint-url http://storage:9000 s3api create-bucket --bucket tracks;
+        aws --endpoint-url http://storage:9000 s3api put-bucket-cors --bucket tracks --cors-configuration file:///storage/cors.local.json
+    depends_on:
+      - storage
 
   # Development SMTP server: every email lands in its web UI, nothing is delivered.
   mail:
@@ -69,4 +108,5 @@ services:
 
 volumes:
   db-data:
+  storage-data:
   web-node-modules:

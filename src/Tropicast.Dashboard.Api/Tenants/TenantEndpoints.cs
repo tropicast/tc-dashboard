@@ -23,8 +23,12 @@ namespace Tropicast.Dashboard.Api.Tenants;
 /// <param name="DirectoryListing">RadioBrowser listing allowed.</param>
 /// <param name="Embed">Embeddable player allowed.</param>
 /// <param name="Analytics">Listener statistics included.</param>
+/// <param name="AutoDj">AutoDJ: uploaded tracks play when no DJ is live.</param>
+/// <param name="AutoDjScheduling">Scheduled AutoDJ playlists; without it, one fallback playlist.</param>
+/// <param name="StorageQuotaBytes">Uploaded audio the tenant may store, across its stations.</param>
 internal sealed record PlanResponse(string Id, string Name, int MaxStations, int MaxListeners, int MaxBitrateKbps,
-    IReadOnlyList<string> Formats, bool DirectoryListing, bool Embed, bool Analytics);
+    IReadOnlyList<string> Formats, bool DirectoryListing, bool Embed, bool Analytics, bool AutoDj, bool AutoDjScheduling,
+    long StorageQuotaBytes);
 
 /// <summary>A tenant (customer account).</summary>
 /// <param name="Id">Tenant ID; send it as X-Tenant-Id to choose this tenant.</param>
@@ -33,7 +37,9 @@ internal sealed record PlanResponse(string Id, string Name, int MaxStations, int
 /// <param name="Status">Active or Suspended.</param>
 /// <param name="Plan">Current plan.</param>
 /// <param name="StationCount">Stations in use, out of Plan.MaxStations.</param>
-internal sealed record TenantResponse(Guid Id, string Name, string Slug, TenantStatus Status, PlanResponse Plan, int StationCount);
+/// <param name="StorageUsedBytes">Uploaded audio stored, out of Plan.StorageQuotaBytes.</param>
+internal sealed record TenantResponse(Guid Id, string Name, string Slug, TenantStatus Status, PlanResponse Plan, int StationCount,
+    long StorageUsedBytes);
 
 internal static class TenantEndpoints
 {
@@ -66,18 +72,19 @@ internal static class TenantEndpoints
         // Read back through the new tenant's scope.
         current.TenantId = tenant.Id;
         Concurrency.SetETag(context, db, tenant);
-        return TypedResults.Created("/api/v1/tenants/current", await ResponseAsync(db, tenant, cancellationToken));
+        return TypedResults.Created("/api/v1/tenants/current", await ResponseAsync(db, tenant, time.GetUtcNow(), cancellationToken));
     }
 
-    private static async Task<Ok<TenantResponse>> GetAsync(HttpContext context, AppDbContext db, CancellationToken cancellationToken)
+    private static async Task<Ok<TenantResponse>> GetAsync(HttpContext context, AppDbContext db, TimeProvider time,
+        CancellationToken cancellationToken)
     {
         var tenant = await db.Tenants.SingleAsync(cancellationToken);
         Concurrency.SetETag(context, db, tenant);
-        return TypedResults.Ok(await ResponseAsync(db, tenant, cancellationToken));
+        return TypedResults.Ok(await ResponseAsync(db, tenant, time.GetUtcNow(), cancellationToken));
     }
 
     private static async Task<Results<Ok<TenantResponse>, ValidationProblem, ProblemHttpResult>> UpdateAsync(
-        UpdateTenantCommand command, HttpContext context, AppDbContext db, CancellationToken cancellationToken)
+        UpdateTenantCommand command, HttpContext context, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
         var tenant = await db.Tenants.SingleAsync(cancellationToken);
         if (Concurrency.Check(context, db, tenant) is { } precondition)
@@ -90,7 +97,7 @@ internal static class TenantEndpoints
             return problem;
         }
         Concurrency.SetETag(context, db, tenant);
-        return TypedResults.Ok(await ResponseAsync(db, tenant, cancellationToken));
+        return TypedResults.Ok(await ResponseAsync(db, tenant, time.GetUtcNow(), cancellationToken));
     }
 
     private static async Task<ProblemHttpResult?> SaveAsync(AppDbContext db, CancellationToken cancellationToken)
@@ -105,15 +112,17 @@ internal static class TenantEndpoints
         }
     }
 
-    private static async Task<TenantResponse> ResponseAsync(AppDbContext db, Tenant tenant, CancellationToken cancellationToken)
+    private static async Task<TenantResponse> ResponseAsync(AppDbContext db, Tenant tenant, DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         var plan = await db.Plans.SingleAsync(p => p.Id == tenant.PlanId, cancellationToken);
         var stations = await db.Stations.CountAsync(cancellationToken);
-        return new TenantResponse(tenant.Id, tenant.Name, tenant.Slug, tenant.Status, ToResponse(plan), stations);
+        var storage = await Media.TrackEndpoints.UsedBytesAsync(db, now, null, cancellationToken);
+        return new TenantResponse(tenant.Id, tenant.Name, tenant.Slug, tenant.Status, ToResponse(plan), stations, storage);
     }
 
     internal static PlanResponse ToResponse(Plan plan) => new(plan.Id, plan.Name, plan.MaxStations, plan.MaxListeners,
         plan.MaxBitrateKbps,
         [.. new[] { (AudioFormat.Mp3, "mp3"), (AudioFormat.Opus, "opus") }.Where(f => plan.Allows(f.Item1)).Select(f => f.Item2)],
-        plan.DirectoryListing, plan.Embed, plan.Analytics);
+        plan.DirectoryListing, plan.Embed, plan.Analytics, plan.AutoDj, plan.AutoDjScheduling, plan.StorageQuotaBytes);
 }

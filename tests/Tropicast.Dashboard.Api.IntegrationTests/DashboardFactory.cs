@@ -41,6 +41,7 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
     public FakeStatsClient Stats { get; } = new();
     public FakeRadioDirectory Directory { get; } = new();
     public FakePaymentProvider Payments { get; } = new();
+    public FakeObjectStorage Storage { get; } = new();
     /// <summary>Extra configuration for one factory (e.g. enabling the background loops).</summary>
     public IReadOnlyDictionary<string, string> Settings { get; init; } = new Dictionary<string, string>();
     public CapturingLoggerProvider Logs { get; } = new();
@@ -102,6 +103,8 @@ public sealed class DashboardFactory(PostgresContainer postgres) : WebApplicatio
             services.AddSingleton<Tropicast.Dashboard.Application.Directories.IRadioDirectory>(Directory);
             services.RemoveAll<Tropicast.Dashboard.Application.Billing.IPaymentProvider>();
             services.AddSingleton<Tropicast.Dashboard.Application.Billing.IPaymentProvider>(Payments);
+            services.RemoveAll<Tropicast.Dashboard.Application.Media.IObjectStorage>();
+            services.AddSingleton<Tropicast.Dashboard.Application.Media.IObjectStorage>(Storage);
         });
     }
 
@@ -205,6 +208,47 @@ public sealed class FakeRadioDirectory : Tropicast.Dashboard.Application.Directo
         => Fail
             ? throw new Tropicast.Dashboard.Application.Directories.DirectoryException("RadioBrowser is unreachable. The listing is retried later.")
             : Task.FromResult(_entries.GetValueOrDefault(streamUrl));
+}
+
+/// <summary>
+/// The bucket in memory. Presigned URLs point at <c>https://bucket.test</c>; a test "uploads" with
+/// <see cref="Put"/>, as the browser would PUT to the URL.
+/// </summary>
+public sealed class FakeObjectStorage : Tropicast.Dashboard.Application.Media.IObjectStorage
+{
+    private readonly ConcurrentDictionary<string, (byte[] Bytes, string ContentType)> _objects = new();
+
+    public bool IsConfigured { get; set; } = true;
+    public IReadOnlyCollection<string> Keys => [.. _objects.Keys];
+
+    public void Put(string key, byte[] bytes, string contentType = "audio/mpeg") => _objects[key] = (bytes, contentType);
+
+    /// <summary>The key a presigned URL of this fake names.</summary>
+    public static string KeyOf(Uri url) => Uri.UnescapeDataString(url.AbsolutePath.TrimStart('/'));
+
+    public Uri PresignUpload(string key, string contentType, TimeSpan lifetime) => new($"https://bucket.test/{key}?method=PUT&type={Uri.EscapeDataString(contentType)}");
+
+    public Uri PresignDownload(string key, TimeSpan lifetime) => new($"https://bucket.test/{key}?method=GET&ttl={(int)lifetime.TotalSeconds}");
+
+    public Task<Tropicast.Dashboard.Application.Media.StoredObject?> HeadAsync(string key, CancellationToken cancellationToken = default)
+        => Task.FromResult(_objects.TryGetValue(key, out var o) ? new Tropicast.Dashboard.Application.Media.StoredObject(o.Bytes.Length, o.ContentType) : null);
+
+    public Task<byte[]> ReadRangeAsync(string key, long offset, int length, CancellationToken cancellationToken = default)
+        => Task.FromResult(_objects.TryGetValue(key, out var o) && offset < o.Bytes.Length
+            ? o.Bytes.AsSpan((int)offset, (int)Math.Min(length, o.Bytes.Length - offset)).ToArray() : []);
+
+    public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        _objects.TryRemove(key, out _);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> DeletePrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        var keys = _objects.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+        keys.ForEach(k => _objects.TryRemove(k, out _));
+        return Task.FromResult(keys.Count);
+    }
 }
 
 internal sealed class NoTenant : Tropicast.Dashboard.Application.ICurrentTenant

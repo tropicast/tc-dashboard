@@ -54,6 +54,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Application.Billing.IPaymentProvider, Billing.StripePaymentProvider>();
         services.AddScoped<Billing.BillingService>();
         services.AddHostedService<Billing.BillingWorker>();
+        services.Configure<Media.StorageOptions>(configuration.GetSection("Storage"));
+        services.TryAddSingleton<Application.Media.IObjectStorage, Media.S3ObjectStorage>();
+        services.AddSingleton<IOutboxConsumer, Media.StationTracksCleanup>();
+        services.AddHostedService<Media.PendingUploadCleanup>();
         // Read when a context is created, so hosts without a database (e.g. OpenAPI generation) still start.
         services.AddDbContext<AppDbContext>(options => PersistenceSetup.Configure(options,
             configuration.GetConnectionString("Default")

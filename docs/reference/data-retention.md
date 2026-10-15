@@ -36,17 +36,18 @@ EU-hosted tool.
 
 ## Retention
 
-| Data                                       | Kept                                                               | Enforced by                                                   |
-| ------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------- |
-| Account, workspaces, stations, credentials | Until the account or workspace is deleted                          | `DELETE /api/v1/auth/account`, station and member endpoints   |
-| Security events (with IP)                  | 90 days                                                            | `DeviceAuthorizationCleanup` (`SecurityEvent.Retention`)      |
-| Desktop device sessions                    | Expire 60 days after last use; rows kept until account deletion    | `DeviceSession.Lifetime`, cascade on account deletion         |
-| Audit log                                  | As long as the workspace; the actor is removed on account deletion | `DELETE /api/v1/auth/account`                                 |
-| Deleted stations and their history         | Kept (usage and billing records)                                   | Soft delete                                                   |
-| Database backups                           | 30 days                                                            | `deploy/backup.sh` (`BACKUP_RETENTION_DAYS`)                  |
-| Logs, traces, metrics, listener logs       | Grafana Cloud plan retention (14 days on the Free tier)            | Grafana Cloud: **check the plan** before publishing the texts |
-| Rate-limit counters (IP)                   | 1 minute, in memory                                                | ASP.NET Core rate limiter                                     |
-| Invoices and payment data                  | Stripe, as accounting law requires                                 | Stripe                                                        |
+| Data                                       | Kept                                                                      | Enforced by                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Account, workspaces, stations, credentials | Until the account or workspace is deleted                                 | `DELETE /api/v1/auth/account`, station and member endpoints                                         |
+| Security events (with IP)                  | 90 days                                                                   | `DeviceAuthorizationCleanup` (`SecurityEvent.Retention`)                                            |
+| Desktop device sessions                    | Expire 60 days after last use; rows kept until account deletion           | `DeviceSession.Lifetime`, cascade on account deletion                                               |
+| Audit log                                  | As long as the workspace; the actor is removed on account deletion        | `DELETE /api/v1/auth/account`                                                                       |
+| Deleted stations and their history         | Kept (usage and billing records)                                          | Soft delete                                                                                         |
+| Uploaded audio (AutoDJ tracks)             | Until the track or its station is deleted; unconfirmed uploads 30 minutes | Track endpoints, `StationTracksCleanup`, `PendingUploadCleanup` ([media library](media-library.md)) |
+| Database backups                           | 30 days                                                                   | `deploy/backup.sh` (`BACKUP_RETENTION_DAYS`)                                                        |
+| Logs, traces, metrics, listener logs       | Grafana Cloud plan retention (14 days on the Free tier)                   | Grafana Cloud: **check the plan** before publishing the texts                                       |
+| Rate-limit counters (IP)                   | 1 minute, in memory                                                       | ASP.NET Core rate limiter                                                                           |
+| Invoices and payment data                  | Stripe, as accounting law requires                                        | Stripe                                                                                              |
 
 ## Account deletion
 
@@ -61,7 +62,8 @@ EU-hosted tool.
    devices got for themselves.
 3. Removes the user from audit entries (`actor_user_id = NULL`) and records
    `account.deleted` in each shared workspace.
-4. Deletes the workspaces they alone used, unless deleted stations keep a
+4. Deletes the workspaces they alone used (their stations, and with them their
+   uploaded audio, must already be deleted), unless deleted stations keep a
    workspace for its records (it stays, with no member). Invitations they sent
    stay valid, with `invited_by = NULL`.
 5. Deletes the user. Memberships, device sessions and requests, security
