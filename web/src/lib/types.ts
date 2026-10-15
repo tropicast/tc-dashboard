@@ -10,3 +10,6 @@ export type Credential = components['schemas']['CredentialResponse'];
 export type Track = components['schemas']['TrackResponse'];
 export type TrackLibrary = components['schemas']['TrackLibraryResponse'];
 export type TrackUpload = components['schemas']['TrackUploadResponse'];
+export type AutoDj = components['schemas']['AutoDjResponse'];
+export type PlaylistSummary = components['schemas']['PlaylistSummaryResponse'];
+export type Playlist = components['schemas']['PlaylistResponse'];

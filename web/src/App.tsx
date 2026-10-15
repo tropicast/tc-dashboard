@@ -15,6 +15,7 @@ import { AuthGuard } from './components/organisms/layout/AuthGuard';
 import { AppShell } from './components/organisms/layout/AppShell';
 import { LegalPage } from './legal/LegalPage';
 import { MediaLibrary } from './components/organisms/media/MediaLibrary';
+import { Playlists } from './components/organisms/media/Playlists';
 import { StationDetail } from './components/organisms/stations/StationDetail';
 import { Stations } from './components/organisms/stations/Stations';
 import '@/styles/globals.css';
@@ -32,6 +33,7 @@ function ProtectedRoutes() {
           <Route path="stations" element={<Stations />} />
           <Route path="stations/:id" element={<StationDetail />} />
           <Route path="stations/:id/library" element={<MediaLibrary />} />
+          <Route path="stations/:id/playlists" element={<Playlists />} />
           <Route path="account" element={<Account />} />
           <Route path="device" element={<DeviceApproval />} />
         </Routes>
