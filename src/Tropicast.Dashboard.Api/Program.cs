@@ -124,6 +124,7 @@ app.MapCredentials();
 app.MapDesktop();
 app.MapStationStats();
 app.MapTracks();
+app.MapPlaylists();
 app.MapPublicStations();
 app.MapDirectory();
 app.MapBilling();

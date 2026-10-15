@@ -13,7 +13,7 @@ namespace Tropicast.Dashboard.Infrastructure.Media;
 
 /// <summary>
 /// A deleted station keeps its history, not its uploaded audio: every object under its prefix goes, then its track
-/// rows. Idempotent (outbox delivery is at least once). Deleting an account needs its stations deleted first, so
+/// rows, playlists and AutoDJ settings. Idempotent (outbox delivery is at least once). Deleting an account needs its stations deleted first, so
 /// this also covers <c>DELETE /auth/account</c>.
 /// </summary>
 internal sealed class StationTracksCleanup(IServiceScopeFactory scopes) : IOutboxConsumer
@@ -33,6 +33,11 @@ internal sealed class StationTracksCleanup(IServiceScopeFactory scopes) : IOutbo
             await storage.DeletePrefixAsync(Track.StationPrefix(deleted.StationId), cancellationToken);
         }
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.AutoDjSettings.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(a => a.StationId == deleted.StationId)
+            .ExecuteDeleteAsync(cancellationToken);
+        // Playlist entries cascade with their playlist and their track.
+        await db.Playlists.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(p => p.StationId == deleted.StationId)
+            .ExecuteDeleteAsync(cancellationToken);
         await db.Tracks.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.StationId == deleted.StationId)
             .ExecuteDeleteAsync(cancellationToken);
     }
