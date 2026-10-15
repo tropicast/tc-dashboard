@@ -24,6 +24,15 @@ manage them:
 Only the station's own confirmed tracks can be added (400 otherwise).
 Deleting a track removes it from every playlist.
 
+## In the dashboard
+
+The station page has an **AutoDJ** card: the switch, the playlist, what is on
+air now (live DJ, AutoDJ or off air) and the encoding AutoDJ uses. **Edit
+playlists** (`/stations/{id}/playlists`) creates, renames, shuffles and deletes
+playlists, adds tracks from the media library and reorders them with Move up
+and Move down buttons (keyboard focus follows the moved track; each change is
+announced to screen readers). Plans without AutoDJ see an upgrade prompt.
+
 ## The AutoDJ switch
 
 `GET /stations/{id}/autodj` (Member) and `PUT /stations/{id}/autodj` (Admin)

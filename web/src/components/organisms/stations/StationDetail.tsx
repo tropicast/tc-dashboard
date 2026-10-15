@@ -21,6 +21,7 @@ import { ConfirmDialog } from '../../molecules/ConfirmDialog';
 import { CopyField } from '../../molecules/CopyField';
 import { Loading } from '../../molecules/Loading';
 import { PageHeader } from '../../molecules/PageHeader';
+import { AutoDjPanel } from '../media/AutoDjPanel';
 import { DirectoryStatus } from './DirectoryStatus';
 import { SharePanel } from './SharePanel';
 import { formatDateTime } from '../../../lib/i18n';
@@ -177,6 +178,7 @@ export function StationDetail() {
           {item.listenerUrls.opus && <CopyField label="Opus" value={item.listenerUrls.opus} />}
         </Card>
       </div>
+      <AutoDjPanel stationId={id} live={status.data?.live ?? false} />
       <SharePanel stationSlug={item.slug} />
       <Card title={t('station.settings')}>
         <form

@@ -16,6 +16,7 @@ auto-generated list of merged pull requests. See [Releasing](docs/runbook.md#rel
 - AutoDJ source credential and pinned encoding (#106): source auth accepts the station's system-issued AutoDJ credential on its `autodj.(mp3|opus)` mounts only (never device credentials, never live mounts or other stations), while AutoDJ is on; it is revoked when AutoDJ turns off or the station is deleted. Each live connect pins the declared encoding so AutoDJ can match it.
 - AutoDJ on the streaming node (#107): `stations.json` flags stations with AutoDJ on (`"autodj": true`), and `GET /internal/playout/stations` (internal port, node credentials) gives the playout worker each station's outputs, credential, playlist and short-lived track URLs, with a version to poll. AutoDJ mounts count toward the node's source limit.
 - Media library page (#108), from the station page: drag-and-drop or pick MP3, FLAC and Ogg files, with per-file progress and clear errors (unsupported, over 200 MB, over quota, refused by the server); the tracks with duration, size and format; delete with confirmation; storage used against the plan's quota, also on the Account usage card. English and French.
+- AutoDJ on the station page and a playlist editor (#109): turn AutoDJ on or off, choose its playlist and see what is on air (live DJ, AutoDJ, off air); build playlists from the media library, reorder them with the keyboard, shuffle, rename and delete. Plans without AutoDJ get an upgrade prompt. English and French.
 
 ## [0.1.1] - 2026-10-14
 
