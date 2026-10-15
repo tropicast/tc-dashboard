@@ -5,6 +5,17 @@ bucket (#104). Production uses Hetzner Object Storage
 ([runbook](../runbook.md#11-autodj-storage-uploaded-tracks)); `compose.yaml`
 runs RustFS on `localhost:9000` with the bucket `tracks`.
 
+## In the dashboard
+
+The station page links to its **Media library** (`/stations/{id}/library`):
+drag and drop or choose files, one upload at a time with its progress
+(announced to screen readers), the storage used against the quota (also on the
+Account usage card), and the tracks with their duration, size and format.
+Unsupported, oversized and over-quota files are refused before uploading; what
+the server refuses shows its reason. The page reminds that the station must
+hold the rights to the music (Terms of Service). Plans without AutoDJ see an
+upgrade note instead.
+
 ## Upload
 
 1. `POST /api/v1/stations/{id}/tracks/uploads` with `fileName` and `size`.
