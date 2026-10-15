@@ -53,8 +53,9 @@ internal static class CredentialEndpoints
         {
             return TypedResults.NotFound();
         }
+        // The AutoDJ credential is the system's, managed with AutoDJ itself (#106): not a device to list or revoke.
         var credentials = await db.BroadcastCredentials
-            .Where(c => c.StationId == stationId)
+            .Where(c => c.StationId == stationId && c.Purpose == CredentialPurpose.Broadcast)
             .OrderBy(c => c.RevokedAt != null).ThenBy(c => c.DeviceLabel)
             .ToListAsync(cancellationToken);
         return TypedResults.Ok(credentials.Select(ToResponse).ToList());
@@ -102,7 +103,8 @@ internal static class CredentialEndpoints
         TenantAccess access, AppDbContext db, TimeProvider time, CancellationToken cancellationToken)
     {
         var credentials = db.BroadcastCredentials
-            .Where(c => c.Id == credentialId && c.StationId == stationId && c.Station.DeletedAt == null);
+            .Where(c => c.Id == credentialId && c.StationId == stationId && c.Station.DeletedAt == null
+                && c.Purpose == CredentialPurpose.Broadcast);
         var label = await credentials.Select(c => c.DeviceLabel).SingleOrDefaultAsync(cancellationToken);
         if (label is null)
         {

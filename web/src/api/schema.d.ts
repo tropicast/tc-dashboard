@@ -3155,6 +3155,8 @@ export interface components {
             active: boolean;
             /** @description The plan includes scheduled playlists (not offered yet). */
             scheduling: boolean;
+            /** @description What AutoDJ encodes per format, pinned from the live source (or the defaults until one connected). */
+            encoding: components["schemas"]["EncodingResponse"][];
         };
         /** @description The tenant's plan and subscription. */
         BillingResponse: {
@@ -3474,6 +3476,28 @@ export interface components {
         };
         EmailRequest: {
             email: string;
+        };
+        /** @description An encoding, as the live source declared it at its last connect. */
+        EncodingResponse: {
+            /** @description mp3 or opus. */
+            format: string;
+            /**
+             * Format: int32
+             * @description Bitrate, capped by the plan.
+             */
+            bitrateKbps: number | string;
+            /**
+             * Format: int32
+             * @description Hz.
+             */
+            sampleRate: number | string;
+            /**
+             * Format: int32
+             * @description 1 or 2.
+             */
+            channels: number | string;
+            /** @description From a live source; false for the defaults. */
+            pinned: boolean;
         };
         HttpValidationProblemDetails: {
             type?: null | string;

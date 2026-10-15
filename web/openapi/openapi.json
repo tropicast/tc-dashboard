@@ -2811,7 +2811,8 @@
           "defaultPlaylistId",
           "available",
           "active",
-          "scheduling"
+          "scheduling",
+          "encoding"
         ],
         "type": "object",
         "properties": {
@@ -2838,6 +2839,13 @@
           "scheduling": {
             "type": "boolean",
             "description": "The plan includes scheduled playlists (not offered yet)."
+          },
+          "encoding": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EncodingResponse"
+            },
+            "description": "What AutoDJ encodes per format, pinned from the live source (or the defaults until one connected)."
           }
         },
         "description": "A station's AutoDJ."
@@ -3536,6 +3544,54 @@
             "type": "string"
           }
         }
+      },
+      "EncodingResponse": {
+        "required": [
+          "format",
+          "bitrateKbps",
+          "sampleRate",
+          "channels",
+          "pinned"
+        ],
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "mp3 or opus."
+          },
+          "bitrateKbps": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Bitrate, capped by the plan.",
+            "format": "int32"
+          },
+          "sampleRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Hz.",
+            "format": "int32"
+          },
+          "channels": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "1 or 2.",
+            "format": "int32"
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "From a live source; false for the defaults."
+          }
+        },
+        "description": "An encoding, as the live source declared it at its last connect."
       },
       "HttpValidationProblemDetails": {
         "type": "object",

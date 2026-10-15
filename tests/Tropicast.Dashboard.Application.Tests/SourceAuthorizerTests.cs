@@ -75,4 +75,37 @@ public sealed class SourceAuthorizerTests
         Assert.False(decision.Allowed);
         Assert.Contains("plan allows 1 station", decision.Reason, StringComparison.Ordinal);
     }
+
+    private static readonly Guid AutoDjCredential = Guid.NewGuid();
+    private const string AutoDjSecret = "the-autodj-secret";
+
+    private static SourceAuthStation StarterWithAutoDj(bool active = true) => new(Station, true, Plan.Starter,
+        [(Credential, Secrets.Hash(Secret))], 0, [(AutoDjCredential, Secrets.Hash(AutoDjSecret))], active);
+
+    [Fact]
+    public void The_autodj_credential_publishes_to_the_autodj_mounts_only()
+    {
+        var decision = SourceAuthorizer.Decide(Request($"/stations/{Station}/autodj.opus", password: AutoDjSecret), StarterWithAutoDj());
+        Assert.True(decision.Allowed);
+        Assert.Equal((AutoDjCredential, AudioFormat.Opus, true), (decision.CredentialId!.Value, decision.Format!.Value, decision.AutoDj));
+
+        Assert.False(SourceAuthorizer.Decide(Request(password: AutoDjSecret), StarterWithAutoDj()).Allowed);
+        Assert.False(SourceAuthorizer.Decide(Request($"/stations/{Station}/autodj.mp3"), StarterWithAutoDj()).Allowed);
+        Assert.Equal("AutoDJ is off for this station",
+            SourceAuthorizer.Decide(Request($"/stations/{Station}/autodj.mp3", password: AutoDjSecret), StarterWithAutoDj(active: false)).Reason);
+        Assert.False(SourceAuthorizer.Decide(Request($"/stations/{Station}/autodj.aac", password: AutoDjSecret), StarterWithAutoDj()).Allowed);
+    }
+
+    [Theory]
+    [InlineData("bitrate=128;samplerate=44100;channels=2", 128, 44100, 2)]
+    [InlineData("ice-samplerate=48000;ice-bitrate=64;ice-channels=1", 64, 48000, 1)]
+    public void The_declared_encoding_is_read_from_ice_audio_info(string info, int kbps, int rate, int channels)
+        => Assert.Equal((kbps, rate, channels), SourceAuthorizer.DeclaredEncoding(Request(audioInfo: info)));
+
+    [Theory]
+    [InlineData("bitrate=128;samplerate=44100")]
+    [InlineData("samplerate=44100;channels=2")]
+    [InlineData(null)]
+    public void An_incomplete_declaration_pins_nothing(string? info)
+        => Assert.Null(SourceAuthorizer.DeclaredEncoding(Request(audioInfo: info)));
 }

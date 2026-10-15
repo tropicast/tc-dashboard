@@ -13,6 +13,7 @@ auto-generated list of merged pull requests. See [Releasing](docs/runbook.md#rel
 
 - AutoDJ media library API (#104): stations on Starter and above upload MP3, FLAC or Ogg tracks to a private S3-compatible bucket through presigned URLs; the server checks each stored file's format, duration and size. Upload URLs are signed for the declared size and work once, so the quota counts what is stored and a checked file cannot be replaced. Per-plan storage quota (1 GB Starter, 5 GB Growth, 20 GB Pro), shown in the workspace and billing usage. Deleting a station deletes its files. Local development runs RustFS in `compose.yaml`.
 - AutoDJ playlists and switch (#105): playlists of a station's tracks (ordered or shuffled), and a per-station AutoDJ setting with its default playlist. Turning AutoDJ on needs a plan with AutoDJ and a non-empty playlist; on and off are audited.
+- AutoDJ source credential and pinned encoding (#106): source auth accepts the station's system-issued AutoDJ credential on its `autodj.(mp3|opus)` mounts only (never device credentials, never live mounts or other stations), while AutoDJ is on; it is revoked when AutoDJ turns off or the station is deleted. Each live connect pins the declared encoding so AutoDJ can match it.
 
 ## [0.1.1] - 2026-10-14
 

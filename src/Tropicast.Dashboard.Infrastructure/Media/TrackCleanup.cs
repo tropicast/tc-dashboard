@@ -13,10 +13,10 @@ namespace Tropicast.Dashboard.Infrastructure.Media;
 
 /// <summary>
 /// A deleted station keeps its history, not its uploaded audio: every object under its prefix goes, then its track
-/// rows, playlists and AutoDJ settings. Idempotent (outbox delivery is at least once). Deleting an account needs its
-/// stations deleted first, so this also covers <c>DELETE /auth/account</c>. Uploads still pending stay until
-/// <see cref="PendingUploadCleanup"/> takes them: their URL may still PUT a file after the prefix is cleared, and that
-/// cleanup deletes it.
+/// rows, playlists and AutoDJ settings; its AutoDJ credential is revoked and the pinned encoding forgotten.
+/// Idempotent (outbox delivery is at least once). Deleting an account needs its stations deleted first, so this also
+/// covers <c>DELETE /auth/account</c>. Uploads still pending stay until <see cref="PendingUploadCleanup"/> takes them:
+/// their URL may still PUT a file after the prefix is cleared, and that cleanup deletes it.
 /// </summary>
 internal sealed class StationTracksCleanup(IServiceScopeFactory scopes, TimeProvider time) : IOutboxConsumer
 {
@@ -35,6 +35,12 @@ internal sealed class StationTracksCleanup(IServiceScopeFactory scopes, TimeProv
             await storage.DeletePrefixAsync(Track.StationPrefix(deleted.StationId), cancellationToken);
         }
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.BroadcastCredentials.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .Where(c => c.StationId == deleted.StationId && c.Purpose == CredentialPurpose.AutoDj && c.RevokedAt == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(c => c.RevokedAt, message.OccurredAt).SetProperty(c => c.ProtectedSecret, (string?)null),
+                cancellationToken);
+        await db.EncodingProfiles.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(e => e.StationId == deleted.StationId)
+            .ExecuteDeleteAsync(cancellationToken);
         await db.AutoDjSettings.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(a => a.StationId == deleted.StationId)
             .ExecuteDeleteAsync(cancellationToken);
         // Playlist entries cascade with their playlist and their track.

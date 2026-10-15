@@ -102,7 +102,12 @@ internal sealed class BroadcastCredentialConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(e => e.StationId);
         // One active admin-issued credential per device label; revoking frees the label.
         builder.HasIndex(e => new { e.StationId, e.DeviceLabel }).IsUnique()
-            .HasFilter("revoked_at IS NULL AND device_session_id IS NULL");
+            .HasFilter("revoked_at IS NULL AND device_session_id IS NULL AND purpose = 'Broadcast'");
+        // One active AutoDJ credential per station.
+        builder.HasIndex(e => e.StationId, "ix_broadcast_credentials_station_id_autodj").IsUnique()
+            .HasDatabaseName("ix_broadcast_credentials_station_id_autodj")
+            .HasFilter("revoked_at IS NULL AND purpose = 'AutoDj'");
+        builder.Property(e => e.ProtectedSecret).HasMaxLength(1024);
         // One active credential per station and desktop device session; a new one replaces it.
         builder.HasOne<DeviceSession>().WithMany().HasForeignKey(e => e.DeviceSessionId).OnDelete(DeleteBehavior.SetNull);
         builder.HasIndex(e => new { e.StationId, e.DeviceSessionId }).IsUnique()
@@ -181,6 +186,15 @@ internal sealed class AutoDjSettingsConfiguration : IEntityTypeConfiguration<Dom
         builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
         // Deleting the default playlist leaves no playlist chosen (the API refuses it while AutoDJ is on).
         builder.HasOne<Domain.Media.Playlist>().WithMany().HasForeignKey(e => e.DefaultPlaylistId).OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
+internal sealed class EncodingProfileConfiguration : IEntityTypeConfiguration<Domain.Media.EncodingProfile>
+{
+    public void Configure(EntityTypeBuilder<Domain.Media.EncodingProfile> builder)
+    {
+        builder.HasKey(e => new { e.StationId, e.Format });
+        builder.HasOne<Station>().WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Tropicast.Dashboard.Api.Auth;
@@ -40,7 +41,17 @@ internal sealed record PlaylistResponse(Guid Id, string Name, bool Shuffle, IRea
 /// <param name="Available">The plan includes AutoDJ.</param>
 /// <param name="Active">Enabled and available: plays when no DJ is live.</param>
 /// <param name="Scheduling">The plan includes scheduled playlists (not offered yet).</param>
-internal sealed record AutoDjResponse(bool Enabled, Guid? DefaultPlaylistId, bool Available, bool Active, bool Scheduling);
+/// <param name="Encoding">What AutoDJ encodes per format, pinned from the live source (or the defaults until one connected).</param>
+internal sealed record AutoDjResponse(bool Enabled, Guid? DefaultPlaylistId, bool Available, bool Active, bool Scheduling,
+    IReadOnlyList<EncodingResponse> Encoding);
+
+/// <summary>An encoding, as the live source declared it at its last connect.</summary>
+/// <param name="Format">mp3 or opus.</param>
+/// <param name="BitrateKbps">Bitrate, capped by the plan.</param>
+/// <param name="SampleRate">Hz.</param>
+/// <param name="Channels">1 or 2.</param>
+/// <param name="Pinned">From a live source; false for the defaults.</param>
+internal sealed record EncodingResponse(string Format, int BitrateKbps, int SampleRate, int Channels, bool Pinned);
 
 /// <summary>
 /// Playlists of a station and its AutoDJ settings (#105). Stations of other tenants answer 404. Playlist changes
@@ -205,12 +216,12 @@ internal static class PlaylistEndpoints
             return TypedResults.NotFound();
         }
         var settings = await db.AutoDjSettings.SingleOrDefaultAsync(a => a.StationId == stationId, cancellationToken);
-        return TypedResults.Ok(ToResponse(settings, await CurrentPlanAsync(db, cancellationToken)));
+        return TypedResults.Ok(await ResponseAsync(db, stationId, settings, await CurrentPlanAsync(db, cancellationToken), cancellationToken));
     }
 
     private static async Task<Results<Ok<AutoDjResponse>, NotFound, ValidationProblem, ProblemHttpResult>> UpdateAutoDjAsync(
-        Guid stationId, UpdateAutoDjCommand command, HttpContext context, AppDbContext db, TenantAccess access, TimeProvider time,
-        CancellationToken cancellationToken)
+        Guid stationId, UpdateAutoDjCommand command, HttpContext context, AppDbContext db, TenantAccess access,
+        IDataProtectionProvider protection, TimeProvider time, CancellationToken cancellationToken)
     {
         if (!await db.Stations.AnyAsync(s => s.Id == stationId, cancellationToken))
         {
@@ -245,6 +256,15 @@ internal static class PlaylistEndpoints
         var wasEnabled = settings.Enabled;
         var previousPlaylist = settings.DefaultPlaylistId;
         settings.Set(command.Enabled, command.DefaultPlaylistId, now);
+        // The playout worker publishes with the station's AutoDJ credential while AutoDJ is on, and with none after.
+        if (settings.Enabled)
+        {
+            await AutoDjCredentials.EnsureAsync(db, protection, stationId, now, cancellationToken);
+        }
+        else
+        {
+            await AutoDjCredentials.RevokeAsync(db, stationId, now, cancellationToken);
+        }
         if (wasEnabled != settings.Enabled)
         {
             Audit.Record(db, access, context.User, settings.Enabled ? "autodj.enabled" : "autodj.disabled", "Station",
@@ -258,7 +278,7 @@ internal static class PlaylistEndpoints
         {
             return stale;
         }
-        return TypedResults.Ok(ToResponse(settings, plan));
+        return TypedResults.Ok(await ResponseAsync(db, stationId, settings, plan, cancellationToken));
     }
 
     /// <summary>Whether AutoDJ is on and plays this playlist.</summary>
@@ -279,8 +299,22 @@ internal static class PlaylistEndpoints
         return new PlaylistResponse(playlist.Id, playlist.Name, playlist.Shuffle, entries, entries.Sum(e => e.DurationMs), playlist.UpdatedAt);
     }
 
-    private static AutoDjResponse ToResponse(AutoDjSettings? settings, Plan plan) => new(settings?.Enabled ?? false,
-        settings?.DefaultPlaylistId, plan.AutoDj, (settings?.Enabled ?? false) && plan.AutoDj, plan.AutoDjScheduling);
+    private static async Task<AutoDjResponse> ResponseAsync(AppDbContext db, Guid stationId, AutoDjSettings? settings, Plan plan,
+        CancellationToken cancellationToken)
+    {
+        var pinned = await db.EncodingProfiles.Where(e => e.StationId == stationId).ToListAsync(cancellationToken);
+        var encoding = new[] { Domain.AudioFormat.Mp3, Domain.AudioFormat.Opus }.Where(plan.Allows)
+            .Select(format => pinned.SingleOrDefault(e => e.Format == format) is { } profile
+                ? new EncodingResponse(Name(format), profile.BitrateFor(plan), profile.SampleRate, profile.Channels, true)
+                : Default(EncodingProfile.Default(stationId, format, plan)))
+            .ToList();
+        return new AutoDjResponse(settings?.Enabled ?? false, settings?.DefaultPlaylistId, plan.AutoDj,
+            (settings?.Enabled ?? false) && plan.AutoDj, plan.AutoDjScheduling, encoding);
+
+        static EncodingResponse Default(EncodingProfile profile)
+            => new(Name(profile.Format), profile.BitrateKbps, profile.SampleRate, profile.Channels, false);
+        static string Name(Domain.AudioFormat format) => format == Domain.AudioFormat.Mp3 ? "mp3" : "opus";
+    }
 
     private static async Task<Plan> CurrentPlanAsync(AppDbContext db, CancellationToken cancellationToken)
         => await db.Tenants.Join(db.Plans, t => t.PlanId, p => p.Id, (_, p) => p).SingleAsync(cancellationToken);

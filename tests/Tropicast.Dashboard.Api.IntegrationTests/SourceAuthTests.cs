@@ -230,4 +230,122 @@ public sealed class SourceAuthTests(DashboardFactory factory) : IClassFixture<Da
         Denied(await AskAsync(Icecast(), mount, station.PublicId, secret, ("header.ice-audio-info", "bitrate=99999999999999999999")));
         Denied(await AskAsync(Icecast(), mount, station.PublicId, secret, ("header.ice-bitrate", "fast")));
     }
+
+    /// <summary>A Starter station with AutoDJ on (one track in its playlist); returns its AutoDJ secret as the worker gets it.</summary>
+    private async Task<(Browser Owner, StationResponse Station, string DeviceSecret, string AutoDjSecret)> AutoDjStationAsync()
+    {
+        var (owner, station, deviceSecret, _) = await StationAsync("starter");
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var track = Domain.Media.Track.StartUpload(station.Id, "jingle.mp3", 1000, DateTimeOffset.UtcNow, TimeSpan.FromMinutes(5));
+            track.Confirm(Domain.Media.TrackFormat.Mp3, TimeSpan.FromSeconds(30), 1000, "Jingle", "");
+            var playlist = Domain.Media.Playlist.Create(station.Id, "Fallback", false, DateTimeOffset.UtcNow);
+            playlist.SetTracks([track.Id], DateTimeOffset.UtcNow);
+            db.Tracks.Add(track);
+            db.Playlists.Add(playlist);
+            await db.SaveChangesAsync(Token);
+            (await owner.SendAsync(HttpMethod.Put, $"/api/v1/stations/{station.Id}/autodj", new { enabled = true, defaultPlaylistId = playlist.Id }))
+                .Status(HttpStatusCode.OK);
+        }
+        return (owner, station, deviceSecret, await AutoDjSecretAsync(station.Id));
+    }
+
+    private async Task<string> AutoDjSecretAsync(Guid stationId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var credential = await scope.ServiceProvider.GetRequiredService<AppDbContext>().BroadcastCredentials.IgnoreQueryFilters()
+            .SingleAsync(c => c.StationId == stationId && c.Purpose == Domain.Stations.CredentialPurpose.AutoDj && c.RevokedAt == null, Token);
+        return Media.AutoDjCredentials.Reveal(scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(),
+            credential)!;
+    }
+
+    [Fact]
+    public async Task The_autodj_credential_publishes_only_to_its_own_autodj_mounts()
+    {
+        var (_, station, deviceSecret, autoDjSecret) = await AutoDjStationAsync();
+        var (_, other, _, otherAutoDj) = await AutoDjStationAsync();
+
+        Allowed(await AskAsync(Icecast(), $"/stations/{station.PublicId}/autodj.mp3", station.PublicId, autoDjSecret,
+            ("header.ice-audio-info", "bitrate=128;samplerate=44100;channels=2")));
+        Allowed(await AskAsync(Icecast(), $"/stations/{station.PublicId}/autodj.opus", station.PublicId, autoDjSecret));
+        // Not on the live mount, not on another station, and device credentials never on AutoDJ mounts.
+        Assert.Equal("wrong or revoked credential", Denied(await AskAsync(Icecast(), $"/stations/{station.PublicId}/live.mp3", station.PublicId, autoDjSecret)));
+        Denied(await AskAsync(Icecast(), $"/stations/{other.PublicId}/autodj.mp3", other.PublicId, autoDjSecret));
+        Denied(await AskAsync(Icecast(), $"/stations/{other.PublicId}/autodj.mp3", station.PublicId, autoDjSecret));
+        Assert.Equal("wrong or revoked credential", Denied(await AskAsync(Icecast(), $"/stations/{station.PublicId}/autodj.mp3", station.PublicId, deviceSecret)));
+        Denied(await AskAsync(Icecast(), $"/stations/{station.PublicId}/autodj.mp3", station.PublicId, otherAutoDj));
+        // AutoDJ is no live session.
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.LiveSessions.IgnoreQueryFilters().AnyAsync(s => s.StationId == station.Id, Token));
+    }
+
+    [Fact]
+    public async Task Turning_autodj_off_revokes_its_credential_and_turning_it_on_again_rotates_it()
+    {
+        var (owner, station, _, oldSecret) = await AutoDjStationAsync();
+        var mount = $"/stations/{station.PublicId}/autodj.mp3";
+        var settings = await (await owner.SendAsync(HttpMethod.Get, $"/api/v1/stations/{station.Id}/autodj")).Content
+            .ReadFromJsonAsync<System.Text.Json.JsonElement>(Token);
+        var playlist = settings.GetProperty("defaultPlaylistId").GetGuid();
+
+        (await owner.SendAsync(HttpMethod.Put, $"/api/v1/stations/{station.Id}/autodj", new { enabled = false })).Status(HttpStatusCode.OK);
+        Assert.Equal("AutoDJ is off for this station", Denied(await AskAsync(Icecast(), mount, station.PublicId, oldSecret)));
+
+        (await owner.SendAsync(HttpMethod.Put, $"/api/v1/stations/{station.Id}/autodj", new { enabled = true, defaultPlaylistId = playlist }))
+            .Status(HttpStatusCode.OK);
+        var newSecret = await AutoDjSecretAsync(station.Id);
+        Assert.NotEqual(oldSecret, newSecret);
+        Assert.Equal("wrong or revoked credential", Denied(await AskAsync(Icecast(), mount, station.PublicId, oldSecret)));
+        Allowed(await AskAsync(Icecast(), mount, station.PublicId, newSecret));
+        // System-managed: not listed with the devices.
+        var devices = await (await owner.SendAsync(HttpMethod.Get, $"/api/v1/stations/{station.Id}/credentials")).Content
+            .ReadFromJsonAsync<List<System.Text.Json.JsonElement>>(Token);
+        Assert.Equal(["Studio PC"], devices!.Select(d => d.GetProperty("deviceLabel").GetString()));
+    }
+
+    [Fact]
+    public async Task After_a_downgrade_or_station_deletion_the_autodj_credential_is_refused()
+    {
+        var (owner, station, _, secret) = await AutoDjStationAsync();
+        var mount = $"/stations/{station.PublicId}/autodj.mp3";
+
+        await Browser.SetPlanAsync(factory, owner.TenantId!.Value, "free");
+        Assert.Equal("AutoDJ is off for this station", Denied(await AskAsync(Icecast(), mount, station.PublicId, secret)));
+        await Browser.SetPlanAsync(factory, owner.TenantId!.Value, "starter");
+        Allowed(await AskAsync(Icecast(), mount, station.PublicId, secret));
+
+        (await owner.SendAsync(HttpMethod.Delete, $"/api/v1/stations/{station.Id}")).Status(HttpStatusCode.NoContent);
+        Denied(await AskAsync(Icecast(), mount, station.PublicId, secret));
+        while (await factory.Services.GetRequiredService<Infrastructure.Outbox.OutboxDispatcher>().DispatchBatchAsync(Token) > 0)
+        {
+        }
+        await using var scope = factory.Services.CreateAsyncScope();
+        var credential = await scope.ServiceProvider.GetRequiredService<AppDbContext>().BroadcastCredentials.IgnoreQueryFilters()
+            .SingleAsync(c => c.StationId == station.Id && c.Purpose == Domain.Stations.CredentialPurpose.AutoDj, Token);
+        Assert.Equal((true, (string?)null), (credential.RevokedAt is not null, credential.ProtectedSecret));
+    }
+
+    [Fact]
+    public async Task A_live_connect_pins_the_encoding_autodj_uses()
+    {
+        var (owner, station, deviceSecret, _) = await AutoDjStationAsync();
+        static async Task<List<System.Text.Json.JsonElement>> EncodingAsync(Browser owner, Guid station)
+            => [.. (await (await owner.SendAsync(HttpMethod.Get, $"/api/v1/stations/{station}/autodj")).Content
+                .ReadFromJsonAsync<System.Text.Json.JsonElement>(Token)).GetProperty("encoding").EnumerateArray()];
+
+        var defaults = await EncodingAsync(owner, station.Id);
+        Assert.Equal(["mp3:128:44100:False", "opus:64:48000:False"], defaults.Select(Describe));
+
+        Allowed(await AskAsync(Icecast(), $"/stations/{station.PublicId}/live.mp3", station.PublicId, deviceSecret,
+            ("header.ice-bitrate", "96"), ("header.ice-audio-info", "bitrate=96;samplerate=48000;channels=1")));
+        // Nothing declared: the pinned Opus profile stays the default.
+        Allowed(await AskAsync(Icecast(), $"/stations/{station.PublicId}/live.opus", station.PublicId, deviceSecret));
+
+        Assert.Equal(["mp3:96:48000:True", "opus:64:48000:False"], (await EncodingAsync(owner, station.Id)).Select(Describe));
+
+        static string Describe(System.Text.Json.JsonElement e) => $"{e.GetProperty("format").GetString()}:{e.GetProperty("bitrateKbps").GetInt32()}:"
+            + $"{e.GetProperty("sampleRate").GetInt32()}:{e.GetProperty("pinned").GetBoolean()}";
+    }
 }
