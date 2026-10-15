@@ -16,7 +16,7 @@ public sealed record RenderedStations(string Json, string Version);
 /// Renders the desired state of a streaming node as tc-streaming's <c>stations.json</c> (README, "Station limits"):
 /// <c>{"default": {"max_listeners": N}, "stations": {"&lt;id&gt;": {plan, max_listeners, max_bitrate_kbps, formats, directory?}}}</c>.
 /// <c>directory</c> makes the node send the station's metadata as <c>icy-*</c> headers, which directories such as
-/// RadioBrowser read to update a listing (tc-streaming README, "Station limits").
+/// RadioBrowser read to update a listing (tc-streaming docs/reference/icecast.md, "Station limits").
 /// Deterministic: the same stations and plans always give the same bytes and version.
 /// </summary>
 public static class StationLimitsDocument
