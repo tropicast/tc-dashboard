@@ -14,9 +14,10 @@ namespace Tropicast.Dashboard.Infrastructure.Media;
 /// <summary>
 /// A deleted station keeps its history, not its uploaded audio: every object under its prefix goes, then its track
 /// rows. Idempotent (outbox delivery is at least once). Deleting an account needs its stations deleted first, so
-/// this also covers <c>DELETE /auth/account</c>.
+/// this also covers <c>DELETE /auth/account</c>. Uploads still pending stay until <see cref="PendingUploadCleanup"/>
+/// takes them: their URL may still PUT a file after the prefix is cleared, and that cleanup deletes it.
 /// </summary>
-internal sealed class StationTracksCleanup(IServiceScopeFactory scopes) : IOutboxConsumer
+internal sealed class StationTracksCleanup(IServiceScopeFactory scopes, TimeProvider time) : IOutboxConsumer
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -33,7 +34,9 @@ internal sealed class StationTracksCleanup(IServiceScopeFactory scopes) : IOutbo
             await storage.DeletePrefixAsync(Track.StationPrefix(deleted.StationId), cancellationToken);
         }
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Tracks.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.StationId == deleted.StationId)
+        var now = time.GetUtcNow();
+        await db.Tracks.IgnoreQueryFilters([AppDbContext.TenantFilter])
+            .Where(t => t.StationId == deleted.StationId && (t.Status == TrackStatus.Ready || t.UploadExpiresAt < now))
             .ExecuteDeleteAsync(cancellationToken);
     }
 }

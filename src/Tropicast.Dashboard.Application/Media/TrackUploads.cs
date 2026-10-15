@@ -23,8 +23,14 @@ public static class TrackRules
     /// <summary>Longest track accepted.</summary>
     public static readonly TimeSpan MaxDuration = TimeSpan.FromHours(3);
 
-    /// <summary>How long a presigned upload URL (and the pending track) lives.</summary>
+    /// <summary>How long a presigned upload URL lives: the PUT must start by then.</summary>
     public static readonly TimeSpan UploadLifetime = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// How long the pending track lives: longer than its URL, since a PUT started just in time can still be running.
+    /// Its object is deleted with it, so a late upload is not left in the bucket.
+    /// </summary>
+    public static readonly TimeSpan PendingLifetime = UploadLifetime + TimeSpan.FromHours(1);
 
     public const string Accepted = "MP3, FLAC or Ogg (Opus or Vorbis)";
 

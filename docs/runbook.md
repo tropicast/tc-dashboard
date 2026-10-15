@@ -432,9 +432,11 @@ nothing in the bucket is public.
    ```
 
    Change the origin in that file if `APP_HOST` is not `app.tropicastradio.com`.
+   Run it again whenever that file changes (the browser's upload sends
+   `If-None-Match`, which the rules must allow).
 4. Run the deploy workflow. Check: on a Starter workspace, upload an MP3 on the
    station's media library; it appears with its duration.
 
 Deleting a station deletes its files (`StationTracksCleanup`, through the
-outbox); unconfirmed uploads go after 30 minutes (`PendingUploadCleanup`).
+outbox); unconfirmed uploads go after 90 minutes (`PendingUploadCleanup`).
 Without the variables, uploads answer `503` and nothing else changes.

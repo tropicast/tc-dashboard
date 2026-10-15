@@ -2430,6 +2430,15 @@ export interface paths {
                     };
                     content?: never;
                 };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         options?: never;
@@ -3735,13 +3744,16 @@ export interface components {
              * @description Presigned bucket URL: PUT the file's bytes there.
              */
             uploadUrl: string;
-            /** @description Headers the PUT must carry, exactly (the URL is signed for them). */
+            /**
+             * @description Headers the PUT must carry, exactly (the URL is signed for them). The body must be exactly the declared size, and
+             *     the URL works once: a second PUT to it is refused.
+             */
             headers: {
                 [key: string]: string;
             };
             /**
              * Format: date-time
-             * @description The URL and the pending upload end then.
+             * @description The PUT must start by then; confirm within an hour after.
              */
             expiresAt: string;
         };

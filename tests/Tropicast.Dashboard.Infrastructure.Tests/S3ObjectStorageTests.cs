@@ -50,25 +50,49 @@ public sealed class S3ObjectStorageTests : IAsyncLifetime
         const string key = "stations/abc/tracks/one";
         using var http = new HttpClient();
 
-        using var content = new ByteArrayContent(bytes);
-        content.Headers.ContentType = new MediaTypeHeaderValue("audio/mpeg");
-        var put = await http.PutAsync(_storage.PresignUpload(key, "audio/mpeg", TimeSpan.FromMinutes(5)), content, Token);
+        var put = await PutAsync(http, _storage.PresignUpload(key, "audio/mpeg", bytes.Length, TimeSpan.FromMinutes(5)), bytes);
         Assert.True(put.IsSuccessStatusCode, $"PUT answered {put.StatusCode}");
 
         Assert.Equal(new Application.Media.StoredObject(bytes.Length, "audio/mpeg"), await _storage.HeadAsync(key, Token));
         Assert.Equal(bytes[..1000], await _storage.ReadRangeAsync(key, 0, 1000, Token));
         Assert.Equal(bytes[^500..], await _storage.ReadRangeAsync(key, bytes.Length - 500, 500, Token));
         Assert.Equal(bytes, await http.GetByteArrayAsync(_storage.PresignDownload(key, TimeSpan.FromMinutes(5)), Token));
+        Assert.Empty(await _storage.ReadRangeAsync(key, 0, 0, Token));
+    }
+
+    [Fact]
+    public async Task A_put_of_another_length_than_signed_is_refused()
+    {
+        using var http = new HttpClient();
+        var upload = _storage.PresignUpload("stations/abc/tracks/big", "audio/mpeg", 3, TimeSpan.FromMinutes(5));
+
+        var put = await PutAsync(http, upload, new byte[3000]);
+
+        Assert.False(put.IsSuccessStatusCode, $"PUT answered {put.StatusCode}");
+        Assert.Null(await _storage.HeadAsync("stations/abc/tracks/big", Token));
+    }
+
+    [Fact]
+    public async Task The_upload_url_cannot_replace_the_stored_file()
+    {
+        const string key = "stations/abc/tracks/once";
+        using var http = new HttpClient();
+        var upload = _storage.PresignUpload(key, "audio/mpeg", 3, TimeSpan.FromMinutes(5));
+        (await PutAsync(http, upload, [1, 2, 3])).EnsureSuccessStatusCode();
+
+        var again = await PutAsync(http, upload, [9, 9, 9]);
+
+        Assert.False(again.IsSuccessStatusCode, $"PUT answered {again.StatusCode}");
+        Assert.Equal([1, 2, 3], await _storage.ReadRangeAsync(key, 0, 3, Token));
     }
 
     [Fact]
     public async Task A_put_with_another_content_type_than_signed_is_refused()
     {
         using var http = new HttpClient();
-        using var content = new ByteArrayContent([1, 2, 3]);
-        content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
+        var upload = _storage.PresignUpload("stations/abc/tracks/html", "audio/mpeg", 3, TimeSpan.FromMinutes(5));
 
-        var put = await http.PutAsync(_storage.PresignUpload("stations/abc/tracks/html", "audio/mpeg", TimeSpan.FromMinutes(5)), content, Token);
+        var put = await PutAsync(http, upload with { Headers = new Dictionary<string, string>(upload.Headers) { ["Content-Type"] = "text/html" } }, [1, 2, 3]);
 
         Assert.False(put.IsSuccessStatusCode);
         Assert.Null(await _storage.HeadAsync("stations/abc/tracks/html", Token));
@@ -95,9 +119,26 @@ public sealed class S3ObjectStorageTests : IAsyncLifetime
     private async Task PutAsync(string key)
     {
         using var http = new HttpClient();
-        using var content = new ByteArrayContent([1, 2, 3]);
-        content.Headers.ContentType = new MediaTypeHeaderValue("audio/ogg");
-        (await http.PutAsync(_storage.PresignUpload(key, "audio/ogg", TimeSpan.FromMinutes(5)), content, Token)).EnsureSuccessStatusCode();
+        (await PutAsync(http, _storage.PresignUpload(key, "audio/ogg", 3, TimeSpan.FromMinutes(5)), [1, 2, 3])).EnsureSuccessStatusCode();
+    }
+
+    /// <summary>As the browser does: the returned headers, exactly.</summary>
+    private static async Task<HttpResponseMessage> PutAsync(HttpClient http, Application.Media.PresignedUpload upload, byte[] body)
+    {
+        using var content = new ByteArrayContent(body);
+        using var request = new HttpRequestMessage(HttpMethod.Put, upload.Url) { Content = content };
+        foreach (var (name, value) in upload.Headers)
+        {
+            if (name == "Content-Type")
+            {
+                content.Headers.ContentType = MediaTypeHeaderValue.Parse(value);
+            }
+            else
+            {
+                request.Headers.Add(name, value);
+            }
+        }
+        return await http.SendAsync(request, Token);
     }
 
     public async ValueTask DisposeAsync()

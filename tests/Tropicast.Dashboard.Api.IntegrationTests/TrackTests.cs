@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tropicast.Dashboard.Api.Media;
 using Tropicast.Dashboard.Api.Stations;
+using Tropicast.Dashboard.Application.Media;
 using Tropicast.Dashboard.Domain.Media;
 using Tropicast.Dashboard.Domain.Tenants;
 using Tropicast.Dashboard.Infrastructure.Media;
@@ -62,6 +63,7 @@ public sealed class TrackTests(DashboardFactory factory) : IClassFixture<Dashboa
         start.Status(HttpStatusCode.OK);
         var upload = (await start.Content.ReadFromJsonAsync<TrackUploadResponse>(Browser.Json, Token))!;
         Assert.Equal("audio/mpeg", upload.Headers["Content-Type"]);
+        Assert.Equal("*", upload.Headers["If-None-Match"]);
         Assert.StartsWith($"stations/{station.Id:N}/tracks/", FakeObjectStorage.KeyOf(upload.UploadUrl), StringComparison.Ordinal);
 
         var bytes = Fixture("cbr.mp3");
@@ -113,7 +115,7 @@ public sealed class TrackTests(DashboardFactory factory) : IClassFixture<Dashboa
     }
 
     [Fact]
-    public async Task Unsupported_files_are_refused_before_and_after_upload_and_nothing_stays()
+    public async Task Unsupported_files_are_refused_before_and_after_upload_and_no_file_stays()
     {
         var (owner, station) = await StationAsync();
         (await StartAsync(owner, station.Id, "song.wav", 1000)).Status(HttpStatusCode.BadRequest);
@@ -124,9 +126,17 @@ public sealed class TrackTests(DashboardFactory factory) : IClassFixture<Dashboa
         fake.Status(HttpStatusCode.UnprocessableEntity);
         Assert.Empty((await LibraryAsync(owner, station.Id)).Tracks);
         Assert.DoesNotContain(factory.Storage.Keys, k => k.Contains($"{station.Id:N}", StringComparison.Ordinal));
+        // The pending row stays until it expires: its URL could still PUT, and the expiry cleanup deletes that file.
         await using var scope = factory.Services.CreateAsyncScope();
-        Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Tracks.IgnoreQueryFilters()
-            .AnyAsync(t => t.StationId == station.Id, Token));
+        Assert.True(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Tracks.IgnoreQueryFilters()
+            .AllAsync(t => t.StationId != station.Id || t.Status == TrackStatus.Pending, Token));
+
+        // An empty body stored under the URL (an aborted read in the browser): refused, not a crash.
+        var empty = (await (await StartAsync(owner, station.Id, "empty.mp3", 8_000)).Content
+            .ReadFromJsonAsync<TrackUploadResponse>(Browser.Json, Token))!;
+        factory.Storage.Put(FakeObjectStorage.KeyOf(empty.UploadUrl), []);
+        (await owner.SendAsync(HttpMethod.Post, $"/api/v1/stations/{station.Id}/tracks", new { uploadId = empty.TrackId }))
+            .Status(HttpStatusCode.UnprocessableEntity);
     }
 
     [Fact]
@@ -165,7 +175,8 @@ public sealed class TrackTests(DashboardFactory factory) : IClassFixture<Dashboa
         over.Status(HttpStatusCode.Forbidden);
         Assert.Contains("1 GB", await over.Content.ReadAsStringAsync(Token), StringComparison.Ordinal);
 
-        // Announced small, arrives larger than what is left: refused at confirm, and deleted.
+        // Announced small, arrives larger than what is left (the bucket refuses it, as the URL is signed for the
+        // declared size; the confirm checks again): refused at confirm, and deleted.
         var start = await StartAsync(owner, station.Id, "liar.mp3", 1_000);
         start.Status(HttpStatusCode.OK);
         var upload = (await start.Content.ReadFromJsonAsync<TrackUploadResponse>(Browser.Json, Token))!;
@@ -205,10 +216,16 @@ public sealed class TrackTests(DashboardFactory factory) : IClassFixture<Dashboa
     public async Task Without_a_bucket_uploads_answer_503()
     {
         var (owner, station) = await StationAsync();
+        var created = await UploadAsync(owner, station.Id, "cbr.mp3", Fixture("cbr.mp3"));
+        var track = (await created.Content.ReadFromJsonAsync<TrackResponse>(Browser.Json, Token))!;
         factory.Storage.IsConfigured = false;
         try
         {
             (await StartAsync(owner, station.Id, "song.mp3", 8_000)).Status(HttpStatusCode.ServiceUnavailable);
+            // The row would go without its file, which nothing could delete later.
+            (await owner.SendAsync(HttpMethod.Delete, $"/api/v1/stations/{station.Id}/tracks/{track.Id}"))
+                .Status(HttpStatusCode.ServiceUnavailable);
+            Assert.Single((await LibraryAsync(owner, station.Id)).Tracks);
         }
         finally
         {
@@ -223,9 +240,11 @@ public sealed class TrackTests(DashboardFactory factory) : IClassFixture<Dashboa
         var first = await UploadAsync(owner, station.Id, "cbr.mp3", Fixture("cbr.mp3"));
         first.Status(HttpStatusCode.Created);
         (await UploadAsync(owner, station.Id, "tone.ogg", Fixture("tone.ogg"))).Status(HttpStatusCode.Created);
+        var pending = (await (await StartAsync(owner, station.Id, "slow.flac", 8_000)).Content
+            .ReadFromJsonAsync<TrackUploadResponse>(Browser.Json, Token))!;
         var tenant = await (await owner.SendAsync(HttpMethod.Get, "/api/v1/tenants/current")).Content
             .ReadFromJsonAsync<System.Text.Json.JsonElement>(Token);
-        Assert.Equal(Fixture("cbr.mp3").Length + Fixture("tone.ogg").Length, tenant.GetProperty("storageUsedBytes").GetInt64());
+        Assert.Equal(Fixture("cbr.mp3").Length + Fixture("tone.ogg").Length + 8_000, tenant.GetProperty("storageUsedBytes").GetInt64());
         Assert.True(tenant.GetProperty("plan").GetProperty("autoDj").GetBoolean());
 
         (await owner.SendAsync(HttpMethod.Delete, $"/api/v1/stations/{station.Id}")).Status(HttpStatusCode.NoContent);
@@ -233,20 +252,33 @@ public sealed class TrackTests(DashboardFactory factory) : IClassFixture<Dashboa
 
         Assert.DoesNotContain(factory.Storage.Keys, k => k.StartsWith(Track.StationPrefix(station.Id), StringComparison.Ordinal));
         await using var scope = factory.Services.CreateAsyncScope();
-        Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Tracks.IgnoreQueryFilters()
-            .AnyAsync(t => t.StationId == station.Id, Token));
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // The pending upload stays: a PUT still running would land after the prefix was cleared.
+        Assert.Equal([pending.TrackId], await db.Tracks.IgnoreQueryFilters().Where(t => t.StationId == station.Id)
+            .Select(t => t.Id).ToListAsync(Token));
+        factory.Storage.Put(FakeObjectStorage.KeyOf(pending.UploadUrl), Fixture("cbr.mp3"));
+
+        await PendingUploadCleanup.DeleteExpiredAsync(factory.Services.GetRequiredService<IServiceScopeFactory>(),
+            DateTimeOffset.UtcNow + TrackRules.PendingLifetime + TimeSpan.FromMinutes(1), Token);
+
+        Assert.False(Stored(pending.TrackId));
+        Assert.False(await db.Tracks.IgnoreQueryFilters().AnyAsync(t => t.StationId == station.Id, Token));
     }
 
     [Fact]
-    public async Task Expired_uploads_are_deleted_with_their_file()
+    public async Task Expired_uploads_are_deleted_with_their_file_well_after_their_url_expired()
     {
         var (owner, station) = await StationAsync();
         var start = await StartAsync(owner, station.Id, "abandoned.mp3", 8_000);
         var upload = (await start.Content.ReadFromJsonAsync<TrackUploadResponse>(Browser.Json, Token))!;
         factory.Storage.Put(FakeObjectStorage.KeyOf(upload.UploadUrl), Fixture("cbr.mp3"));
+        var scopes = factory.Services.GetRequiredService<IServiceScopeFactory>();
 
-        await PendingUploadCleanup.DeleteExpiredAsync(factory.Services.GetRequiredService<IServiceScopeFactory>(),
-            DateTimeOffset.UtcNow.AddHours(1), Token);
+        // A PUT started just before the URL expired may still be running: the upload stays.
+        await PendingUploadCleanup.DeleteExpiredAsync(scopes, upload.ExpiresAt.AddMinutes(10), Token);
+        Assert.True(Stored(upload.TrackId));
+
+        await PendingUploadCleanup.DeleteExpiredAsync(scopes, DateTimeOffset.UtcNow + TrackRules.PendingLifetime + TimeSpan.FromMinutes(1), Token);
 
         Assert.False(Stored(upload.TrackId));
         (await owner.SendAsync(HttpMethod.Post, $"/api/v1/stations/{station.Id}/tracks", new { uploadId = upload.TrackId }))

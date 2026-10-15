@@ -2055,6 +2055,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -4635,11 +4645,11 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Headers the PUT must carry, exactly (the URL is signed for them)."
+            "description": "Headers the PUT must carry, exactly (the URL is signed for them). The body must be exactly the declared size, and\nthe URL works once: a second PUT to it is refused."
           },
           "expiresAt": {
             "type": "string",
-            "description": "The URL and the pending upload end then.",
+            "description": "The PUT must start by then; confirm within an hour after.",
             "format": "date-time"
           }
         },

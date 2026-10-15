@@ -226,7 +226,9 @@ public sealed class FakeObjectStorage : Tropicast.Dashboard.Application.Media.IO
     /// <summary>The key a presigned URL of this fake names.</summary>
     public static string KeyOf(Uri url) => Uri.UnescapeDataString(url.AbsolutePath.TrimStart('/'));
 
-    public Uri PresignUpload(string key, string contentType, TimeSpan lifetime) => new($"https://bucket.test/{key}?method=PUT&type={Uri.EscapeDataString(contentType)}");
+    public Tropicast.Dashboard.Application.Media.PresignedUpload PresignUpload(string key, string contentType, long size, TimeSpan lifetime)
+        => new(new($"https://bucket.test/{key}?method=PUT&type={Uri.EscapeDataString(contentType)}&size={size}"),
+            new Dictionary<string, string> { ["Content-Type"] = contentType, ["If-None-Match"] = "*" });
 
     public Uri PresignDownload(string key, TimeSpan lifetime) => new($"https://bucket.test/{key}?method=GET&ttl={(int)lifetime.TotalSeconds}");
 

@@ -20,13 +20,32 @@ public static class AudioProbe
     /// <summary>Bytes read from the end: the last Ogg page and an ID3v1 tag live there.</summary>
     public const int TailBytes = 64 * 1024;
 
+    /// <summary>How far past the ID3v2 tag the first MP3 frame is looked for.</summary>
+    private const int FrameSearchBytes = 64 * 1024;
+
+    /// <summary>
+    /// Where to read <see cref="HeadBytes"/> more from, for <see cref="Read"/>'s <c>frames</c>, when an ID3v2 tag (e.g.
+    /// cover art) runs so far that the MP3 frames after it are not in <paramref name="head"/>. Null when they are.
+    /// </summary>
+    public static long? FramesOffset(ReadOnlySpan<byte> head, long size)
+    {
+        var start = Id3v2Length(head);
+        return start > 0 && head.Length < size && start < size && start + FrameSearchBytes > head.Length ? start : null;
+    }
+
     /// <summary>
     /// <paramref name="head"/> is the start of the file; <paramref name="tail"/> its end (the same bytes when the file
-    /// is short); <paramref name="size"/> the whole file's size. Null when the file is not a supported track.
+    /// is short); <paramref name="size"/> the whole file's size; <paramref name="frames"/> the bytes from
+    /// <see cref="FramesOffset"/>, when it gave one. Null when the file is not a supported track.
     /// </summary>
-    public static AudioInfo? Read(ReadOnlySpan<byte> head, ReadOnlySpan<byte> tail, long size)
+    public static AudioInfo? Read(ReadOnlySpan<byte> head, ReadOnlySpan<byte> tail, long size, ReadOnlySpan<byte> frames = default)
     {
         if (head.Length < 4 || size <= 0)
+        {
+            return null;
+        }
+        // Containers whose payload could hold bytes that look like MP3 frames: WAV, AIFF, MP4/M4A.
+        if (head.StartsWith("RIFF"u8) || head.StartsWith("FORM"u8) || (head.Length >= 8 && head[4..8].SequenceEqual("ftyp"u8)))
         {
             return null;
         }
@@ -38,7 +57,7 @@ public static class AudioProbe
         {
             return Ogg(head, tail);
         }
-        return Mp3(head, tail, size);
+        return Mp3(head, tail, size, frames);
     }
 
     private static AudioInfo? Flac(ReadOnlySpan<byte> head)
@@ -214,23 +233,22 @@ public static class AudioProbe
         return new Mp3Frame(version, kbps, rate, length, samples, channels);
     }
 
-    private static AudioInfo? Mp3(ReadOnlySpan<byte> head, ReadOnlySpan<byte> tail, long size)
+    /// <summary>The ID3v2 tag's length with its header and footer, where the audio starts; 0 without a tag.</summary>
+    private static int Id3v2Length(ReadOnlySpan<byte> head) => head.Length >= 10 && head.StartsWith("ID3"u8)
+        ? 10 + SyncSafe(head[6..]) + ((head[5] & 0x10) != 0 ? 10 : 0)
+        : 0;
+
+    private static AudioInfo? Mp3(ReadOnlySpan<byte> head, ReadOnlySpan<byte> tail, long size, ReadOnlySpan<byte> frames)
     {
-        var start = 0;
-        string title = "", artist = "";
-        if (head.Length >= 10 && head.StartsWith("ID3"u8))
-        {
-            var tagSize = (head[6] << 21) | (head[7] << 14) | (head[8] << 7) | head[9];
-            (title, artist) = Id3v2(head, tagSize);
-            start = 10 + tagSize + ((head[5] & 0x10) != 0 ? 10 : 0);
-        }
-        // The first frame whose successor is also a frame: a lone 0xFFE could be inside a picture or junk.
+        var start = Id3v2Length(head);
+        var (title, artist) = start > 0 ? Id3v2(head) : ("", "");
+        // The frames follow the tag: in the head, or read apart when the tag is longer.
+        var audio = frames.IsEmpty ? head[Math.Min(start, head.Length)..] : frames;
         Mp3Frame? frame = null;
-        var at = start;
-        for (; at + 4 <= head.Length && at < start + 64 * 1024; at++)
+        var at = 0;
+        for (; at + 4 <= audio.Length && at < FrameSearchBytes; at++)
         {
-            if (Mp3Header(head[at..]) is { } candidate
-                && (at + candidate.Length + 4 > head.Length || Mp3Header(head[(at + candidate.Length)..]) is not null))
+            if (Mp3Header(audio[at..]) is { } candidate && Followed(audio, at, candidate))
             {
                 frame = candidate;
                 break;
@@ -243,20 +261,20 @@ public static class AudioProbe
         var trailing = tail.Length >= 128 && tail[^128..].StartsWith("TAG"u8) ? 128 : 0;
         // A Xing/Info or VBRI header counts the frames of a VBR file.
         var sideInfo = first.Version == 1 ? (first.Channels == 1 ? 17 : 32) : (first.Channels == 1 ? 9 : 17);
-        long? frames = null;
+        long? frameCount = null;
         var xing = at + 4 + sideInfo;
-        if (xing + 12 <= head.Length && (head[xing..].StartsWith("Xing"u8) || head[xing..].StartsWith("Info"u8))
-            && (BinaryPrimitives.ReadUInt32BigEndian(head[(xing + 4)..]) & 1) != 0)
+        if (xing + 12 <= audio.Length && (audio[xing..].StartsWith("Xing"u8) || audio[xing..].StartsWith("Info"u8))
+            && (BinaryPrimitives.ReadUInt32BigEndian(audio[(xing + 4)..]) & 1) != 0)
         {
-            frames = BinaryPrimitives.ReadUInt32BigEndian(head[(xing + 8)..]);
+            frameCount = BinaryPrimitives.ReadUInt32BigEndian(audio[(xing + 8)..]);
         }
-        else if (at + 36 + 18 <= head.Length && head[(at + 36)..].StartsWith("VBRI"u8))
+        else if (at + 36 + 18 <= audio.Length && audio[(at + 36)..].StartsWith("VBRI"u8))
         {
-            frames = BinaryPrimitives.ReadUInt32BigEndian(head[(at + 36 + 14)..]);
+            frameCount = BinaryPrimitives.ReadUInt32BigEndian(audio[(at + 36 + 14)..]);
         }
-        var seconds = frames is > 0
-            ? (double)frames.Value * first.SamplesPerFrame / first.SampleRate
-            : (size - at - trailing) * 8.0 / (first.Kbps * 1000.0);
+        var seconds = frameCount is > 0
+            ? (double)frameCount.Value * first.SamplesPerFrame / first.SampleRate
+            : (size - start - at - trailing) * 8.0 / (first.Kbps * 1000.0);
         if (seconds <= 0)
         {
             return null;
@@ -270,9 +288,32 @@ public static class AudioProbe
         return new AudioInfo(TrackFormat.Mp3, TimeSpan.FromSeconds(seconds), first.SampleRate, first.Channels, title, artist);
     }
 
-    /// <summary>TIT2 and TPE1 from an ID3v2.3 or v2.4 tag (frames past the bytes read are skipped).</summary>
-    private static (string Title, string Artist) Id3v2(ReadOnlySpan<byte> head, int tagSize)
+    /// <summary>
+    /// Whether the frame at <paramref name="at"/> is followed by two more of the same version and sample rate (or by the
+    /// end of the bytes read): a lone 0xFFE, or two by chance, could be inside a picture or another format's data.
+    /// </summary>
+    private static bool Followed(ReadOnlySpan<byte> audio, int at, Mp3Frame first)
     {
+        var next = at + first.Length;
+        for (var i = 0; i < 2; i++)
+        {
+            if (next + 4 > audio.Length)
+            {
+                return true;
+            }
+            if (Mp3Header(audio[next..]) is not { } frame || frame.Version != first.Version || frame.SampleRate != first.SampleRate)
+            {
+                return false;
+            }
+            next += frame.Length;
+        }
+        return true;
+    }
+
+    /// <summary>TIT2 and TPE1 from an ID3v2.3 or v2.4 tag (frames past the bytes read are skipped).</summary>
+    private static (string Title, string Artist) Id3v2(ReadOnlySpan<byte> head)
+    {
+        var tagSize = SyncSafe(head[6..]);
         string title = "", artist = "";
         var major = head[3];
         if (major is not (3 or 4))
@@ -285,6 +326,10 @@ public static class AudioProbe
         {
             // Extended header: skip it.
             var extended = major == 4 ? SyncSafe(head[offset..]) : (int)BinaryPrimitives.ReadUInt32BigEndian(head[offset..]) + 4;
+            if (extended < 0 || extended > end - offset)
+            {
+                return (title, artist); // A crafted size: nothing to read.
+            }
             offset += extended;
         }
         while (offset + 10 <= end && head[offset] != 0)

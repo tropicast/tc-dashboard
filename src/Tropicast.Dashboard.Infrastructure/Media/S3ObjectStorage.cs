@@ -51,14 +51,23 @@ internal sealed class S3ObjectStorage(IOptions<StorageOptions> options) : IObjec
             ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
         });
 
-    public Uri PresignUpload(string key, string contentType, TimeSpan lifetime) => Presign(key, HttpVerb.PUT, lifetime, contentType);
+    public PresignedUpload PresignUpload(string key, string contentType, long size, TimeSpan lifetime)
+    {
+        var request = PresignRequest(key, HttpVerb.PUT, lifetime);
+        request.ContentType = contentType;
+        // Signed headers: the bucket refuses a body of another length, and a PUT once an object exists.
+        request.Headers.ContentLength = size;
+        request.Headers["If-None-Match"] = "*";
+        return new PresignedUpload(new Uri(_presigner.Value.GetPreSignedURL(request)),
+            new Dictionary<string, string> { ["Content-Type"] = contentType, ["If-None-Match"] = "*" });
+    }
 
-    public Uri PresignDownload(string key, TimeSpan lifetime) => Presign(key, HttpVerb.GET, lifetime, null);
+    public Uri PresignDownload(string key, TimeSpan lifetime) => new(_presigner.Value.GetPreSignedURL(PresignRequest(key, HttpVerb.GET, lifetime)));
 
-    private Uri Presign(string key, HttpVerb verb, TimeSpan lifetime, string? contentType)
+    private GetPreSignedUrlRequest PresignRequest(string key, HttpVerb verb, TimeSpan lifetime)
     {
         var endpoint = Settings.PublicEndpoint ?? Settings.Endpoint!;
-        var request = new GetPreSignedUrlRequest
+        return new GetPreSignedUrlRequest
         {
             BucketName = Settings.Bucket,
             Key = key,
@@ -66,11 +75,6 @@ internal sealed class S3ObjectStorage(IOptions<StorageOptions> options) : IObjec
             Expires = DateTime.UtcNow + lifetime,
             Protocol = endpoint.Scheme == Uri.UriSchemeHttp ? Protocol.HTTP : Protocol.HTTPS,
         };
-        if (contentType is not null)
-        {
-            request.ContentType = contentType;
-        }
-        return new Uri(_presigner.Value.GetPreSignedURL(request));
     }
 
     public async Task<StoredObject?> HeadAsync(string key, CancellationToken cancellationToken = default)
@@ -88,6 +92,10 @@ internal sealed class S3ObjectStorage(IOptions<StorageOptions> options) : IObjec
 
     public async Task<byte[]> ReadRangeAsync(string key, long offset, int length, CancellationToken cancellationToken = default)
     {
+        if (length <= 0)
+        {
+            return []; // "bytes=0--1" is no range.
+        }
         try
         {
             using var response = await _client.Value.GetObjectAsync(new GetObjectRequest

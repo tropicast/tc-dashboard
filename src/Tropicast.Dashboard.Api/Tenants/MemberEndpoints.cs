@@ -41,7 +41,7 @@ internal static class MemberEndpoints
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         // Locks the tenant row: two concurrent removals cannot both see a second Owner and leave none.
-        await db.Tenants.FromSql($"SELECT *, xmin FROM tenants WHERE id = {access.TenantId} FOR UPDATE").SingleAsync(cancellationToken);
+        await TenantPlans.LockAsync(db, access, cancellationToken);
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.UserId == userId, cancellationToken);
         if (membership is null)
         {

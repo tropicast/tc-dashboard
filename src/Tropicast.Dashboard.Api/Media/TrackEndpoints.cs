@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Tropicast.Dashboard.Api.Auth;
+using Tropicast.Dashboard.Api.Tenants;
 using Tropicast.Dashboard.Application.Media;
 using Tropicast.Dashboard.Domain.Media;
 using Tropicast.Dashboard.Domain.Plans;
@@ -11,8 +12,11 @@ namespace Tropicast.Dashboard.Api.Media;
 /// <summary>Where and how the browser sends the file.</summary>
 /// <param name="TrackId">Confirm the upload with it (<c>uploadId</c>).</param>
 /// <param name="UploadUrl">Presigned bucket URL: PUT the file's bytes there.</param>
-/// <param name="Headers">Headers the PUT must carry, exactly (the URL is signed for them).</param>
-/// <param name="ExpiresAt">The URL and the pending upload end then.</param>
+/// <param name="Headers">
+/// Headers the PUT must carry, exactly (the URL is signed for them). The body must be exactly the declared size, and
+/// the URL works once: a second PUT to it is refused.
+/// </param>
+/// <param name="ExpiresAt">The PUT must start by then; confirm within an hour after.</param>
 internal sealed record TrackUploadResponse(Guid TrackId, Uri UploadUrl, IReadOnlyDictionary<string, string> Headers, DateTimeOffset ExpiresAt);
 
 /// <summary>An uploaded track.</summary>
@@ -55,7 +59,8 @@ internal static class TrackEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .WithSummary("Confirms an upload: the server reads the stored file's format, duration and size, then keeps or deletes it.");
-        tracks.MapDelete("/{trackId:guid}", DeleteAsync).WithSummary("Deletes the track and its stored file.");
+        tracks.MapDelete("/{trackId:guid}", DeleteAsync).ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+            .WithSummary("Deletes the track and its stored file.");
     }
 
     private static async Task<Results<Ok<TrackLibraryResponse>, NotFound>> ListAsync(Guid stationId, AppDbContext db,
@@ -67,7 +72,7 @@ internal static class TrackEndpoints
         }
         var tracks = await db.Tracks.Where(t => t.StationId == stationId && t.Status == TrackStatus.Ready)
             .OrderByDescending(t => t.CreatedAt).ToListAsync(cancellationToken);
-        var plan = await CurrentPlanAsync(db, cancellationToken);
+        var plan = await TenantPlans.CurrentAsync(db, cancellationToken);
         return TypedResults.Ok(new TrackLibraryResponse([.. tracks.Select(ToResponse)],
             new StorageUsageResponse(await UsedBytesAsync(db, time.GetUtcNow(), null, cancellationToken), plan.StorageQuotaBytes)));
     }
@@ -87,7 +92,7 @@ internal static class TrackEndpoints
         var now = time.GetUtcNow();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         // Locks the tenant row: concurrent uploads cannot both pass the quota.
-        var plan = await LockPlanAsync(db, access, cancellationToken);
+        var plan = await TenantPlans.LockPlanAsync(db, access, cancellationToken);
         if (!plan.AutoDj)
         {
             return NoAutoDj(plan);
@@ -96,13 +101,13 @@ internal static class TrackEndpoints
         {
             return OverQuota(plan);
         }
-        var track = Track.StartUpload(stationId, Path.GetFileName(command.FileName), command.Size, now, TrackRules.UploadLifetime);
+        var track = Track.StartUpload(stationId, Path.GetFileName(command.FileName), command.Size, now, TrackRules.PendingLifetime);
         db.Tracks.Add(track);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        var contentType = TrackRules.ContentTypeOf(command.FileName)!;
-        return TypedResults.Ok(new TrackUploadResponse(track.Id, storage.PresignUpload(track.ObjectKey, contentType, TrackRules.UploadLifetime),
-            new Dictionary<string, string> { ["Content-Type"] = contentType }, track.UploadExpiresAt!.Value));
+        // Signed for the declared size, the quota counted: the bucket refuses another body.
+        var upload = storage.PresignUpload(track.ObjectKey, TrackRules.ContentTypeOf(command.FileName)!, command.Size, TrackRules.UploadLifetime);
+        return TypedResults.Ok(new TrackUploadResponse(track.Id, upload.Url, upload.Headers, now + TrackRules.UploadLifetime));
     }
 
     private static async Task<Results<Created<TrackResponse>, NotFound, ProblemHttpResult>> ConfirmAsync(Guid stationId,
@@ -126,9 +131,13 @@ internal static class TrackEndpoints
             return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict,
                 title: "The file has not arrived in storage. Upload it to the URL you were given, then confirm again.");
         }
+        if (stored.Size == 0)
+        {
+            return await RefuseAsync(storage, track, StatusCodes.Status422UnprocessableEntity, "This file is empty.", cancellationToken);
+        }
         if (stored.Size > TrackRules.MaxBytes)
         {
-            return await RefuseAsync(db, storage, track, StatusCodes.Status422UnprocessableEntity,
+            return await RefuseAsync(storage, track, StatusCodes.Status422UnprocessableEntity,
                 $"Files up to {TrackRules.Size(TrackRules.MaxBytes)} are accepted.", cancellationToken);
         }
 
@@ -136,60 +145,75 @@ internal static class TrackEndpoints
         var tailLength = (int)Math.Min(stored.Size, AudioProbe.TailBytes);
         var tail = stored.Size <= AudioProbe.HeadBytes ? head
             : await storage.ReadRangeAsync(track.ObjectKey, stored.Size - tailLength, tailLength, cancellationToken);
-        var info = AudioProbe.Read(head, tail, stored.Size);
+        // An ID3v2 tag with large cover art can push the MP3 frames past the head: read them where they start.
+        var frames = AudioProbe.FramesOffset(head, stored.Size) is { } offset
+            ? await storage.ReadRangeAsync(track.ObjectKey, offset, (int)Math.Min(stored.Size - offset, AudioProbe.HeadBytes), cancellationToken)
+            : [];
+        var info = AudioProbe.Read(head, tail, stored.Size, frames);
         if (info is null)
         {
-            return await RefuseAsync(db, storage, track, StatusCodes.Status422UnprocessableEntity,
+            return await RefuseAsync(storage, track, StatusCodes.Status422UnprocessableEntity,
                 $"This file is not {TrackRules.Accepted} audio the server can read.", cancellationToken);
         }
         if (info.Duration > TrackRules.MaxDuration)
         {
-            return await RefuseAsync(db, storage, track, StatusCodes.Status422UnprocessableEntity,
+            return await RefuseAsync(storage, track, StatusCodes.Status422UnprocessableEntity,
                 $"Tracks up to {TrackRules.MaxDuration.TotalHours:0} hours are accepted.", cancellationToken);
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var plan = await LockPlanAsync(db, access, cancellationToken);
+        var plan = await TenantPlans.LockPlanAsync(db, access, cancellationToken);
         // The real size counts now, not the declared one: a larger file than announced must still fit.
         if (!plan.AutoDj || !TrackRules.FitsQuota(plan, await UsedBytesAsync(db, now, track.Id, cancellationToken), stored.Size))
         {
             await transaction.RollbackAsync(cancellationToken);
-            return await RefuseAsync(db, storage, track, StatusCodes.Status403Forbidden,
+            return await RefuseAsync(storage, track, StatusCodes.Status403Forbidden,
                 plan.AutoDj ? TrackRules.QuotaMessage(plan) : TrackRules.NoAutoDjMessage(plan), cancellationToken);
         }
         var fallbackTitle = Path.GetFileNameWithoutExtension(track.FileName);
         track.Confirm(info.Format, info.Duration, stored.Size,
             FirstNonEmpty(command.Title, info.Title, fallbackTitle), FirstNonEmpty(command.Artist, info.Artist));
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another confirm of this upload won, or the expired upload was cleaned up while the file was read.
+            return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict,
+                title: "This upload was confirmed or expired meanwhile. Reload the media library.");
+        }
         await transaction.CommitAsync(cancellationToken);
         return TypedResults.Created($"/api/v1/stations/{stationId}/tracks/{track.Id}", ToResponse(track));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteAsync(Guid stationId, Guid trackId, AppDbContext db,
+    private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> DeleteAsync(Guid stationId, Guid trackId, AppDbContext db,
         IObjectStorage storage, CancellationToken cancellationToken)
     {
+        if (!storage.IsConfigured)
+        {
+            return Unavailable(); // The row would go without its object, and nothing could delete it later.
+        }
         var track = await db.Tracks.SingleOrDefaultAsync(t => t.Id == trackId && t.StationId == stationId, cancellationToken);
         if (track is null)
         {
             return TypedResults.NotFound();
         }
         // The object first: a failure leaves the row, so the delete can be retried.
-        if (storage.IsConfigured)
-        {
-            await storage.DeleteAsync(track.ObjectKey, cancellationToken);
-        }
+        await storage.DeleteAsync(track.ObjectKey, cancellationToken);
         db.Tracks.Remove(track);
         await db.SaveChangesAsync(cancellationToken);
         return TypedResults.NoContent();
     }
 
-    /// <summary>Refused after the upload: nothing stays in the bucket, and the pending track goes.</summary>
-    private static async Task<ProblemHttpResult> RefuseAsync(AppDbContext db, IObjectStorage storage, Track track, int status,
-        string title, CancellationToken cancellationToken)
+    /// <summary>
+    /// Refused after the upload: the file leaves the bucket at once. The pending track stays until it expires, holding
+    /// its declared size in the quota: its URL can still PUT that much, and the expiry cleanup deletes what it puts.
+    /// </summary>
+    private static async Task<ProblemHttpResult> RefuseAsync(IObjectStorage storage, Track track, int status, string title,
+        CancellationToken cancellationToken)
     {
         await storage.DeleteAsync(track.ObjectKey, cancellationToken);
-        db.ChangeTracker.Clear();
-        await db.Tracks.Where(t => t.Id == track.Id).ExecuteDeleteAsync(cancellationToken);
         return TypedResults.Problem(statusCode: status, title: title);
     }
 
@@ -197,16 +221,6 @@ internal static class TrackEndpoints
     internal static Task<long> UsedBytesAsync(AppDbContext db, DateTimeOffset now, Guid? except, CancellationToken cancellationToken)
         => db.Tracks.Where(t => t.Id != except && (t.Status == TrackStatus.Ready || t.UploadExpiresAt > now))
             .SumAsync(t => t.SizeBytes, cancellationToken);
-
-    private static async Task<Plan> LockPlanAsync(AppDbContext db, TenantAccess access, CancellationToken cancellationToken)
-    {
-        var tenant = await db.Tenants.FromSql($"SELECT *, xmin FROM tenants WHERE id = {access.TenantId} FOR UPDATE")
-            .AsNoTracking().SingleAsync(cancellationToken);
-        return await db.Plans.SingleAsync(p => p.Id == tenant.PlanId, cancellationToken);
-    }
-
-    private static async Task<Plan> CurrentPlanAsync(AppDbContext db, CancellationToken cancellationToken)
-        => await db.Tenants.Join(db.Plans, t => t.PlanId, p => p.Id, (_, p) => p).SingleAsync(cancellationToken);
 
     private static ProblemHttpResult NoAutoDj(Plan plan) => TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden,
         title: TrackRules.NoAutoDjMessage(plan), extensions: new Dictionary<string, object?> { ["limit"] = "autodj" });
