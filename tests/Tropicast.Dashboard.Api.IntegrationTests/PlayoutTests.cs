@@ -101,22 +101,62 @@ public sealed class PlayoutTests(DashboardFactory factory, PostgresContainer pos
         var station = await StationAsync();
         var (body, _) = await PlayoutAsync();
 
-        var entry = Assert.Single(body.Stations, s => s.PublicId == station.Station.PublicId);
+        var entry = body.Stations[station.Station.PublicId];
         Assert.Equal(["/stations/" + station.Station.PublicId + "/autodj.mp3:128:44100", "/stations/" + station.Station.PublicId + "/autodj.opus:64:48000"],
             entry.Outputs.Select(o => $"{o.Mount}:{o.BitrateKbps}:{o.SampleRate}"));
-        Assert.Equal(station.PlaylistId, entry.Playlist.Id);
-        Assert.Equal(["Morning song", "Jingle"], entry.Playlist.Tracks.Select(t => t.Title));
-        Assert.All(entry.Playlist.Tracks, t => Assert.StartsWith($"https://bucket.test/stations/{station.Station.Id:N}/tracks/", t.Url.ToString(), StringComparison.Ordinal));
+        Assert.Equal(station.PlaylistId, entry.PlaylistId);
+        Assert.Equal(["Morning song", "Jingle"], entry.Tracks.Select(t => t.Title));
+        Assert.All(entry.Tracks, t => Assert.StartsWith($"https://bucket.test/stations/{station.Station.Id:N}/tracks/", t.Url.ToString(), StringComparison.Ordinal));
         Assert.True(body.UrlsExpireAt > DateTimeOffset.UtcNow.AddMinutes(10));
 
         // The credential it hands out is the one source auth accepts on the AutoDJ mount, and only there.
         var icecast = Node();
         var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["action"] = "stream_auth", ["mount"] = $"/stations/{entry.PublicId}/autodj.mp3", ["user"] = entry.Username, ["pass"] = entry.Password,
+            ["action"] = "stream_auth", ["mount"] = $"/stations/{station.Station.PublicId}/autodj.mp3", ["user"] = station.Station.PublicId,
+            ["pass"] = entry.Password,
         });
         var auth = await icecast.PostAsync("/internal/icecast/source-auth", form, Token);
         Assert.Equal("1", auth.Headers.GetValues("icecast-auth-user").Single());
+    }
+
+    [Fact]
+    public async Task The_answer_has_the_shape_tc_streaming_s_playout_worker_parses()
+    {
+        var station = await StationAsync();
+        var response = await Node().GetAsync(PlayoutEndpoint.Path, Token);
+        var root = (await response.Content.ReadFromJsonAsync<JsonElement>(Token)).GetProperty("stations");
+
+        // tc-streaming docs/reference/playout.md: stations keyed by source user, snake_case encoder fields, tracks with an id and url.
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        var entry = root.GetProperty(station.Station.PublicId);
+        Assert.False(string.IsNullOrEmpty(entry.GetProperty("password").GetString()));
+        Assert.Equal(JsonValueKind.False, entry.GetProperty("shuffle").ValueKind);
+        var output = entry.GetProperty("outputs")[0];
+        Assert.Equal("mp3", output.GetProperty("format").GetString());
+        Assert.Equal(128, output.GetProperty("bitrate_kbps").GetInt32());
+        Assert.Equal(44100, output.GetProperty("sample_rate").GetInt32());
+        Assert.Equal(2, output.GetProperty("channels").GetInt32());
+        var track = entry.GetProperty("tracks")[0];
+        Assert.Matches("^[A-Za-z0-9_-]{1,64}$", track.GetProperty("id").GetString());
+        Assert.StartsWith("https://", track.GetProperty("url").GetString(), StringComparison.Ordinal);
+        Assert.Equal("Morning song", track.GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task The_version_changes_every_half_url_lifetime_so_the_worker_renews_its_urls()
+    {
+        await using var shortUrls = new DashboardFactory(postgres) { Settings = new Dictionary<string, string> { ["Storage:DownloadUrlLifetime"] = "00:00:02" } };
+        await shortUrls.InitializeAsync();
+        await StationAsync(shortUrls);
+        var client = shortUrls.CreateClient(new() { BaseAddress = new Uri("http://localhost:8081") });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes($"{SourceAuthNode.Username}:{SourceAuthNode.Password}")));
+        var first = (await client.GetAsync(PlayoutEndpoint.Path, Token)).Headers.ETag!.ToString();
+
+        await Task.Delay(TimeSpan.FromSeconds(1.2), Token);
+
+        Assert.NotEqual(first, (await client.GetAsync(PlayoutEndpoint.Path, Token)).Headers.ETag!.ToString());
     }
 
     [Fact]
@@ -142,17 +182,17 @@ public sealed class PlayoutTests(DashboardFactory factory, PostgresContainer pos
     {
         var station = await StationAsync(enable: false);
         Assert.False(AutoDjIn(await ReconciledAsync(), station.Station.PublicId));
-        Assert.DoesNotContain((await PlayoutAsync()).Body.Stations, s => s.PublicId == station.Station.PublicId);
+        Assert.DoesNotContain(station.Station.PublicId, (await PlayoutAsync()).Body.Stations.Keys);
 
         (await station.Owner.SendAsync(HttpMethod.Put, $"/api/v1/stations/{station.Station.Id}/autodj",
             new { enabled = true, defaultPlaylistId = station.PlaylistId })).Status(HttpStatusCode.OK);
         Assert.True(AutoDjIn(await ReconciledAsync(), station.Station.PublicId));
-        Assert.Contains((await PlayoutAsync()).Body.Stations, s => s.PublicId == station.Station.PublicId);
+        Assert.Contains(station.Station.PublicId, (await PlayoutAsync()).Body.Stations.Keys);
 
         (await station.Owner.SendAsync(HttpMethod.Put, $"/api/v1/stations/{station.Station.Id}/autodj", new { enabled = false }))
             .Status(HttpStatusCode.OK);
         Assert.False(AutoDjIn(await ReconciledAsync(), station.Station.PublicId));
-        Assert.DoesNotContain((await PlayoutAsync()).Body.Stations, s => s.PublicId == station.Station.PublicId);
+        Assert.DoesNotContain(station.Station.PublicId, (await PlayoutAsync()).Body.Stations.Keys);
     }
 
     [Fact]
@@ -164,14 +204,14 @@ public sealed class PlayoutTests(DashboardFactory factory, PostgresContainer pos
         await Browser.SetPlanAsync(_factory, station.Owner.TenantId!.Value, "free");
 
         Assert.False(AutoDjIn(await ReconciledAsync(), station.Station.PublicId));
-        Assert.DoesNotContain((await PlayoutAsync()).Body.Stations, s => s.PublicId == station.Station.PublicId);
+        Assert.DoesNotContain(station.Station.PublicId, (await PlayoutAsync()).Body.Stations.Keys);
     }
 
     [Fact]
     public async Task A_credential_that_cannot_be_decrypted_is_rotated()
     {
         var station = await StationAsync();
-        var before = Assert.Single((await PlayoutAsync()).Body.Stations, s => s.PublicId == station.Station.PublicId).Password;
+        var before = (await PlayoutAsync()).Body.Stations[station.Station.PublicId].Password;
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.ExecuteSqlAsync(
@@ -179,7 +219,7 @@ public sealed class PlayoutTests(DashboardFactory factory, PostgresContainer pos
                 Token);
         }
 
-        var after = Assert.Single((await PlayoutAsync()).Body.Stations, s => s.PublicId == station.Station.PublicId).Password;
+        var after = (await PlayoutAsync()).Body.Stations[station.Station.PublicId].Password;
 
         Assert.NotEqual(before, after);
         Assert.Equal(43, after.Length);

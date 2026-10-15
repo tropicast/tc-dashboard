@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -16,29 +17,40 @@ using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Playout;
 
-/// <summary>What the playout worker plays, for every station with AutoDJ on (#107).</summary>
-/// <param name="Version">Changes when a station, its encoding, credential or playlist changes; not when URLs are renewed.</param>
-/// <param name="UrlsExpireAt">The track URLs stop working then: fetch again (without If-None-Match) before.</param>
-/// <param name="Stations">One entry per station to play.</param>
-internal sealed record PlayoutResponse(string Version, DateTimeOffset UrlsExpireAt, IReadOnlyList<PlayoutStation> Stations);
+/// <summary>
+/// What the playout worker plays, for every station with AutoDJ on (#107), in the shape tc-streaming's
+/// <c>docs/reference/playout.md</c> defines (hence the snake_case output fields).
+/// </summary>
+/// <param name="Version">
+/// Changes when a station, its encoding, credential or playlist changes, and every half URL lifetime: the worker
+/// only refetches in full when the ETag changes, so its URLs are renewed well before they expire.
+/// </param>
+/// <param name="UrlsExpireAt">The track URLs stop working then.</param>
+/// <param name="Stations">By station public ID (the source user name): one entry per station to play.</param>
+internal sealed record PlayoutResponse(string Version, DateTimeOffset UrlsExpireAt, IReadOnlyDictionary<string, PlayoutStation> Stations);
 
-/// <summary>A station the worker publishes to.</summary>
-/// <param name="PublicId">The station's public ID.</param>
-/// <param name="Username">Source user name (the public ID).</param>
+/// <summary>A station the worker publishes to, as source user = its public ID.</summary>
 /// <param name="Password">The station's AutoDJ credential (accepted on its autodj mounts only).</param>
-/// <param name="Outputs">One per format: mount and the encoding to match the live stream.</param>
-/// <param name="Playlist">What to play.</param>
-internal sealed record PlayoutStation(string PublicId, string Username, string Password, IReadOnlyList<PlayoutOutput> Outputs,
-    PlayoutPlaylist Playlist);
+/// <param name="Shuffle">Shuffle the tracks on each pass; else play them in order.</param>
+/// <param name="PlaylistId">The default playlist the tracks come from.</param>
+/// <param name="Outputs">One per format, with the encoding of the live stream.</param>
+/// <param name="Tracks">In playlist order.</param>
+internal sealed record PlayoutStation(string Password, bool Shuffle, Guid PlaylistId, IReadOnlyList<PlayoutOutput> Outputs,
+    IReadOnlyList<PlayoutTrack> Tracks);
 
-/// <summary>One AutoDJ mount.</summary>
-internal sealed record PlayoutOutput(string Format, string Mount, string ContentType, int BitrateKbps, int SampleRate, int Channels);
+/// <summary>One AutoDJ mount: <c>mp3</c> or <c>opus</c>.</summary>
+internal sealed record PlayoutOutput(
+    string Format,
+    string Mount,
+    [property: JsonPropertyName("bitrate_kbps")] int BitrateKbps,
+    [property: JsonPropertyName("sample_rate")] int SampleRate,
+    int Channels);
 
-/// <summary>The station's default playlist, in play order (shuffle it when <see cref="Shuffle"/>).</summary>
-internal sealed record PlayoutPlaylist(Guid Id, string Name, bool Shuffle, IReadOnlyList<PlayoutTrack> Tracks);
-
-/// <summary>A track and a presigned URL to download it.</summary>
-internal sealed record PlayoutTrack(Guid Id, string Title, string Artist, long DurationMs, TrackFormat Format, Uri Url);
+/// <summary>
+/// A track and a presigned URL to download it. No sha256: the ID names an object that is never overwritten, so the
+/// worker caches by ID.
+/// </summary>
+internal sealed record PlayoutTrack(Guid Id, string Title, string Artist, long DurationMs, Uri Url);
 
 /// <summary>
 /// <c>GET /internal/playout/stations</c> for the Liquidsoap playout worker (tc-streaming#61). Like source auth: the
@@ -70,7 +82,7 @@ internal static class PlayoutEndpoint
         var now = time.GetUtcNow();
         var lifetime = storageOptions.Value.DownloadUrlLifetime;
         var stations = await StationsAsync(db, streaming.Value.Node, cancellationToken);
-        var result = new List<PlayoutStation>();
+        var result = new Dictionary<string, PlayoutStation>(StringComparer.Ordinal);
         foreach (var station in stations)
         {
             if (!storage.IsConfigured)
@@ -78,15 +90,14 @@ internal static class PlayoutEndpoint
                 break; // No bucket: nothing can be played (and nothing was uploaded).
             }
             var password = await CredentialAsync(db, protection, station.Id, now, cancellationToken);
-            var playlist = new PlayoutPlaylist(station.Playlist.Id, station.Playlist.Name, station.Playlist.Shuffle,
-                [.. station.Tracks.Select(t => new PlayoutTrack(t.Id, t.Title, t.Artist, t.DurationMs ?? 0, t.Format!.Value,
+            result[station.PublicId] = new PlayoutStation(password.Secret, station.Playlist.Shuffle, station.Playlist.Id, station.Outputs,
+                [.. station.Tracks.Select(t => new PlayoutTrack(t.Id, t.Title, t.Artist, t.DurationMs ?? 0,
                     storage.PresignDownload(t.ObjectKey, lifetime)))]);
-            result.Add(new PlayoutStation(station.PublicId, station.PublicId, password.Secret, station.Outputs, playlist));
             station.CredentialId = password.Id;
         }
         await db.SaveChangesAsync(cancellationToken);
 
-        var version = Version(stations.Where(s => s.CredentialId is not null));
+        var version = Version(stations.Where(s => s.CredentialId is not null), now, lifetime);
         context.Response.Headers.CacheControl = "no-store";
         context.Response.Headers.ETag = $"\"{version}\"";
         if (context.Request.Headers.IfNoneMatch.ToString().Trim() == $"\"{version}\"")
@@ -156,8 +167,8 @@ internal static class PlayoutEndpoint
                 var profile = profiles.SingleOrDefault(p => p.StationId == row.StationId && p.Format == format)
                     ?? EncodingProfile.Default(row.StationId, format, row.Plan);
                 var name = format == AudioFormat.Mp3 ? "mp3" : "opus";
-                return new PlayoutOutput(name, $"/stations/{row.PublicId}/autodj.{name}", format == AudioFormat.Mp3 ? "audio/mpeg" : "audio/ogg",
-                    profile.BitrateFor(row.Plan), profile.SampleRate, profile.Channels);
+                return new PlayoutOutput(name, $"/stations/{row.PublicId}/autodj.{name}", profile.BitrateFor(row.Plan), profile.SampleRate,
+                    profile.Channels);
             }).ToList();
             result.Add(new Candidate { Id = row.StationId, PublicId = row.PublicId, Playlist = playlist, Tracks = entries, Outputs = outputs });
         }
@@ -179,15 +190,19 @@ internal static class PlayoutEndpoint
         return (fresh.Id, AutoDjCredentials.Reveal(protection, fresh)!);
     }
 
-    /// <summary>A hash of what the worker acts on: stations, credentials (by ID), outputs and playlists; never the URLs.</summary>
-    private static string Version(IEnumerable<Candidate> stations)
+    /// <summary>
+    /// A hash of what the worker acts on: stations, credentials (by ID), outputs and playlists, never the URLs; and the
+    /// current half URL lifetime, so the worker gets fresh URLs while the ones it holds still work.
+    /// </summary>
+    private static string Version(IEnumerable<Candidate> stations, DateTimeOffset now, TimeSpan urlLifetime)
     {
-        var state = stations.Select(s => new
+        var window = now.ToUnixTimeSeconds() / Math.Max(1, (long)urlLifetime.TotalSeconds / 2);
+        var state = new { Window = window, Stations = stations.Select(s => new
         {
             s.PublicId, s.CredentialId, s.Outputs,
             Playlist = new { s.Playlist.Id, s.Playlist.Name, s.Playlist.Shuffle },
             Tracks = s.Tracks.Select(t => new { t.Id, t.Title, t.Artist, t.DurationMs }),
-        });
+        }) };
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(state, Json))))[..16];
     }
 }

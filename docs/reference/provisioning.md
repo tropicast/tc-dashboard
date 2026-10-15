@@ -39,7 +39,10 @@ Compose sets `Provisioning__Enabled=false`: locally there is no node.
 ## Playout worker endpoint
 
 `GET /internal/playout/stations` tells the Liquidsoap playout worker
-(tc-streaming#61) what to play (#107). Like source auth it is served on the
+(tc-streaming#61) what to play (#107). The shape is the worker's (tc-streaming
+`docs/reference/playout.md`): stations keyed by public ID, which is also the
+source user name, and snake_case encoder fields. Tracks have no `sha256`; the
+worker caches them by ID, which always names the same file. Like source auth it is served on the
 internal port 8081 only (404 on the public port), with the node's HTTP Basic
 credentials (401 otherwise), and is never cached (`Cache-Control: no-store`).
 
@@ -47,38 +50,31 @@ credentials (401 otherwise), and is never cached (`Cache-Control: no-store`).
 {
     "version": "3f9c0a1b2d4e5f60",
     "urlsExpireAt": "2026-10-15T18:15:00+00:00",
-    "stations": [
-        {
-            "publicId": "k3m9x2p7qa",
-            "username": "k3m9x2p7qa",
+    "stations": {
+        "k3m9x2p7qa": {
             "password": "<the station's AutoDJ credential>",
+            "shuffle": false,
+            "playlistId": "…",
             "outputs": [
                 {
                     "format": "mp3",
                     "mount": "/stations/k3m9x2p7qa/autodj.mp3",
-                    "contentType": "audio/mpeg",
-                    "bitrateKbps": 128,
-                    "sampleRate": 44100,
+                    "bitrate_kbps": 128,
+                    "sample_rate": 44100,
                     "channels": 2
                 }
             ],
-            "playlist": {
-                "id": "…",
-                "name": "Fallback",
-                "shuffle": false,
-                "tracks": [
-                    {
-                        "id": "…",
-                        "title": "Jingle",
-                        "artist": "",
-                        "durationMs": 30000,
-                        "format": "Mp3",
-                        "url": "https://…"
-                    }
-                ]
-            }
+            "tracks": [
+                {
+                    "id": "…",
+                    "title": "Jingle",
+                    "artist": "",
+                    "durationMs": 30000,
+                    "url": "https://…"
+                }
+            ]
         }
-    ]
+    }
 }
 ```
 
@@ -93,6 +89,6 @@ credentials (401 otherwise), and is never cached (`Cache-Control: no-store`).
 - **Track URLs:** presigned GETs from the private bucket, valid
   `Storage:DownloadUrlLifetime` (15 minutes); download them to a local cache.
 - **Polling:** `version` (also the `ETag`) changes when a station, its
-  encoding, credential or playlist changes, not when URLs are renewed. Poll
-  with `If-None-Match` (304 while unchanged), and fetch without it before
-  `urlsExpireAt`.
+  encoding, credential or playlist changes, and every half URL lifetime, so a
+  worker polling with `If-None-Match` (304 while unchanged) gets fresh URLs
+  before the ones it holds expire.
