@@ -71,6 +71,11 @@ internal static partial class SourceAuthEndpoint
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
             timeout.CancelAfter(options.Value.Timeout);
             var request = await ReadAsync(context.Request, timeout.Token);
+            if (request.Action == SourceAuthorizer.MetadataAction)
+            {
+                // The update's request URI: decide on the mount it names, as for a source connect to it.
+                request = request with { Mount = SourceAuthorizer.MetadataMount(request.Mount) ?? "" };
+            }
             mount = request.Mount;
             // Resolved here, so a missing or broken database denies instead of failing the request.
             var db = context.RequestServices.GetRequiredService<AppDbContext>();
@@ -116,7 +121,8 @@ internal static partial class SourceAuthEndpoint
             return new SourceAuthRequest(null, null, null, null, null);
         }
         var form = await new FormFeature(request, FormLimits).ReadFormAsync(cancellationToken);
-        return new SourceAuthRequest(form["mount"], form["user"], form["pass"], form["header.ice-bitrate"], form["header.ice-audio-info"]);
+        return new SourceAuthRequest(form["mount"], form["user"], form["pass"], form["header.ice-bitrate"], form["header.ice-audio-info"],
+            form["action"]);
     }
 
     private static async Task<SourceAuthDecision> DecideAndRecordAsync(SourceAuthRequest request, AppDbContext db,
@@ -156,8 +162,9 @@ internal static partial class SourceAuthEndpoint
         var decision = SourceAuthorizer.Decide(request, station is null ? null : new SourceAuthStation(station.PublicId,
             station.Status == TenantStatus.Active, station.Plan, [.. credentials.Select(c => (c.Id, c.SecretHash))], rank,
             [.. autoDjCredentials.Select(c => (c.Id, c.SecretHash))], autoDjOn));
-        if (!decision.Allowed)
+        if (!decision.Allowed || request.Action == SourceAuthorizer.MetadataAction)
         {
+            // A title update of a source already let in: no session, no use to record, no encoding to pin.
             return decision;
         }
 

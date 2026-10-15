@@ -30,6 +30,14 @@ Icecast asks it before accepting audio from a source.
   (`Ice-Audio-Info`: bitrate, sample rate and channels) for that format, so
   AutoDJ encodes the same ([AutoDJ](autodj.md#encoding-and-credential)).
   AutoDJ mounts open no session.
+- **Track titles** (tc-streaming#72). MP3 sources send titles as ICY metadata
+  updates (`GET /admin/metadata?mode=updinfo&mount=…&song=…`) with their own
+  credentials; Icecast asks with `action=metadata_auth` and the update's
+  request URI as `mount`. The endpoint takes that URI's one `mount` query
+  parameter (`SourceAuthorizer.MetadataMount`; a path other than
+  `/admin/metadata`, no `mode=updinfo`, or several mounts deny) and decides as
+  for a connect to it. An allowed update records nothing: no `last_used_at`,
+  no session, no encoding pin.
 
 To try it with a real Icecast, run tc-streaming's `icecast` service with
 `ICECAST_SOURCE_AUTH_URL=http://api:8081/internal/icecast/source-auth` and

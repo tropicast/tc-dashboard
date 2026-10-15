@@ -18,6 +18,10 @@ auto-generated list of merged pull requests. See [Releasing](docs/runbook.md#rel
 - Media library page (#108), from the station page: drag-and-drop or pick MP3, FLAC and Ogg files, with per-file progress and clear errors (unsupported, over 200 MB, over quota, refused by the server); the tracks with duration, size and format; delete with confirmation; storage used against the plan's quota, also on the Account usage card. English and French.
 - AutoDJ on the station page and a playlist editor (#109): turn AutoDJ on or off, choose its playlist and see what is on air (live DJ, AutoDJ, off air); build playlists from the media library, reorder them with the keyboard, shuffle, rename and delete. Plans without AutoDJ get an upgrade prompt. English and French.
 
+### Fixed
+
+- Source auth accepts ICY metadata updates (`action=metadata_auth`, tc-streaming#72) for a source's own mount with its own credential, so MP3 track titles reach listeners. They record nothing.
+
 ## [0.1.1] - 2026-10-14
 
 ### Added

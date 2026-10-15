@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Web;
 using Tropicast.Dashboard.Application.Security;
 using Tropicast.Dashboard.Domain;
 using Tropicast.Dashboard.Domain.Plans;
@@ -12,7 +13,11 @@ namespace Tropicast.Dashboard.Application.SourceAuth;
 /// <param name="Password">Station broadcast credential secret.</param>
 /// <param name="IceBitrate">The <c>header.ice-bitrate</c> field, if sent.</param>
 /// <param name="IceAudioInfo">The <c>header.ice-audio-info</c> field, if sent.</param>
-public sealed record SourceAuthRequest(string? Mount, string? User, string? Password, string? IceBitrate, string? IceAudioInfo);
+/// <param name="Action">
+/// <c>stream_auth</c> for a source connect, <see cref="SourceAuthorizer.MetadataAction"/> for an ICY metadata update.
+/// </param>
+public sealed record SourceAuthRequest(string? Mount, string? User, string? Password, string? IceBitrate, string? IceAudioInfo,
+    string? Action = null);
 
 /// <summary>The station data a decision needs. Null when the station does not exist or was deleted.</summary>
 /// <param name="PublicId">The station's public ID.</param>
@@ -61,6 +66,28 @@ public static partial class SourceAuthorizer
 
     [GeneratedRegex(@"(?:^|;)\s*(?:ice-)?bitrate=(\d+)")]
     private static partial Regex AudioInfoBitrate();
+
+    /// <summary>
+    /// An ICY metadata update (tc-streaming#72): an MP3 source sends a track title as
+    /// <c>GET /admin/metadata?mode=updinfo&amp;mount=…&amp;song=…</c> with its own credentials, and Icecast asks with this
+    /// action. Checked as a connect to that mount, but it starts no session.
+    /// </summary>
+    public const string MetadataAction = "metadata_auth";
+
+    /// <summary>
+    /// The mount a metadata update names. Icecast sends the update's request URI as <c>mount</c>; null unless its path
+    /// is <c>/admin/metadata</c>, <c>mode</c> is <c>updinfo</c> and the query has exactly one <c>mount</c>.
+    /// </summary>
+    public static string? MetadataMount(string? uri)
+    {
+        var separator = uri?.IndexOf('?', StringComparison.Ordinal) ?? -1;
+        if (separator < 0 || !string.Equals(uri![..separator], "/admin/metadata", StringComparison.Ordinal))
+        {
+            return null;
+        }
+        var query = HttpUtility.ParseQueryString(uri[(separator + 1)..]);
+        return query.GetValues("mode") is ["updinfo"] && query.GetValues("mount") is [var mount] ? mount : null;
+    }
 
     /// <summary>The station a mount names, or null when the mount is outside the layout.</summary>
     public static string? StationOf(string? mount)
