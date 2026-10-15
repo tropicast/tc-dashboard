@@ -108,4 +108,23 @@ public sealed class SourceAuthorizerTests
     [InlineData(null)]
     public void An_incomplete_declaration_pins_nothing(string? info)
         => Assert.Null(SourceAuthorizer.DeclaredEncoding(Request(audioInfo: info)));
+
+    // A metadata update's `mount` field is its request URI, as Icecast 2.5 sends it (tc-streaming#72).
+    [Theory]
+    [InlineData("/admin/metadata?mode=updinfo&mount=/stations/k3m9x2p7qa/autodj.mp3&charset=UTF-8&song=A%20-%20B", "/stations/k3m9x2p7qa/autodj.mp3")]
+    [InlineData("/admin/metadata?mount=%2Fstations%2Fk3m9x2p7qa%2Flive.mp3&mode=updinfo&song=Title", "/stations/k3m9x2p7qa/live.mp3")]
+    public void A_metadata_update_names_its_mount(string uri, string mount)
+        => Assert.Equal(mount, SourceAuthorizer.MetadataMount(uri));
+
+    [Theory]
+    [InlineData("/stations/k3m9x2p7qa/live.mp3")]
+    [InlineData("/admin/metadata")]
+    [InlineData("/admin/stats?mode=updinfo&mount=/stations/k3m9x2p7qa/live.mp3")]
+    [InlineData("/admin/metadata?mode=updinfo")]
+    [InlineData("/admin/metadata?mount=/stations/k3m9x2p7qa/live.mp3")]
+    [InlineData("/admin/metadata?mode=updinfo&mode=updinfo&mount=/stations/k3m9x2p7qa/live.mp3")]
+    [InlineData("/admin/metadata?mode=updinfo&mount=/stations/k3m9x2p7qa/live.mp3&mount=/stations/other1234/live.mp3")]
+    [InlineData(null)]
+    public void Anything_but_one_mount_s_metadata_update_names_none(string? uri)
+        => Assert.Null(SourceAuthorizer.MetadataMount(uri));
 }

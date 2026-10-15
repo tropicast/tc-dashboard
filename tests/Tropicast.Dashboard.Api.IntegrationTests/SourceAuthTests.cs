@@ -260,6 +260,48 @@ public sealed class SourceAuthTests(DashboardFactory factory) : IClassFixture<Da
             credential)!;
     }
 
+    /// <summary>An ICY metadata update as Icecast forwards it (tc-streaming#72): the request URI as mount, no headers.</summary>
+    private static Task<HttpResponseMessage> MetadataAsync(HttpClient icecast, string uri, string user, string pass)
+        => icecast.PostAsync("/internal/icecast/source-auth", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["action"] = "metadata_auth", ["mount"] = uri, ["user"] = user, ["pass"] = pass, ["ip"] = "172.18.0.3",
+            ["agent"] = "Liquidsoap/2.4.6", ["client"] = "18", ["server"] = "listen.tropicastradio.com", ["port"] = "8000",
+        }), Token);
+
+    [Fact]
+    public async Task A_source_updates_its_own_title_with_its_credential_and_nothing_is_recorded()
+    {
+        var (_, station, secret, credentialId) = await StationAsync();
+        var (_, other, otherSecret, _) = await StationAsync();
+        string Update(string publicId, string extra = "") =>
+            $"/admin/metadata?mode=updinfo&mount=%2Fstations%2F{publicId}%2Flive.mp3&song=Artist%20-%20Title{extra}";
+
+        Allowed(await MetadataAsync(Icecast(), Update(station.PublicId), station.PublicId, secret));
+        // Not another station's title, not with a wrong password, and only one mount per update.
+        Denied(await MetadataAsync(Icecast(), Update(other.PublicId), station.PublicId, secret));
+        Denied(await MetadataAsync(Icecast(), Update(station.PublicId), other.PublicId, otherSecret));
+        Denied(await MetadataAsync(Icecast(), Update(station.PublicId), station.PublicId, "wrong"));
+        Denied(await MetadataAsync(Icecast(), Update(station.PublicId, $"&mount=%2Fstations%2F{station.PublicId}%2Flive.opus"),
+            station.PublicId, secret));
+        // The URI must be a metadata update: a plain mount is not one.
+        Denied(await MetadataAsync(Icecast(), $"/stations/{station.PublicId}/live.mp3", station.PublicId, secret));
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.LiveSessions.IgnoreQueryFilters().AnyAsync(s => s.StationId == station.Id, Token));
+        Assert.Null((await db.BroadcastCredentials.IgnoreQueryFilters().SingleAsync(c => c.Id == credentialId, Token)).LastUsedAt);
+    }
+
+    [Fact]
+    public async Task AutoDJ_updates_its_title_with_the_autodj_credential_only()
+    {
+        var (_, station, deviceSecret, autoDjSecret) = await AutoDjStationAsync();
+        var uri = $"/admin/metadata?mode=updinfo&mount=/stations/{station.PublicId}/autodj.mp3&charset=UTF-8&song=Tropicast%20-%20Track";
+
+        Allowed(await MetadataAsync(Icecast(), uri, station.PublicId, autoDjSecret));
+        Denied(await MetadataAsync(Icecast(), uri, station.PublicId, deviceSecret));
+    }
+
     [Fact]
     public async Task The_autodj_credential_publishes_only_to_its_own_autodj_mounts()
     {
