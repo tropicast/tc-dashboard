@@ -65,6 +65,21 @@ public sealed class StatsTests
         var mount = Assert.Single(sample.Mounts);
         Assert.Equal(("k3m9x2p7qa", AudioFormat.Mp3, 3, 4_200_000L, true),
             (mount.PublicId, mount.Format, mount.Listeners, mount.SentBytes, mount.AutoDj));
+        // An exporter before tc-streaming#77: no start time, no bitrate.
+        Assert.Equal((0.0, (DateTimeOffset?)null), (mount.BitrateKbps, mount.StartedAt));
+    }
+
+    [Fact]
+    public void AutoDj_mounts_carry_their_start_time_and_declared_bitrate()
+    {
+        const string withStartAndBitrate = """
+            tc_autodj_mount_start_timestamp_seconds{station="k3m9x2p7qa",format="mp3"} 1791633600.0
+            tc_autodj_mount_bitrate_kbps{station="k3m9x2p7qa",format="mp3"} 64
+            """;
+        var sample = ExporterMetrics.Parse("tc-stream-1", AutoDjTakesOver + "\n" + withStartAndBitrate, Now);
+
+        var mount = Assert.Single(sample.Mounts);
+        Assert.Equal((64.0, DateTimeOffset.FromUnixTimeSeconds(1791633600), true), (mount.BitrateKbps, mount.StartedAt, mount.AutoDj));
     }
 
     [Fact]
@@ -150,6 +165,34 @@ public sealed class StatsTests
 
         Assert.Equal((4, 4 * 15.0, (long)Math.Round(1_000_000 * 1.10)),
             (increment.PeakListeners, increment.ListenerSeconds, increment.EgressBytes));
+    }
+
+    private static MountSample AutoDj(int listeners, double kbps, long sent, DateTimeOffset? startedAt) =>
+        new("k3m9x2p7qa", AudioFormat.Mp3, listeners, kbps, sent, startedAt, AutoDj: true);
+
+    [Fact]
+    public void AutoDj_egress_comes_from_its_bitrate_as_soon_as_listeners_move_to_it()
+    {
+        // The DJ was live; at the next sample the source dropped and AutoDJ has the 10 listeners: no AutoDJ sample before.
+        var first = Sample(Now, Mp3(10));
+        var second = Sample(Now.AddSeconds(15), AutoDj(10, 64, 500_000, Now));
+
+        var increment = Assert.Single(ListenerAccounting.Increments(first, second, TimeSpan.FromSeconds(90)));
+
+        Assert.Equal((10 * 15.0, (long)Math.Round(64_000 / 8 * 10 * 15 * 1.10)), (increment.ListenerSeconds, increment.EgressBytes));
+    }
+
+    [Theory]
+    [InlineData(500_000L)] // the new counter is still below the old one
+    [InlineData(9_000_000L)] // the new counter already passed it
+    public void An_AutoDj_restart_adds_no_sent_bytes_delta(long sentAfterRestart)
+    {
+        var first = Sample(Now, AutoDj(10, 0, 5_000_000, Now.AddHours(-1)));
+        var second = Sample(Now.AddSeconds(15), AutoDj(10, 0, sentAfterRestart, Now.AddSeconds(10)));
+
+        var increment = Assert.Single(ListenerAccounting.Increments(first, second, TimeSpan.FromSeconds(90)));
+
+        Assert.Equal((10 * 15.0, 0L), (increment.ListenerSeconds, increment.EgressBytes));
     }
 
     [Fact]

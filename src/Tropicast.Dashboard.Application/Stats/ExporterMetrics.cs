@@ -35,7 +35,9 @@ public static class ExporterMetrics
                     break;
                 default:
                     // Live mounts are icecast_mount_* with station and format labels; AutoDJ mounts are repeated as
-                    // tc_autodj_mount_* (up, listeners, sent bytes), keyed the same way (tc-streaming#66). An
+                    // tc_autodj_mount_*, keyed the same way: up, listeners, sent bytes (tc-streaming#66), and since
+                    // tc-streaming#77 the start time and the declared bitrate. Older exporters send neither: the
+                    // AutoDJ mount then has no start time and a bitrate of 0, and egress falls back to sent bytes. An
                     // icecast_mount_* series of an AutoDJ mount is skipped even when labeled, or it would count twice.
                     var autoDj = name.StartsWith(AutoDjPrefix, StringComparison.Ordinal);
                     if ((autoDj || (name.StartsWith(LivePrefix, StringComparison.Ordinal) && !IsAutoDjMount(labels)))

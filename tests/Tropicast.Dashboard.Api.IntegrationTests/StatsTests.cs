@@ -93,9 +93,9 @@ public sealed class StatsTests(DashboardFactory factory) : IClassFixture<Dashboa
         var output = Assert.Single(status.Outputs);
         Assert.Equal((true, 7, false, 128.0), (status.Live, status.Listeners, output.AutoDj, output.BitrateKbps));
 
-        // The DJ's source drops: Icecast moves the 7 listeners to autodj.mp3.
+        // The DJ's source drops: Icecast moves the 7 listeners to autodj.mp3, which declares 64 kbps (tc-streaming#77).
         await SampleAsync(collector, DateTimeOffset.UtcNow.AddSeconds(1),
-            new MountSample(station.PublicId, AudioFormat.Mp3, 7, 0, 0, null, AutoDj: true));
+            new MountSample(station.PublicId, AudioFormat.Mp3, 7, 64, 0, DateTimeOffset.UtcNow.AddHours(-1), AutoDj: true));
 
         status = await GetAsync<StationStatusResponse>(owner, $"/api/v1/stations/{station.Id}/status");
         output = Assert.Single(status.Outputs);
