@@ -2,7 +2,7 @@ namespace Tropicast.Dashboard.Application.Stats;
 
 /// <summary>What one sample adds to a station's statistics.</summary>
 /// <param name="PublicId">Station public ID.</param>
-/// <param name="PeakListeners">Listeners on all the station's formats at this sample.</param>
+/// <param name="PeakListeners">Listeners on all the station's formats at this sample, live and AutoDJ.</param>
 /// <param name="ListenerSeconds">Listener-seconds since the previous sample.</param>
 /// <param name="EgressBytes">Estimated node egress since the previous sample, overhead included.</param>
 public sealed record StationIncrement(string PublicId, int PeakListeners, double ListenerSeconds, long EgressBytes);
@@ -28,7 +28,7 @@ public static class ListenerAccounting
         var seconds = previous is { IcecastUp: true } && current.At > previous.At && current.At - previous.At <= maxGap
             ? (current.At - previous.At).TotalSeconds
             : 0;
-        var before = previous?.Mounts.ToDictionary(m => (m.PublicId, m.Format)) ?? [];
+        var before = previous?.Mounts.ToDictionary(m => (m.PublicId, m.Format, m.AutoDj)) ?? [];
         return [.. current.Mounts.GroupBy(m => m.PublicId).Select(station =>
         {
             double listenerSeconds = 0, egress = 0;
@@ -40,7 +40,7 @@ public static class ListenerAccounting
                 {
                     egress += mount.BitrateKbps * 1000 / 8 * mountSeconds;
                 }
-                else if (seconds > 0 && before.TryGetValue((mount.PublicId, mount.Format), out var last)
+                else if (seconds > 0 && before.TryGetValue((mount.PublicId, mount.Format, mount.AutoDj), out var last)
                     && last.StartedAt == mount.StartedAt && mount.SentBytes >= last.SentBytes)
                 {
                     egress += mount.SentBytes - last.SentBytes;

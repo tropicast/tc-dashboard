@@ -12,7 +12,7 @@ public static class ExporterMetrics
     public static NodeSample Parse(string node, string text, DateTimeOffset at)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var mounts = new Dictionary<(string Station, AudioFormat Format), MountFields>();
+        var mounts = new Dictionary<(string Station, AudioFormat Format, bool AutoDj), MountFields>();
         var icecastUp = false;
         long? egress = null, included = null;
         foreach (var raw in text.Split('\n'))
@@ -34,12 +34,16 @@ public static class ExporterMetrics
                     included = (long)value;
                     break;
                 default:
-                    if (name.StartsWith("icecast_mount_", StringComparison.Ordinal)
+                    // Live mounts are icecast_mount_* with station and format labels; AutoDJ mounts are repeated as
+                    // tc_autodj_mount_* (up, listeners, sent bytes), keyed the same way (tc-streaming#66).
+                    var autoDj = name.StartsWith(AutoDjPrefix, StringComparison.Ordinal);
+                    if ((autoDj || name.StartsWith(LivePrefix, StringComparison.Ordinal))
                         && labels.TryGetValue("station", out var station)
                         && labels.TryGetValue("format", out var format) && Format(format) is { } audio)
                     {
-                        var fields = mounts.TryGetValue((station, audio), out var known) ? known : new MountFields();
-                        mounts[(station, audio)] = Apply(fields, name, value);
+                        var key = (station, audio, autoDj);
+                        var fields = mounts.TryGetValue(key, out var known) ? known : new MountFields();
+                        mounts[key] = Apply(fields, name[(autoDj ? AutoDjPrefix : LivePrefix).Length..], value);
                     }
                     break;
             }
@@ -47,20 +51,24 @@ public static class ExporterMetrics
         var samples = icecastUp
             ? mounts.Where(m => m.Value.Up).Select(m => new MountSample(m.Key.Station, m.Key.Format,
                 (int)Math.Max(0, m.Value.Listeners), Math.Max(0, m.Value.Bitrate), (long)Math.Max(0, m.Value.SentBytes),
-                m.Value.Start > 0 ? DateTimeOffset.FromUnixTimeMilliseconds((long)(m.Value.Start * 1000)) : null)).ToList()
+                m.Value.Start > 0 ? DateTimeOffset.FromUnixTimeMilliseconds((long)(m.Value.Start * 1000)) : null,
+                m.Key.AutoDj)).ToList()
             : [];
         return new NodeSample(node, at, icecastUp, samples, egress, included);
     }
+
+    private const string LivePrefix = "icecast_mount_";
+    private const string AutoDjPrefix = "tc_autodj_mount_";
 
     private sealed record MountFields(bool Up = false, double Listeners = 0, double Bitrate = 0, double SentBytes = 0, double Start = 0);
 
     private static MountFields Apply(MountFields fields, string name, double value) => name switch
     {
-        "icecast_mount_up" => fields with { Up = value >= 1 },
-        "icecast_mount_listeners" => fields with { Listeners = value },
-        "icecast_mount_bitrate_kbps" => fields with { Bitrate = value },
-        "icecast_mount_sent_bytes_total" => fields with { SentBytes = value },
-        "icecast_mount_start_timestamp_seconds" => fields with { Start = value },
+        "up" => fields with { Up = value >= 1 },
+        "listeners" => fields with { Listeners = value },
+        "bitrate_kbps" => fields with { Bitrate = value },
+        "sent_bytes_total" => fields with { SentBytes = value },
+        "start_timestamp_seconds" => fields with { Start = value },
         _ => fields,
     };
 

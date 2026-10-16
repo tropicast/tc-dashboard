@@ -7,7 +7,8 @@ internal static class LiveStatus
 {
     /// <summary>
     /// Live is null when the state is not known: no recent sample (three missed: the node or the collector is down),
-    /// or Icecast did not answer.
+    /// or Icecast did not answer. Live means a live source is connected; when it drops, Icecast moves the listeners to
+    /// AutoDJ's fallback mount, so each output counts the listeners of both mounts of its format.
     /// </summary>
     internal static (bool? Live, IReadOnlyList<LiveOutputResponse> Outputs, DateTimeOffset? UpdatedAt) Of(LiveStatusStore store,
         string node, string publicId, TimeSpan interval, DateTimeOffset now)
@@ -19,9 +20,15 @@ internal static class LiveStatus
         }
         var outputs = sample.Mounts
             .Where(m => m.PublicId == publicId)
-            .OrderBy(m => m.Format)
-            .Select(m => new LiveOutputResponse(m.Format, m.Listeners, m.BitrateKbps > 0 ? m.BitrateKbps : null, m.StartedAt))
+            .GroupBy(m => m.Format)
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var live = g.FirstOrDefault(m => !m.AutoDj);
+                return new LiveOutputResponse(g.Key, g.Sum(m => m.Listeners), live?.BitrateKbps > 0 ? live.BitrateKbps : null,
+                    live?.StartedAt, live is null);
+            })
             .ToList();
-        return (outputs.Count > 0, outputs, sample.At);
+        return (outputs.Any(o => !o.AutoDj), outputs, sample.At);
     }
 }

@@ -3566,25 +3566,27 @@ export interface components {
              */
             opus: null | string;
         };
-        /** @description One live stream of a station. */
+        /** @description One stream of a station, live or played by AutoDJ. */
         LiveOutputResponse: {
             /** @description Stream format. */
             format: components["schemas"]["AudioFormat"];
             /**
              * Format: int32
-             * @description Current listeners.
+             * @description Current listeners, on the live mount and AutoDJ's fallback together.
              */
             listeners: number | string;
             /**
              * Format: double
-             * @description Source bitrate, declared or measured; null until known.
+             * @description Live source bitrate, declared or measured; null until known, and under AutoDJ.
              */
             bitrateKbps: null | number | string;
             /**
              * Format: date-time
-             * @description When the source connected.
+             * @description When the live source connected; null under AutoDJ.
              */
             liveSince: null | string;
+            /** @description No live source: AutoDJ plays this stream. */
+            autoDj: boolean;
         };
         LoginRequest: {
             email: string;
@@ -4065,14 +4067,14 @@ export interface components {
         };
         /** @description A station's live status, at most one collector interval (15 s) old. */
         StationStatusResponse: {
-            /** @description Some source is connected; null when the node's state is not known (see bool StationStatusResponse.Stale). */
+            /** @description A live source is connected (AutoDJ alone is not live); null when the node's state is not known (see bool StationStatusResponse.Stale). */
             live: null | boolean;
             /**
              * Format: int32
-             * @description Listeners on all formats.
+             * @description Listeners on all formats, live or AutoDJ.
              */
             listeners: number | string;
-            /** @description Live streams. */
+            /** @description Streams with a source, live or AutoDJ. */
             outputs: components["schemas"]["LiveOutputResponse"][];
             /**
              * Format: date-time

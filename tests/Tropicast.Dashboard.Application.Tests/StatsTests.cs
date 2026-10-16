@@ -45,6 +45,38 @@ public sealed class StatsTests
         Assert.Equal(22_000_000_000_000L, sample.IncludedBytes);
     }
 
+    /// <summary>The live source dropped: Icecast moved its listeners to AutoDJ's fallback mount (tc-streaming#61).</summary>
+    private const string AutoDjTakesOver = """
+        icecast_up 1
+        icecast_mount_up{mount="/stations/k3m9x2p7qa/autodj.mp3"} 1
+        icecast_mount_listeners{mount="/stations/k3m9x2p7qa/autodj.mp3"} 3
+        tc_autodj_mount_up{station="k3m9x2p7qa",format="mp3"} 1
+        tc_autodj_mount_listeners{station="k3m9x2p7qa",format="mp3"} 3
+        tc_autodj_mount_sent_bytes_total{station="k3m9x2p7qa",format="mp3"} 4.2e+06
+        tc_autodj_mount_up{station="k3m9x2p7qa",format="opus"} 0
+        tc_autodj_mount_listeners{station="k3m9x2p7qa",format="opus"} 0
+        """;
+
+    [Fact]
+    public void AutoDj_mounts_carry_the_listeners_once_the_live_source_drops()
+    {
+        var sample = ExporterMetrics.Parse("tc-stream-1", AutoDjTakesOver, Now);
+
+        var mount = Assert.Single(sample.Mounts);
+        Assert.Equal(("k3m9x2p7qa", AudioFormat.Mp3, 3, 4_200_000L, true),
+            (mount.PublicId, mount.Format, mount.Listeners, mount.SentBytes, mount.AutoDj));
+    }
+
+    [Fact]
+    public void Live_and_AutoDj_mounts_of_one_format_stay_apart()
+    {
+        var sample = ExporterMetrics.Parse("tc-stream-1", Exporter + "\n" + AutoDjTakesOver.Replace("icecast_up 1", ""), Now);
+
+        Assert.Equal(3, sample.Mounts.Count);
+        Assert.Equal(5, sample.Mounts.Single(m => m is { Format: AudioFormat.Mp3, AutoDj: false }).Listeners);
+        Assert.Equal(3, sample.Mounts.Single(m => m is { Format: AudioFormat.Mp3, AutoDj: true }).Listeners);
+    }
+
     [Fact]
     public void Icecast_down_means_mounts_unknown()
     {
@@ -92,6 +124,19 @@ public sealed class StatsTests
         var second = Sample(Now.AddSeconds(15), Mp3(10, kbps: 0, sent: 3_000_000));
 
         Assert.Equal((long)Math.Round(2_000_000 * 1.10), ListenerAccounting.Increments(first, second, TimeSpan.FromSeconds(90))[0].EgressBytes);
+    }
+
+    [Fact]
+    public void AutoDj_listeners_count_in_listener_time_and_egress()
+    {
+        MountSample AutoDj(int listeners, long sent) => new("k3m9x2p7qa", AudioFormat.Mp3, listeners, 0, sent, null, AutoDj: true);
+        var first = Sample(Now, Mp3(0, kbps: 0, sent: 1_000_000), AutoDj(4, 1_000_000));
+        var second = Sample(Now.AddSeconds(15), Mp3(0, kbps: 0, sent: 1_000_000), AutoDj(4, 2_000_000));
+
+        var increment = Assert.Single(ListenerAccounting.Increments(first, second, TimeSpan.FromSeconds(90)));
+
+        Assert.Equal((4, 4 * 15.0, (long)Math.Round(1_000_000 * 1.10)),
+            (increment.PeakListeners, increment.ListenerSeconds, increment.EgressBytes));
     }
 
     [Fact]

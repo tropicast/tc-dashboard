@@ -120,7 +120,9 @@ export function StationDetail() {
     ? { color: 'warning' as const, label: t('station.statusUnavailable') }
     : status.data?.live
       ? { color: 'success' as const, label: t('station.live') }
-      : { color: 'gray' as const, label: t('station.offline') };
+      : status.data?.outputs.some((output) => output.autoDj)
+        ? { color: 'brand' as const, label: t('station.autoDj') }
+        : { color: 'gray' as const, label: t('station.offline') };
   return (
     <section className="flex flex-col gap-6">
       <PageHeader
@@ -157,7 +159,7 @@ export function StationDetail() {
             <ul className="flex flex-col gap-1 text-sm text-tertiary">
               {status.data.outputs.map((output) => (
                 <li key={output.format}>
-                  {t('station.output', {
+                  {t(output.autoDj ? 'station.outputAutoDj' : 'station.output', {
                     format: output.format,
                     count: Number(output.listeners),
                     bitrate: output.bitrateKbps ?? '—',
