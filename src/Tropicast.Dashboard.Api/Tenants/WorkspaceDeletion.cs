@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
+using Tropicast.Dashboard.Infrastructure.Media;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
 namespace Tropicast.Dashboard.Api.Tenants;
@@ -9,7 +10,7 @@ namespace Tropicast.Dashboard.Api.Tenants;
 /// <summary>Why a workspace cannot be deleted now.</summary>
 internal enum DeletionBlocker
 {
-    /// <summary>An active, trialing, past-due or incomplete subscription: cancel it in the billing portal first.</summary>
+    /// <summary>A subscription Stripe may still charge for (<see cref="Subscription.MayCharge"/>): cancel it first.</summary>
     Subscription,
     /// <summary>A station is live: stop the broadcast first.</summary>
     Live,
@@ -58,10 +59,6 @@ internal static class WorkspaceDeletion
 {
     private static readonly string[] All = [AppDbContext.TenantFilter, AppDbContext.DeletedFilter];
 
-    /// <summary>Statuses Stripe may still charge for (as account deletion: <c>Incomplete</c> too).</summary>
-    private static readonly SubscriptionStatus[] Billable =
-        [SubscriptionStatus.Active, SubscriptionStatus.Trialing, SubscriptionStatus.PastDue, SubscriptionStatus.Incomplete];
-
     internal static async Task<WorkspaceDeletionResponse> ReportAsync(AppDbContext db, Tenant tenant, CancellationToken cancellationToken)
     {
         var stations = await AllStations(db, tenant.Id).OrderBy(s => s.CreatedAt)
@@ -85,58 +82,70 @@ internal static class WorkspaceDeletion
     }
 
     /// <summary>
-    /// Deletes the workspace, or returns its blockers and changes nothing. Call inside a transaction: the row lock
-    /// holds until the commit, so no station, subscription or member can change under the delete.
+    /// Deletes the workspace, or returns its blockers and changes nothing; <c>Gone</c> when another request deleted it
+    /// first. Call inside a transaction: the locks hold until the commit. The workspace row lock stops new stations,
+    /// subscriptions and members; the station row locks stop what hangs off a station (a DJ connecting, an upload, a
+    /// credential), whose foreign key check needs a share lock on its station.
     /// </summary>
-    internal static async Task<(IReadOnlyList<DeletionBlocker> Blockers, DeletionCountsResponse? Counts)> DeleteAsync(AppDbContext db,
-        Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    internal static async Task<(bool Gone, IReadOnlyList<DeletionBlocker> Blockers, DeletionCountsResponse? Counts)> DeleteAsync(
+        AppDbContext db, Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        await db.Tenants.FromSql($"SELECT *, xmin FROM tenants WHERE id = {tenantId} FOR UPDATE")
-            .IgnoreQueryFilters(All).AsNoTracking().SingleAsync(cancellationToken);
-        var stationIds = await AllStations(db, tenantId).Select(s => s.Id).ToListAsync(cancellationToken);
+        if (await db.Tenants.FromSql($"SELECT *, xmin FROM tenants WHERE id = {tenantId} FOR UPDATE")
+                .IgnoreQueryFilters(All).AsNoTracking().SingleOrDefaultAsync(cancellationToken) is null)
+        {
+            return (true, [], null);
+        }
+        var stations = await db.Stations.FromSql($"SELECT *, xmin FROM stations WHERE tenant_id = {tenantId} ORDER BY id FOR UPDATE")
+            .IgnoreQueryFilters(All).ToListAsync(cancellationToken);
+        List<Guid> stationIds = [.. stations.Select(s => s.Id)];
         var subscription = await db.Subscriptions.IgnoreQueryFilters(All).Where(s => s.TenantId == tenantId)
             .Select(s => (SubscriptionStatus?)s.Status).FirstOrDefaultAsync(cancellationToken);
         var live = await db.LiveSessions.IgnoreQueryFilters(All).AnyAsync(l => stationIds.Contains(l.StationId) && l.EndedAt == null,
             cancellationToken);
         if (Blockers(subscription, live) is { Count: > 0 } blockers)
         {
-            return (blockers, null);
+            return (false, blockers, null);
         }
-        var counts = await CountsAsync(db, tenantId, cancellationToken);
 
-        // Events of the workspace not delivered yet would point at rows that no longer exist; StationDeleted ones stay,
-        // their consumers still have audio to remove.
+        // Events not delivered yet would point at rows that no longer exist: the workspace's, and its stations' (AutoDJ
+        // changes carry only the station). StationDeleted ones stay: their consumers still have audio to remove.
         var id = tenantId.ToString();
-        await db.Database.ExecuteSqlAsync(
-            $"DELETE FROM outbox_messages WHERE processed_at IS NULL AND type <> 'StationDeleted' AND payload ->> 'tenantId' = {id}",
-            cancellationToken);
+        string[] stationKeys = [.. stationIds.Select(s => s.ToString())];
+        await db.Database.ExecuteSqlAsync($"""
+            DELETE FROM outbox_messages WHERE processed_at IS NULL AND type <> 'StationDeleted'
+              AND (payload ->> 'tenantId' = {id} OR payload ->> 'stationId' = ANY({stationKeys}))
+            """, cancellationToken);
         // One StationDeleted per station still on air: the node drops its mounts and its audio leaves object storage.
-        foreach (var station in await db.Stations.IgnoreQueryFilters(All).Where(s => s.TenantId == tenantId).ToListAsync(cancellationToken))
+        foreach (var station in stations)
         {
             station.Delete(now);
         }
         await db.SaveChangesAsync(cancellationToken);
 
-        // Station children are RESTRICT: they go first. Playlist entries cascade with their playlist and their track.
-        await db.BroadcastCredentials.IgnoreQueryFilters(All).Where(c => stationIds.Contains(c.StationId)).ExecuteDeleteAsync(cancellationToken);
-        await db.LiveSessions.IgnoreQueryFilters(All).Where(l => stationIds.Contains(l.StationId)).ExecuteDeleteAsync(cancellationToken);
-        await db.StationStatsRollups.IgnoreQueryFilters(All).Where(r => stationIds.Contains(r.StationId)).ExecuteDeleteAsync(cancellationToken);
+        // What cascades with the workspace is counted first; the rest comes from the deletes.
+        var members = await db.Memberships.IgnoreQueryFilters(All).CountAsync(m => m.TenantId == tenantId, cancellationToken);
+        var invitations = await db.Invitations.IgnoreQueryFilters(All).CountAsync(i => i.TenantId == tenantId, cancellationToken);
+        var audit = await db.AuditEntries.IgnoreQueryFilters(All).CountAsync(e => e.TenantId == tenantId, cancellationToken);
+        // Station children are RESTRICT: they go first. Pending uploads become orphans the upload cleanup deletes.
+        var credentials = await db.BroadcastCredentials.IgnoreQueryFilters(All).Where(c => stationIds.Contains(c.StationId))
+            .ExecuteDeleteAsync(cancellationToken);
+        var sessions = await db.LiveSessions.IgnoreQueryFilters(All).Where(l => stationIds.Contains(l.StationId))
+            .ExecuteDeleteAsync(cancellationToken);
+        var rollups = await db.StationStatsRollups.IgnoreQueryFilters(All).Where(r => stationIds.Contains(r.StationId))
+            .ExecuteDeleteAsync(cancellationToken);
         await db.StreamAssignments.IgnoreQueryFilters(All).Where(a => stationIds.Contains(a.StationId)).ExecuteDeleteAsync(cancellationToken);
         await db.DirectoryListings.Where(l => stationIds.Contains(l.StationId)).ExecuteDeleteAsync(cancellationToken);
-        await db.AutoDjSettings.IgnoreQueryFilters(All).Where(a => stationIds.Contains(a.StationId)).ExecuteDeleteAsync(cancellationToken);
-        await db.EncodingProfiles.IgnoreQueryFilters(All).Where(e => stationIds.Contains(e.StationId)).ExecuteDeleteAsync(cancellationToken);
-        await db.Playlists.IgnoreQueryFilters(All).Where(p => stationIds.Contains(p.StationId)).ExecuteDeleteAsync(cancellationToken);
-        await db.Tracks.IgnoreQueryFilters(All).Where(t => stationIds.Contains(t.StationId)).ExecuteDeleteAsync(cancellationToken);
-        await db.Stations.IgnoreQueryFilters(All).Where(s => s.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken);
+        var (tracks, playlists) = await StationMedia.DeleteAsync(db, stationIds, now, orphanPending: true, cancellationToken);
+        var deleted = await db.Stations.IgnoreQueryFilters(All).Where(s => s.TenantId == tenantId).ExecuteDeleteAsync(cancellationToken);
         // Memberships, subscriptions, invitations and audit entries cascade with the workspace.
         await db.Tenants.IgnoreQueryFilters(All).Where(t => t.Id == tenantId).ExecuteDeleteAsync(cancellationToken);
-        return ([], counts);
+        return (false, [], new DeletionCountsResponse(deleted, credentials, sessions, rollups, tracks, playlists, members, invitations, audit));
     }
 
     private static List<DeletionBlocker> Blockers(SubscriptionStatus? subscription, bool live)
     {
         List<DeletionBlocker> blockers = [];
-        if (subscription is { } status && Billable.Contains(status))
+        if (subscription is { } status && Subscription.MayCharge(status))
         {
             blockers.Add(DeletionBlocker.Subscription);
         }

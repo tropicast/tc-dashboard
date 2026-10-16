@@ -32,10 +32,13 @@ export function DeleteWorkspacePanel() {
     enabled: open,
     // Always fresh: a station may have gone live since the dialog was last open.
     staleTime: 0,
+    gcTime: 0,
   });
   const remove = useMutation({
     mutationFn: (confirmSlug: string) =>
       data<WorkspaceDeleted>(api.DELETE('/api/v1/tenants/current', { body: { confirmSlug } })),
+    // A 409 means something changed since the report (a DJ went live): show the blocker it found.
+    onError: () => void report.refetch(),
   });
   const close = () => {
     setOpen(false);

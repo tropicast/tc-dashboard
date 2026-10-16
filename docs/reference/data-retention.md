@@ -58,8 +58,11 @@ are those of the operator's `ops/delete-workspace.sh`:
    the subscription, the members (and who is left without a workspace), the
    stations (live, listed on RadioBrowser) and the rows that go.
 2. **Guards**: refused (409) while a subscription is `Active`, `Trialing`,
-   `PastDue` or `Incomplete`, or a station is live. Checked again inside the
-   delete transaction, with the workspace row locked (`FOR UPDATE`).
+   `PastDue` or `Incomplete` (anything but `Canceled`, as account deletion), or
+   a station is live. Checked again inside the
+   delete transaction, with the workspace row and its station rows locked
+   (`FOR UPDATE`): no DJ can connect and no upload start meanwhile. A second
+   request that waited on the lock gets 404.
 3. **Slug**: `DELETE /api/v1/tenants/current` takes `{ "confirmSlug": "…" }`
    and answers 422 when it is not the workspace's slug.
 4. **Delete**, one transaction (`WorkspaceDeletion`): the workspace's
@@ -70,7 +73,10 @@ are those of the operator's `ops/delete-workspace.sh`:
    workspace (memberships, subscriptions, invitations and audit entries
    cascade). Member accounts stay.
 5. **After the commit**: the `StationDeleted` events remove the uploaded audio
-   from object storage and drop the mounts at the next provisioning pass. The
+   from object storage and drop the mounts at the next provisioning pass. An
+   upload still running keeps its object key in `orphaned_uploads`:
+   `PendingUploadCleanup` deletes a file it may still write once its URL
+   expired. The
    owners get a confirmation email. The deleting user's security events keep a
    `workspace.deleted` record (workspace ID, slug and counts, no member emails
    or station names) for 90 days.

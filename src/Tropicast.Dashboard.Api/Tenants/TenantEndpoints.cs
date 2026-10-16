@@ -71,7 +71,8 @@ internal static class TenantEndpoints
         tenants.MapGet("/current/deletion", GetDeletionAsync).RequireAuthorization(TenantPolicies.Owner)
             .WithSummary("What deleting the current workspace would delete, and what blocks it. Changes nothing.");
         tenants.MapDelete("/current", DeleteAsync).RequireAuthorization(TenantPolicies.Owner).AddEndpointFilter<RequestValidation>()
-            .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .WithSummary("Deletes the current workspace and everything in it; member accounts stay. Needs its slug. Refused (409) "
                 + "while it has a subscription Stripe may charge for, or a live station.");
     }
@@ -93,7 +94,12 @@ internal static class TenantEndpoints
             .Join(db.Users, m => m.UserId, u => u.Id, (_, u) => u.Email!).ToListAsync(cancellationToken);
         var now = time.GetUtcNow();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var (blockers, counts) = await WorkspaceDeletion.DeleteAsync(db, tenant.Id, now, cancellationToken);
+        var (gone, blockers, counts) = await WorkspaceDeletion.DeleteAsync(db, tenant.Id, now, cancellationToken);
+        if (gone)
+        {
+            // Another request (another tab, another owner) deleted it while this one waited for the lock.
+            return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "This workspace was already deleted.");
+        }
         if (counts is null)
         {
             return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: blockers[0] switch
@@ -110,13 +116,14 @@ internal static class TenantEndpoints
 
         var logger = loggers.CreateLogger(typeof(TenantEndpoints));
         LogDeleted(logger, tenant.Id, counts.Stations, counts.Members);
+        // Committed: every owner is told even if the caller goes away now (no request token from here on).
         foreach (var owner in owners)
         {
             try
             {
-                await email.SendAsync(DeletedEmail(owner, tenant.Name, counts), cancellationToken);
+                await email.SendAsync(DeletedEmail(owner, tenant.Name, counts), CancellationToken.None);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
                 // The workspace is gone either way: a lost confirmation must not turn the deletion into an error.
                 LogEmailFailed(logger, ex.GetType().Name);

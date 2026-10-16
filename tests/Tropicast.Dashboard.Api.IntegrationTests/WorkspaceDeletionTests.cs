@@ -9,6 +9,8 @@ using Tropicast.Dashboard.Domain.Media;
 using Tropicast.Dashboard.Domain.Plans;
 using Tropicast.Dashboard.Domain.Stations;
 using Tropicast.Dashboard.Domain.Tenants;
+using Tropicast.Dashboard.Application.Media;
+using Tropicast.Dashboard.Infrastructure.Media;
 using Tropicast.Dashboard.Infrastructure.Outbox;
 using Tropicast.Dashboard.Infrastructure.Persistence;
 
@@ -156,6 +158,53 @@ public sealed class WorkspaceDeletionTests(DashboardFactory factory) : IClassFix
     }
 
     [Fact]
+    public async Task An_upload_still_running_is_deleted_once_its_url_expired()
+    {
+        var workspace = await WorkspaceAsync();
+        var now = DateTimeOffset.UtcNow;
+        string key;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var pending = Track.StartUpload(workspace.Station.Id, "late.flac", 1000, now, TrackRules.PendingLifetime);
+            db.Tracks.Add(pending);
+            await db.SaveChangesAsync(Token);
+            key = pending.ObjectKey;
+        }
+
+        (await DeleteAsync(workspace.Owner, workspace.Slug)).Status(HttpStatusCode.OK);
+        while (await factory.Services.GetRequiredService<OutboxDispatcher>().DispatchBatchAsync(Token) > 0)
+        {
+        }
+        // The browser's PUT lands after the station prefix was cleared.
+        factory.Storage.Put(key, [4, 5, 6]);
+        var scopes = factory.Services.GetRequiredService<IServiceScopeFactory>();
+        await PendingUploadCleanup.DeleteExpiredAsync(scopes, now, Token);
+        Assert.Contains(key, factory.Storage.Keys);
+
+        await PendingUploadCleanup.DeleteExpiredAsync(scopes, now + TrackRules.PendingLifetime + TimeSpan.FromMinutes(1), Token);
+        Assert.DoesNotContain(key, factory.Storage.Keys);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().OrphanedUploads.AnyAsync(o => o.ObjectKey == key, Token));
+        }
+    }
+
+    [Fact]
+    public async Task A_second_delete_finds_the_workspace_gone()
+    {
+        var workspace = await WorkspaceAsync();
+        (await DeleteAsync(workspace.Owner, workspace.Slug)).Status(HttpStatusCode.OK);
+
+        // What a request that waited on the lock meanwhile sees.
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync(Token);
+        var (gone, blockers, counts) = await WorkspaceDeletion.DeleteAsync(db, workspace.TenantId, DateTimeOffset.UtcNow, Token);
+        Assert.Equal((true, 0, (DeletionCountsResponse?)null), (gone, blockers.Count, counts));
+    }
+
+    [Fact]
     public async Task Deleting_removes_every_row_and_file_and_keeps_the_member_accounts()
     {
         var workspace = await WorkspaceAsync();
@@ -194,8 +243,9 @@ public sealed class WorkspaceDeletionTests(DashboardFactory factory) : IClassFix
             Assert.Contains(await db.SecurityEvents.Where(e => e.Action == TenantEndpoints.WorkspaceDeleted).Select(e => e.Detail).ToListAsync(Token),
                 d => d!.StartsWith(workspace.TenantId.ToString(), StringComparison.Ordinal));
             // Only the StationDeleted events wait in the outbox: the rest would point at rows that are gone.
+            string[] ids = [workspace.TenantId.ToString(), workspace.Station.Id.ToString(), oldId.ToString()];
             var pending = (await db.OutboxMessages.Where(m => m.ProcessedAt == null).Select(m => new { m.Type, m.Payload }).ToListAsync(Token))
-                .Where(m => m.Payload.Contains(workspace.TenantId.ToString(), StringComparison.Ordinal)).Select(m => m.Type).ToList();
+                .Where(m => ids.Any(id => m.Payload.Contains(id, StringComparison.Ordinal))).Select(m => m.Type).ToList();
             Assert.All(pending, type => Assert.Equal(nameof(StationDeleted), type));
             Assert.NotEmpty(pending);
         }

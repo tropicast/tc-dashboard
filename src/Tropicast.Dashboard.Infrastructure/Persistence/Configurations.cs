@@ -237,6 +237,16 @@ internal sealed class DeviceAuthorizationConfiguration : IEntityTypeConfiguratio
     }
 }
 
+internal sealed class OrphanedUploadConfiguration : IEntityTypeConfiguration<Media.OrphanedUpload>
+{
+    public void Configure(EntityTypeBuilder<Media.OrphanedUpload> builder)
+    {
+        builder.HasKey(e => e.ObjectKey);
+        builder.Property(e => e.ObjectKey).HasMaxLength(128);
+        builder.HasIndex(e => e.DeleteAfter);
+    }
+}
+
 internal sealed class DirectoryListingConfiguration : IEntityTypeConfiguration<Directories.DirectoryListing>
 {
     public void Configure(EntityTypeBuilder<Directories.DirectoryListing> builder)

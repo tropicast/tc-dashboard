@@ -139,8 +139,8 @@ internal static class AccountEndpoints
             {
                 return Conflict($"Delete the stations of \"{tenant.Name}\", or the whole workspace (Account, Delete workspace), first.");
             }
-            if (await db.Subscriptions.IgnoreQueryFilters([AppDbContext.TenantFilter]).AnyAsync(s => s.TenantId == tenant.Id
-                    && s.Status != SubscriptionStatus.Canceled, cancellationToken))
+            if ((await db.Subscriptions.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(s => s.TenantId == tenant.Id)
+                    .Select(s => s.Status).ToListAsync(cancellationToken)).Any(Subscription.MayCharge))
             {
                 return Conflict($"Cancel the subscription of \"{tenant.Name}\" in the billing portal first.");
             }

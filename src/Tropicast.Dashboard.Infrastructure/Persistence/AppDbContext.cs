@@ -55,6 +55,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<Domain.Media.PlaylistItem> PlaylistItems => Set<Domain.Media.PlaylistItem>();
     public DbSet<Domain.Media.AutoDjSettings> AutoDjSettings => Set<Domain.Media.AutoDjSettings>();
     public DbSet<Domain.Media.EncodingProfile> EncodingProfiles => Set<Domain.Media.EncodingProfile>();
+    public DbSet<Media.OrphanedUpload> OrphanedUploads => Set<Media.OrphanedUpload>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
