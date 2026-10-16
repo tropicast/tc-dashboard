@@ -9,6 +9,7 @@ internal static class LiveStatus
     /// Live is null when the state is not known: no recent sample (three missed: the node or the collector is down),
     /// or Icecast did not answer. Live means a live source is connected; when it drops, Icecast moves the listeners to
     /// AutoDJ's fallback mount, so each output counts the listeners of both mounts of its format.
+    /// The bitrate and start time are the live source's: AutoDJ outputs show neither, even when the node reports them.
     /// </summary>
     internal static (bool? Live, IReadOnlyList<LiveOutputResponse> Outputs, DateTimeOffset? UpdatedAt) Of(LiveStatusStore store,
         string node, string publicId, TimeSpan interval, DateTimeOffset now)
