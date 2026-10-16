@@ -62,7 +62,16 @@ internal sealed class S3ObjectStorage(IOptions<StorageOptions> options) : IObjec
             new Dictionary<string, string> { ["Content-Type"] = contentType, ["If-None-Match"] = "*" });
     }
 
-    public Uri PresignDownload(string key, TimeSpan lifetime) => new(_presigner.Value.GetPreSignedURL(PresignRequest(key, HttpVerb.GET, lifetime)));
+    public Uri PresignDownload(string key, TimeSpan lifetime, string? downloadName = null)
+    {
+        var request = PresignRequest(key, HttpVerb.GET, lifetime);
+        if (downloadName is not null)
+        {
+            // Signed into the URL (response-content-disposition): the bucket answers with it.
+            request.ResponseHeaderOverrides.ContentDisposition = new System.Net.Mime.ContentDisposition { FileName = downloadName }.ToString();
+        }
+        return new Uri(_presigner.Value.GetPreSignedURL(request));
+    }
 
     private GetPreSignedUrlRequest PresignRequest(string key, HttpVerb verb, TimeSpan lifetime)
     {

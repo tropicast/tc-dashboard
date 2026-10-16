@@ -61,6 +61,21 @@ public sealed class S3ObjectStorageTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_presigned_get_with_a_download_name_answers_an_attachment_of_that_name()
+    {
+        const string key = "releases/tc-station/latest/README.md";
+        using var http = new HttpClient();
+        var put = await PutAsync(http, _storage.PresignUpload(key, "text/markdown", 2, TimeSpan.FromMinutes(5)), "# "u8.ToArray());
+        Assert.True(put.IsSuccessStatusCode, $"PUT answered {put.StatusCode}");
+
+        using var response = await http.GetAsync(_storage.PresignDownload(key, TimeSpan.FromMinutes(5), "README.md"), Token);
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.Equal("README.md", response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+    }
+
+    [Fact]
     public async Task A_put_of_another_length_than_signed_is_refused()
     {
         using var http = new HttpClient();

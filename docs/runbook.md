@@ -442,3 +442,10 @@ nothing in the bucket is public.
 Deleting a station deletes its files (`StationTracksCleanup`, through the
 outbox); unconfirmed uploads go after 90 minutes (`PendingUploadCleanup`).
 Without the variables, uploads answer `503` and nothing else changes.
+
+The same bucket serves the desktop app downloads (`releases/tc-station/latest/`,
+[downloads](reference/downloads.md)), filled by tc-station's *Mirror release*
+workflow (tc-station#72). Until it has run once, download links and the welcome
+email point to the GitHub release instead. Check:
+`curl -sI https://app.tropicastradio.com/download/station/win-x64` answers 302
+to `fsn1.your-objectstorage.com`, not to `github.com`.

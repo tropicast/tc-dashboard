@@ -87,6 +87,20 @@ export const fr: Locale = {
     openStations: 'Voir les stations',
     step: 'Étape {{current}} sur {{total}}',
   },
+  downloads: {
+    for: 'Télécharger pour {{platform}}',
+    version: 'Tropicast Station {{version}}',
+    others: 'Autres systèmes',
+    all: 'Télécharger Tropicast Station',
+    guide: 'Guide d’installation et dépannage (en anglais)',
+    github: 'Télécharger Tropicast Station sur GitHub',
+    platforms: {
+      'win-x64': 'Windows 10 ou 11',
+      'osx-arm64': 'macOS (Apple silicon)',
+      'osx-x64': 'macOS (Intel)',
+      'linux-x64': 'Linux (AppImage)',
+    },
+  },
   stations: {
     title: 'Stations',
     intro: 'Les stations de cet espace de travail.',

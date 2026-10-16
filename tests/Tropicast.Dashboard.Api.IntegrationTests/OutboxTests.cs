@@ -34,7 +34,9 @@ public sealed class OutboxTests(PostgresContainer postgres) : IAsyncLifetime
         await dispatcher.DispatchBatchAsync(Token);
         await using (var scope = factory.Services.CreateAsyncScope())
         {
-            var failed = await scope.ServiceProvider.GetRequiredService<AppDbContext>().OutboxMessages.SingleAsync(Token);
+            // The station's event; the tenant's (TenantCreated) goes to the welcome email.
+            var failed = await scope.ServiceProvider.GetRequiredService<AppDbContext>().OutboxMessages
+                .SingleAsync(m => m.Type == "StationCreated", Token);
             Assert.Equal((1, "InvalidOperationException"), (failed.Attempts, failed.LastError));
             Assert.Null(failed.ProcessedAt);
             Assert.NotNull(failed.NextAttemptAt);

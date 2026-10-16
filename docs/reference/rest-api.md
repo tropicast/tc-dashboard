@@ -21,6 +21,7 @@ is at `/scalar`.
 | `GET /stations/{id}/credentials`                   | Admin     | Per-device broadcast credentials, active first; never the secret                                    |
 | `POST /stations/{id}/credentials`                  | Admin     | Issues a 256-bit secret for one device; the only response that shows it (`Cache-Control: no-store`) |
 | `DELETE /stations/{id}/credentials/{credentialId}` | Admin     | Revokes that device only; idempotent                                                                |
+| `GET /downloads/station`                           | Anyone    | The desktop app's latest release and its download links ([downloads](downloads.md))                  |
 | `GET /stations/{id}/tracks`                        | Member    | Confirmed tracks and the workspace's storage use ([media library](media-library.md))                |
 | `POST /stations/{id}/tracks/uploads`               | Member    | Presigned PUT URL; AutoDJ plans only (403), within the storage quota (403), 503 without a bucket    |
 | `POST /stations/{id}/tracks`                       | Member    | Confirms an upload from the stored file (422 not audio, 403 over quota, 409 not arrived yet)        |

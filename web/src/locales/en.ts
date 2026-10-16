@@ -85,6 +85,20 @@ export const en = {
     openStations: 'Open stations',
     step: 'Step {{current}} of {{total}}',
   },
+  downloads: {
+    for: 'Download for {{platform}}',
+    version: 'Tropicast Station {{version}}',
+    others: 'Other systems',
+    all: 'Download Tropicast Station',
+    guide: 'Install guide and troubleshooting',
+    github: 'Download Tropicast Station on GitHub',
+    platforms: {
+      'win-x64': 'Windows 10 or 11',
+      'osx-arm64': 'macOS (Apple silicon)',
+      'osx-x64': 'macOS (Intel)',
+      'linux-x64': 'Linux (AppImage)',
+    },
+  },
   stations: {
     title: 'Stations',
     intro: 'The stations of this workspace.',

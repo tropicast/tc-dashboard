@@ -7,6 +7,7 @@ import type { FC, ReactNode } from 'react';
 import { Button } from '@/components/base/buttons/button';
 import { FeaturedIcon } from '@/components/foundations/featured-icon/featured-icon';
 import { Card } from '../../molecules/Card';
+import { DownloadApp } from '../downloads/DownloadApp';
 import { z } from 'zod';
 import { api } from '../../../api/client';
 import { selectedTenantId } from '../../../api/client';
@@ -138,7 +139,8 @@ export function Onboarding() {
       title={t('onboarding.readyTitle')}
       description={t('onboarding.readyText')}
     >
-      <Button href="/stations" size="lg" iconTrailing={ArrowRight}>
+      <DownloadApp />
+      <Button href="/stations" size="lg" color="secondary" iconTrailing={ArrowRight}>
         {t('onboarding.openStations')}
       </Button>
     </Step>

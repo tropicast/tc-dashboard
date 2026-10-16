@@ -9,6 +9,9 @@ public enum TenantStatus
 /// <summary>A tenant's plan changed: provisioning applies the new limits to its stations (#8).</summary>
 public sealed record TenantPlanChanged(Guid TenantId, string PlanId, DateTimeOffset OccurredAt) : IDomainEvent;
 
+/// <summary>A tenant was created: its creator gets the welcome email (#127).</summary>
+public sealed record TenantCreated(Guid TenantId, DateTimeOffset OccurredAt) : IDomainEvent;
+
 /// <summary>A customer account: owns stations, members and a subscription.</summary>
 public sealed class Tenant : IHasDomainEvents
 {
@@ -28,15 +31,20 @@ public sealed class Tenant : IHasDomainEvents
     public TenantStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
-    public static Tenant Create(string name, string slug, DateTimeOffset now) => new()
+    public static Tenant Create(string name, string slug, DateTimeOffset now)
     {
-        Id = Guid.CreateVersion7(now),
-        Name = Text.Required(name, 100, nameof(name)),
-        Slug = Text.Slug(slug, nameof(slug)),
-        PlanId = Plans.Plan.Free.Id,
-        Status = TenantStatus.Active,
-        CreatedAt = now,
-    };
+        var tenant = new Tenant
+        {
+            Id = Guid.CreateVersion7(now),
+            Name = Text.Required(name, 100, nameof(name)),
+            Slug = Text.Slug(slug, nameof(slug)),
+            PlanId = Plans.Plan.Free.Id,
+            Status = TenantStatus.Active,
+            CreatedAt = now,
+        };
+        tenant._events.Add(new TenantCreated(tenant.Id, now));
+        return tenant;
+    }
 
     public void Rename(string name, string slug)
     {
