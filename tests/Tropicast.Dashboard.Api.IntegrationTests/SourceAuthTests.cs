@@ -46,15 +46,20 @@ public sealed class SourceAuthTests(DashboardFactory factory) : IClassFixture<Da
     private static void Allowed(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(response.Headers.TryGetValues("icecast-auth-user", out var values) && values.Single() == "1",
-            response.Headers.TryGetValues("icecast-auth-message", out var reasons) ? reasons.Single() : "no reason");
+        Assert.True(response.Headers.TryGetValues("x-icecast-auth-result", out var values) && values.Single() == "ok",
+            response.Headers.TryGetValues("x-icecast-auth-message", out var reasons) ? reasons.Single() : "no reason");
+        // Old style too, for nodes whose Icecast is not set to the new headers yet.
+        Assert.Equal("1", response.Headers.GetValues("icecast-auth-user").Single());
     }
 
     private static string Denied(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(response.Headers.Contains("x-icecast-auth-result"));
         Assert.False(response.Headers.Contains("icecast-auth-user"));
-        return response.Headers.GetValues("icecast-auth-message").Single();
+        var reason = response.Headers.GetValues("x-icecast-auth-message").Single();
+        Assert.Equal(reason, response.Headers.GetValues("icecast-auth-message").Single());
+        return reason;
     }
 
     private async Task<(Browser Owner, StationResponse Station, string Secret, Guid CredentialId)> StationAsync(string plan = "free")

@@ -28,8 +28,9 @@ internal sealed class SourceAuthOptions
 
 /// <summary>
 /// <c>POST /internal/icecast/source-auth</c>: Icecast asks before accepting audio from a source
-/// (contract: tc-streaming docs/source-auth.md). Allow: 200 with <c>icecast-auth-user: 1</c>. Deny: 200 with
-/// <c>icecast-auth-message</c>. Errors deny; reasons never contain the credential.
+/// (contract: tc-streaming docs/source-auth.md). Allow: 200 with <c>x-icecast-auth-result: ok</c>. Deny: 200 with
+/// <c>x-icecast-auth-message</c>. Errors deny; reasons never contain the credential. Each header goes out in the old
+/// style too (<c>icecast-auth-user: 1</c>, <c>icecast-auth-message</c>), for nodes not yet set to the new one.
 /// </summary>
 internal static partial class SourceAuthEndpoint
 {
@@ -100,10 +101,12 @@ internal static partial class SourceAuthEndpoint
         context.Response.StatusCode = StatusCodes.Status200OK;
         if (decision.Allowed)
         {
+            context.Response.Headers["x-icecast-auth-result"] = "ok";
             context.Response.Headers["icecast-auth-user"] = "1";
         }
         else
         {
+            context.Response.Headers["x-icecast-auth-message"] = decision.Reason;
             context.Response.Headers["icecast-auth-message"] = decision.Reason;
         }
     }
