@@ -230,7 +230,9 @@ public sealed class FakeObjectStorage : Tropicast.Dashboard.Application.Media.IO
         => new(new($"https://bucket.test/{key}?method=PUT&type={Uri.EscapeDataString(contentType)}&size={size}"),
             new Dictionary<string, string> { ["Content-Type"] = contentType, ["If-None-Match"] = "*" });
 
-    public Uri PresignDownload(string key, TimeSpan lifetime) => new($"https://bucket.test/{key}?method=GET&ttl={(int)lifetime.TotalSeconds}");
+    public Uri PresignDownload(string key, TimeSpan lifetime, string? downloadName = null)
+        => new($"https://bucket.test/{key}?method=GET&ttl={(int)lifetime.TotalSeconds}"
+            + (downloadName is null ? "" : $"&download={Uri.EscapeDataString(downloadName)}"));
 
     public Task<Tropicast.Dashboard.Application.Media.StoredObject?> HeadAsync(string key, CancellationToken cancellationToken = default)
         => Task.FromResult(_objects.TryGetValue(key, out var o) ? new Tropicast.Dashboard.Application.Media.StoredObject(o.Bytes.Length, o.ContentType) : null);

@@ -393,6 +393,26 @@
         }
       }
     },
+    "/api/v1/downloads/station": {
+      "get": {
+        "tags": [
+          "Downloads"
+        ],
+        "summary": "The desktop app's latest release: version and download links.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationDownloadsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/version": {
       "get": {
         "tags": [
@@ -4699,6 +4719,75 @@
         },
         "description": "Starts an upload: the server answers with a presigned URL the browser PUTs the file to."
       },
+      "StationDownloadResponse": {
+        "required": [
+          "platform",
+          "name",
+          "size",
+          "sha256",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "description": "win-x64, osx-arm64, osx-x64, linux-x64; or certificate, checksums, script, readme."
+          },
+          "name": {
+            "type": "string",
+            "description": "File name, e.g. Tropicast-Station-0.2.1-win-x64.msix."
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Bytes.",
+            "format": "int64"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Lowercase hex, also in the checksums file."
+          },
+          "url": {
+            "type": "string",
+            "description": "Download link on this site; it never expires.",
+            "format": "uri"
+          }
+        },
+        "description": "A file of the desktop app's latest release."
+      },
+      "StationDownloadsResponse": {
+        "required": [
+          "version",
+          "releasesPage",
+          "files"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Version, e.g. 0.2.1; null when no release can be served from here now (use ReleasesPage)."
+          },
+          "releasesPage": {
+            "type": "string",
+            "description": "The release on GitHub: the fallback.",
+            "format": "uri"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationDownloadResponse"
+            },
+            "description": "Installers first, then the certificate, checksums, Windows install script and install guide."
+          }
+        },
+        "description": "The desktop app's latest release."
+      },
       "StationResponse": {
         "examples": [
           {
@@ -5650,6 +5739,9 @@
     },
     {
       "name": "Stations"
+    },
+    {
+      "name": "Downloads"
     },
     {
       "name": "Tropicast.Dashboard.Api"

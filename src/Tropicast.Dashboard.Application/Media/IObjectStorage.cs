@@ -22,8 +22,11 @@ public interface IObjectStorage
     /// </summary>
     PresignedUpload PresignUpload(string key, string contentType, long size, TimeSpan lifetime);
 
-    /// <summary>A URL that GETs the object (the playout worker reads tracks this way).</summary>
-    Uri PresignDownload(string key, TimeSpan lifetime);
+    /// <summary>
+    /// A URL that GETs the object (the playout worker reads tracks this way). With <paramref name="downloadName"/>, the
+    /// answer asks the browser to save it under that name (<c>Content-Disposition: attachment</c>).
+    /// </summary>
+    Uri PresignDownload(string key, TimeSpan lifetime, string? downloadName = null);
 
     /// <summary>The object's size and type; null when there is none.</summary>
     Task<StoredObject?> HeadAsync(string key, CancellationToken cancellationToken = default);

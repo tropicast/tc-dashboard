@@ -457,6 +457,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/downloads/station": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The desktop app's latest release: version and download links. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StationDownloadsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/version": {
         parameters: {
             query?: never;
@@ -3973,6 +4009,37 @@ export interface components {
              * @description The file's size in bytes.
              */
             size: number | string;
+        };
+        /** @description A file of the desktop app's latest release. */
+        StationDownloadResponse: {
+            /** @description win-x64, osx-arm64, osx-x64, linux-x64; or certificate, checksums, script, readme. */
+            platform: string;
+            /** @description File name, e.g. Tropicast-Station-0.2.1-win-x64.msix. */
+            name: string;
+            /**
+             * Format: int64
+             * @description Bytes.
+             */
+            size: number | string;
+            /** @description Lowercase hex, also in the checksums file. */
+            sha256: string;
+            /**
+             * Format: uri
+             * @description Download link on this site; it never expires.
+             */
+            url: string;
+        };
+        /** @description The desktop app's latest release. */
+        StationDownloadsResponse: {
+            /** @description Version, e.g. 0.2.1; null when no release can be served from here now (use ReleasesPage). */
+            version: null | string;
+            /**
+             * Format: uri
+             * @description The release on GitHub: the fallback.
+             */
+            releasesPage: string;
+            /** @description Installers first, then the certificate, checksums, Windows install script and install guide. */
+            files: components["schemas"]["StationDownloadResponse"][];
         };
         /**
          * @description A station.

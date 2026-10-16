@@ -1,4 +1,6 @@
 using Tropicast.Dashboard.Api.Billing;
+using Tropicast.Dashboard.Api.Downloads;
+using Tropicast.Dashboard.Application.Outbox;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -89,6 +91,9 @@ builder.Services.AddOptions<DirectoryOptions>().PostConfigure<IOptions<Streaming
     options.PublicBaseUrl = new Uri(app.Value.PublicBaseUrl);
 });
 builder.Services.Configure<OperatorOptions>(builder.Configuration.GetSection("Operators"));
+// Desktop app downloads and the welcome email that carries them (#127).
+builder.Services.AddSingleton<StationReleases>();
+builder.Services.AddSingleton<IOutboxConsumer, WelcomeEmail>();
 builder.Services.AddScoped<IAuthorizationHandler, OperatorHandler>();
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(OperatorEndpoints.Policy, policy => policy.RequireAuthenticatedUser().AddRequirements(new OperatorRequirement()));
@@ -132,6 +137,7 @@ app.MapBilling();
 app.MapSourceAuth();
 app.MapPlayout();
 app.MapOperator();
+app.MapDownloads();
 
 // The React SPA is built into wwwroot; client-side routes fall back to index.html.
 app.UseDefaultFiles();

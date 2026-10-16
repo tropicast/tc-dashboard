@@ -24,6 +24,7 @@ import { PageHeader } from '../../molecules/PageHeader';
 import { AutoDjPanel, type OnAir } from '../media/AutoDjPanel';
 import { DirectoryStatus } from './DirectoryStatus';
 import { SharePanel } from './SharePanel';
+import { DownloadApp } from '../downloads/DownloadApp';
 import { formatDateTime } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import { stationSchema } from '../../../lib/station-validation';
@@ -281,6 +282,7 @@ export function StationDetail() {
             <h2 className="text-lg font-semibold text-primary">{t('station.desktopTitle')}</h2>
             <p className="text-sm text-tertiary">{t('station.desktopText')}</p>
           </div>
+          <DownloadApp />
         </Card>
       </div>
     </section>
