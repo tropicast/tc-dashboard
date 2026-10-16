@@ -64,7 +64,8 @@ internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
 {
     public void Configure(EntityTypeBuilder<Station> builder)
     {
-        builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Restrict);
+        // Stations are soft-deleted; only deleting the whole workspace removes them, with everything below (#132).
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
         builder.Property(e => e.PublicId).HasMaxLength(StationPublicId.Length).IsFixedLength();
         // Part of listener URLs and Icecast mounts: never changes once saved, never reused.
         builder.Property(e => e.PublicId).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
@@ -87,7 +88,7 @@ internal sealed class StreamAssignmentConfiguration : IEntityTypeConfiguration<S
 {
     public void Configure(EntityTypeBuilder<StreamAssignment> builder)
     {
-        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(e => e.StationId).IsUnique();
         builder.Property(e => e.Node).HasMaxLength(64);
         builder.Property(e => e.MountBase).HasMaxLength(64);
@@ -98,7 +99,7 @@ internal sealed class BroadcastCredentialConfiguration : IEntityTypeConfiguratio
 {
     public void Configure(EntityTypeBuilder<BroadcastCredential> builder)
     {
-        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(e => e.StationId);
         // One active admin-issued credential per device label; revoking frees the label.
         builder.HasIndex(e => new { e.StationId, e.DeviceLabel }).IsUnique()
@@ -122,7 +123,7 @@ internal sealed class LiveSessionConfiguration : IEntityTypeConfiguration<LiveSe
 {
     public void Configure(EntityTypeBuilder<LiveSession> builder)
     {
-        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(e => new { e.StationId, e.StartedAt });
         // At most one open session per station and format.
         builder.HasIndex(e => new { e.StationId, e.Format }).IsUnique().HasFilter("ended_at IS NULL");
@@ -134,7 +135,7 @@ internal sealed class StationStatsRollupConfiguration : IEntityTypeConfiguration
     public void Configure(EntityTypeBuilder<StationStatsRollup> builder)
     {
         builder.HasKey(e => new { e.StationId, e.Interval, e.PeriodStart });
-        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -143,7 +144,7 @@ internal sealed class TrackConfiguration : IEntityTypeConfiguration<Domain.Media
     public void Configure(EntityTypeBuilder<Domain.Media.Track> builder)
     {
         // Deleted with their station's objects by StationTracksCleanup, never by a cascade (the station stays).
-        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(e => new { e.StationId, e.CreatedAt });
         builder.HasIndex(e => e.UploadExpiresAt).HasFilter("status = 'Pending'");
         builder.HasIndex(e => e.ObjectKey).IsUnique();
@@ -158,7 +159,7 @@ internal sealed class PlaylistConfiguration : IEntityTypeConfiguration<Domain.Me
 {
     public void Configure(EntityTypeBuilder<Domain.Media.Playlist> builder)
     {
-        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(e => new { e.StationId, e.Name });
         builder.Property(e => e.Name).HasMaxLength(100);
         builder.HasMany(e => e.Items).WithOne().HasForeignKey(i => i.PlaylistId).OnDelete(DeleteBehavior.Cascade);
@@ -183,7 +184,7 @@ internal sealed class AutoDjSettingsConfiguration : IEntityTypeConfiguration<Dom
     {
         builder.ToTable("auto_dj_settings");
         builder.HasKey(e => e.StationId);
-        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
         // Deleting the default playlist leaves no playlist chosen (the API refuses it while AutoDJ is on).
         builder.HasOne<Domain.Media.Playlist>().WithMany().HasForeignKey(e => e.DefaultPlaylistId).OnDelete(DeleteBehavior.SetNull);
     }
@@ -194,7 +195,7 @@ internal sealed class EncodingProfileConfiguration : IEntityTypeConfiguration<Do
     public void Configure(EntityTypeBuilder<Domain.Media.EncodingProfile> builder)
     {
         builder.HasKey(e => new { e.StationId, e.Format });
-        builder.HasOne<Station>().WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Station>().WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -252,7 +253,7 @@ internal sealed class DirectoryListingConfiguration : IEntityTypeConfiguration<D
     public void Configure(EntityTypeBuilder<Directories.DirectoryListing> builder)
     {
         builder.HasKey(e => e.StationId);
-        builder.HasOne<Station>().WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Station>().WithMany().HasForeignKey(e => e.StationId).OnDelete(DeleteBehavior.Cascade);
         builder.Property(e => e.RadioBrowserUuid).HasMaxLength(64);
         builder.Property(e => e.LastError).HasMaxLength(300);
         builder.Ignore(e => e.Submitted);

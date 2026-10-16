@@ -65,13 +65,14 @@ are those of the operator's `ops/delete-workspace.sh`:
    request that waited on the lock gets 404.
 3. **Slug**: `DELETE /api/v1/tenants/current` takes `{ "confirmSlug": "…" }`
    and answers 422 when it is not the workspace's slug.
-4. **Delete**, one transaction (`WorkspaceDeletion`): the workspace's
-   undelivered outbox events (except `StationDeleted`), then one
-   `StationDeleted` per station still on air, then credentials, live
-   sessions, stats rollups, stream assignments, directory listings, AutoDJ
-   settings, encoding profiles, playlists, tracks and stations, then the
-   workspace (memberships, subscriptions, invitations and audit entries
-   cascade). Member accounts stay.
+4. **Delete**, one transaction (`WorkspaceDeletion`): the undelivered outbox
+   events of the workspace and its stations (except `StationDeleted`), then
+   one `StationDeleted` per station still on air, then pending uploads to
+   `orphaned_uploads`, then one `DELETE` of the workspace row. Everything
+   else cascades in the database (#132): stations and every row below them,
+   memberships, subscriptions, invitations and audit entries. Member accounts
+   stay. `PersistenceTests` fails when a table references `stations` or
+   `tenants` without `ON DELETE CASCADE`.
 5. **After the commit**: the `StationDeleted` events remove the uploaded audio
    from object storage and drop the mounts at the next provisioning pass. An
    upload still running keeps its object key in `orphaned_uploads`:

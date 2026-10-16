@@ -39,7 +39,7 @@ internal sealed class StationTracksCleanup(IServiceScopeFactory scopes, TimeProv
             .Where(c => c.StationId == deleted.StationId && c.Purpose == CredentialPurpose.AutoDj && c.RevokedAt == null)
             .ExecuteUpdateAsync(set => set.SetProperty(c => c.RevokedAt, message.OccurredAt).SetProperty(c => c.ProtectedSecret, (string?)null),
                 cancellationToken);
-        await StationMedia.DeleteAsync(db, [deleted.StationId], time.GetUtcNow(), orphanPending: false, cancellationToken);
+        await StationMedia.DeleteAsync(db, [deleted.StationId], time.GetUtcNow(), cancellationToken);
     }
 }
 
