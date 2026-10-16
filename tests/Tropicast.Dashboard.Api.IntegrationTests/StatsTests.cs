@@ -80,6 +80,36 @@ public sealed class StatsTests(DashboardFactory factory) : IClassFixture<Dashboa
     }
 
     [Fact]
+    public async Task Listeners_moved_to_AutoDj_when_the_live_source_drops_still_count()
+    {
+        var (owner, station) = await StationAsync();
+        var collector = Collector();
+        var startedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        await SampleAsync(collector, DateTimeOffset.UtcNow,
+            new MountSample(station.PublicId, AudioFormat.Mp3, 7, 128, 0, startedAt),
+            new MountSample(station.PublicId, AudioFormat.Mp3, 0, 0, 0, null, AutoDj: true));
+
+        var status = await GetAsync<StationStatusResponse>(owner, $"/api/v1/stations/{station.Id}/status");
+        var output = Assert.Single(status.Outputs);
+        Assert.Equal((true, 7, false, 128.0), (status.Live, status.Listeners, output.AutoDj, output.BitrateKbps));
+
+        // The DJ's source drops: Icecast moves the 7 listeners to autodj.mp3.
+        await SampleAsync(collector, DateTimeOffset.UtcNow.AddSeconds(1),
+            new MountSample(station.PublicId, AudioFormat.Mp3, 7, 0, 0, null, AutoDj: true));
+
+        status = await GetAsync<StationStatusResponse>(owner, $"/api/v1/stations/{station.Id}/status");
+        output = Assert.Single(status.Outputs);
+        Assert.Equal((false, 7, false), (status.Live, status.Listeners, status.Stale));
+        Assert.Equal((AudioFormat.Mp3, 7, true, (double?)null, (DateTimeOffset?)null),
+            (output.Format, output.Listeners, output.AutoDj, output.BitrateKbps, output.LiveSince));
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // Only the live broadcast is a session; AutoDJ opens none.
+        var session = Assert.Single(await db.LiveSessions.IgnoreQueryFilters().Where(l => l.StationId == station.Id).ToListAsync(Token));
+        Assert.NotNull(session.EndedAt);
+    }
+
+    [Fact]
     public async Task A_session_that_source_auth_just_opened_is_not_ended_by_an_older_view()
     {
         var (_, station) = await StationAsync();

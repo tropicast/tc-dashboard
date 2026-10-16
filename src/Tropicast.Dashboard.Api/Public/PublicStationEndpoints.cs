@@ -27,12 +27,13 @@ internal sealed record PublicStreamResponse(AudioFormat Format, string ContentTy
 /// <param name="Language">BCP 47 language tag.</param>
 /// <param name="LogoUrl">Logo address.</param>
 /// <param name="Website">The station's website.</param>
-/// <param name="Live">On air now; null when not known.</param>
+/// <param name="Live">A DJ is live now; null when not known.</param>
+/// <param name="AutoDj">No DJ is live and AutoDJ plays: the stream is on air all the same.</param>
 /// <param name="Streams">Streams, Opus first (less data) when the plan includes it, then MP3 (plays everywhere).</param>
 /// <param name="PageUrl">Public page.</param>
 /// <param name="EmbedUrl">Embeddable player, or null when the station's plan does not include embedding.</param>
 internal sealed record PublicStationResponse(string Name, string Description, string Genre, string? Country, string? Language, Uri? LogoUrl,
-    Uri? Website, bool? Live, IReadOnlyList<PublicStreamResponse> Streams, Uri PageUrl, Uri? EmbedUrl);
+    Uri? Website, bool? Live, bool AutoDj, IReadOnlyList<PublicStreamResponse> Streams, Uri PageUrl, Uri? EmbedUrl);
 
 /// <summary>
 /// Public station page, embeddable player and their read endpoint (#12). Rendered by the API without the SPA, so the
@@ -145,7 +146,7 @@ internal static class PublicStationEndpoints
         StreamingOptions streaming, AppOptions app, DateTimeOffset now)
     {
         var station = found.Station;
-        var (live, _, _) = LiveStatus.Of(store, found.Node ?? streaming.Node, station.PublicId, stats.Interval, now);
+        var (live, outputs, _) = LiveStatus.Of(store, found.Node ?? streaming.Node, station.PublicId, stats.Interval, now);
         var mountBase = $"/stations/{station.PublicId}";
         List<PublicStreamResponse> streams = [];
         if (found.Plan.Allows(AudioFormat.Opus))
@@ -155,7 +156,7 @@ internal static class PublicStationEndpoints
         streams.Add(new(AudioFormat.Mp3, "audio/mpeg", new Uri(streaming.ListenerBaseUrl, $"{mountBase}/live.mp3")));
         var origin = new Uri(app.PublicBaseUrl);
         return new PublicStationResponse(station.Name, station.Description, station.Genre, station.Country, station.Language,
-            station.LogoUrl, station.Website, live, streams, new Uri(origin, $"/listen/{tenantSlug}/{station.Slug}"),
+            station.LogoUrl, station.Website, live, live == false && outputs.Count > 0, streams, new Uri(origin, $"/listen/{tenantSlug}/{station.Slug}"),
             found.Plan.Embed ? new Uri(origin, $"/embed/{tenantSlug}/{station.Slug}") : null);
     }
 

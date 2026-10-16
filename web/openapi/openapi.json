@@ -3763,7 +3763,8 @@
           "format",
           "listeners",
           "bitrateKbps",
-          "liveSince"
+          "liveSince",
+          "autoDj"
         ],
         "type": "object",
         "properties": {
@@ -3777,7 +3778,7 @@
               "integer",
               "string"
             ],
-            "description": "Current listeners.",
+            "description": "Current listeners, on the live mount and AutoDJ's fallback together.",
             "format": "int32"
           },
           "bitrateKbps": {
@@ -3787,7 +3788,7 @@
               "number",
               "string"
             ],
-            "description": "Source bitrate, declared or measured; null until known.",
+            "description": "Live source bitrate, declared or measured; null until known, and under AutoDJ.",
             "format": "double"
           },
           "liveSince": {
@@ -3795,11 +3796,15 @@
               "null",
               "string"
             ],
-            "description": "When the source connected.",
+            "description": "When the live source connected; null under AutoDJ.",
             "format": "date-time"
+          },
+          "autoDj": {
+            "type": "boolean",
+            "description": "No live source: AutoDJ plays this stream."
           }
         },
-        "description": "One live stream of a station."
+        "description": "One stream of a station, live or played by AutoDJ."
       },
       "LoginRequest": {
         "required": [
@@ -4437,6 +4442,7 @@
           "logoUrl",
           "website",
           "live",
+          "autoDj",
           "streams",
           "pageUrl",
           "embedUrl"
@@ -4490,7 +4496,11 @@
               "null",
               "boolean"
             ],
-            "description": "On air now; null when not known."
+            "description": "A DJ is live now; null when not known."
+          },
+          "autoDj": {
+            "type": "boolean",
+            "description": "No DJ is live and AutoDJ plays: the stream is on air all the same."
           },
           "streams": {
             "type": "array",
@@ -4876,7 +4886,7 @@
               "null",
               "boolean"
             ],
-            "description": "Some source is connected; null when the node's state is not known (see bool StationStatusResponse.Stale)."
+            "description": "A live source is connected (AutoDJ alone is not live); null when the node's state is not known (see bool StationStatusResponse.Stale)."
           },
           "listeners": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -4884,7 +4894,7 @@
               "integer",
               "string"
             ],
-            "description": "Listeners on all formats.",
+            "description": "Listeners on all formats, live or AutoDJ.",
             "format": "int32"
           },
           "outputs": {
@@ -4892,7 +4902,7 @@
             "items": {
               "$ref": "#/components/schemas/LiveOutputResponse"
             },
-            "description": "Live streams."
+            "description": "Streams with a source, live or AutoDJ."
           },
           "updatedAt": {
             "type": [

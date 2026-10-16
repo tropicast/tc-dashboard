@@ -236,6 +236,47 @@ test('shows a new credential as separate connection settings', async () => {
   expect(within(panel).getAllByRole('button', { name: 'Copy' })).toHaveLength(5);
 });
 
+test('counts the listeners AutoDJ took over when the live source dropped (#124)', async () => {
+  renderAt('/stations/s1', (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/me') return Response.json(signedIn);
+    if (path === '/api/v1/stations/s1') {
+      return Response.json({
+        id: 's1',
+        publicId: 'radio1',
+        name: 'Radio One',
+        slug: 'radio-one',
+        description: '',
+        genre: '',
+        country: null,
+        language: null,
+        logoUrl: null,
+        website: null,
+        listInDirectory: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        listenerUrls: { mp3: 'https://listen.example.test/stations/radio1/live.mp3', opus: null },
+      });
+    }
+    if (path === '/api/v1/stations/s1/status') {
+      return Response.json({
+        live: false,
+        listeners: 7,
+        outputs: [
+          { format: 'Mp3', listeners: 7, bitrateKbps: null, liveSince: null, autoDj: true },
+        ],
+        updatedAt: '2026-10-16T12:00:00Z',
+        stale: false,
+      });
+    }
+    if (path === '/api/v1/stations/s1/credentials') return Response.json([]);
+    return Response.json({ title: 'Not found', status: 404 }, { status: 404 });
+  });
+
+  expect(await screen.findByText('7 listeners')).toBeInTheDocument();
+  expect(screen.getByText('Mp3: 7 listeners · AutoDJ')).toBeInTheDocument();
+  expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+});
+
 test('lists only active credentials and revokes one after confirmation', async () => {
   const deleted: string[] = [];
   const credentials = [

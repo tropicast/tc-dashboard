@@ -21,7 +21,7 @@ import { ConfirmDialog } from '../../molecules/ConfirmDialog';
 import { CopyField } from '../../molecules/CopyField';
 import { Loading } from '../../molecules/Loading';
 import { PageHeader } from '../../molecules/PageHeader';
-import { AutoDjPanel } from '../media/AutoDjPanel';
+import { AutoDjPanel, type OnAir } from '../media/AutoDjPanel';
 import { DirectoryStatus } from './DirectoryStatus';
 import { SharePanel } from './SharePanel';
 import { formatDateTime } from '../../../lib/i18n';
@@ -116,11 +116,22 @@ export function StationDetail() {
   if (station.isPending) return <Loading label={t('station.loading')} />;
   if (!station.data) return <Notice error={station.error} />;
   const item = station.data.station;
+  // What is on air, from the streaming node: the header badge and the AutoDJ panel both show this.
+  const onAir: OnAir | null =
+    !status.data || status.data.stale
+      ? null
+      : status.data.live
+        ? 'live'
+        : status.data.outputs.length > 0
+          ? 'autoDj'
+          : 'none';
   const badge = status.data?.stale
     ? { color: 'warning' as const, label: t('station.statusUnavailable') }
-    : status.data?.live
+    : onAir === 'live'
       ? { color: 'success' as const, label: t('station.live') }
-      : { color: 'gray' as const, label: t('station.offline') };
+      : onAir === 'autoDj'
+        ? { color: 'brand' as const, label: t('station.autoDj') }
+        : { color: 'gray' as const, label: t('station.offline') };
   return (
     <section className="flex flex-col gap-6">
       <PageHeader
@@ -157,7 +168,7 @@ export function StationDetail() {
             <ul className="flex flex-col gap-1 text-sm text-tertiary">
               {status.data.outputs.map((output) => (
                 <li key={output.format}>
-                  {t('station.output', {
+                  {t(output.autoDj ? 'station.outputAutoDj' : 'station.output', {
                     format: output.format,
                     count: Number(output.listeners),
                     bitrate: output.bitrateKbps ?? '—',
@@ -172,10 +183,7 @@ export function StationDetail() {
           {item.listenerUrls.opus && <CopyField label="Opus" value={item.listenerUrls.opus} />}
         </Card>
       </div>
-      <AutoDjPanel
-        stationId={id}
-        live={status.data && !status.data.stale ? status.data.live : null}
-      />
+      <AutoDjPanel stationId={id} onAir={onAir} />
       <SharePanel stationSlug={item.slug} />
       <Card title={t('station.settings')}>
         <form

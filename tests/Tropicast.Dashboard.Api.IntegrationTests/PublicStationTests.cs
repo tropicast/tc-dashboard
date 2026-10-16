@@ -163,6 +163,21 @@ public sealed class PublicStationTests(DashboardFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task AutoDj_on_air_is_playable_on_the_public_page()
+    {
+        var (_, tenantSlug, station) = await StationAsync();
+        factory.Stats.Next = new NodeSample("tc-stream-1", DateTimeOffset.UtcNow, true,
+            [new MountSample(station.PublicId, AudioFormat.Mp3, 2, 0, 0, null, AutoDj: true)], null, null);
+        await ActivatorUtilities.CreateInstance<StatsCollector>(factory.Services).SampleOnceAsync(Token);
+
+        var anonymous = factory.CreateClient();
+        var info = await anonymous.GetFromJsonAsync<PublicStationResponse>($"/api/v1/public/stations/{tenantSlug}/radio-mada", Browser.Json, Token);
+        Assert.Equal((false, true), (info!.Live, info.AutoDj));
+        var html = await anonymous.GetStringAsync($"/listen/{tenantSlug}/radio-mada", Token);
+        Assert.Contains("\"autoDj\":true", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_play_button_is_a_plain_button_whose_label_says_what_it_does()
     {
         // #74: Play/Stop text plus aria-pressed made screen readers say "Stop, pressed".

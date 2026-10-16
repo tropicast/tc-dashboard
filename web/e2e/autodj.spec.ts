@@ -70,7 +70,15 @@ test('build a playlist and enable AutoDJ', async ({ page }) => {
         listenerUrls: { mp3: 'https://listen.example.test/live.mp3', opus: null },
       });
     if (path === `${base}/status`)
-      return json(route, 200, { live: false, stale: false, listeners: 0, outputs: [] });
+      // The node runs AutoDJ's fallback mount while AutoDJ is on.
+      return json(route, 200, {
+        live: false,
+        stale: false,
+        listeners: 0,
+        outputs: autodj.active
+          ? [{ format: 'Mp3', listeners: 0, bitrateKbps: null, liveSince: null, autoDj: true }]
+          : [],
+      });
     if (path === `${base}/autodj` && request.method() === 'GET') return json(route, 200, autodj);
     if (path === `${base}/autodj`) {
       Object.assign(autodj, body, { active: Boolean(body?.enabled) });

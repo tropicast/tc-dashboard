@@ -9,17 +9,19 @@ using Tropicast.Dashboard.Infrastructure.Stats;
 
 namespace Tropicast.Dashboard.Api.Stations;
 
-/// <summary>One live stream of a station.</summary>
+/// <summary>One stream of a station, live or played by AutoDJ.</summary>
 /// <param name="Format">Stream format.</param>
-/// <param name="Listeners">Current listeners.</param>
-/// <param name="BitrateKbps">Source bitrate, declared or measured; null until known.</param>
-/// <param name="LiveSince">When the source connected.</param>
-internal sealed record LiveOutputResponse(AudioFormat Format, int Listeners, double? BitrateKbps, DateTimeOffset? LiveSince);
+/// <param name="Listeners">Current listeners, on the live mount and AutoDJ's fallback together.</param>
+/// <param name="BitrateKbps">Live source bitrate, declared or measured; null until known, and under AutoDJ.</param>
+/// <param name="LiveSince">When the live source connected; null under AutoDJ.</param>
+/// <param name="AutoDj">No live source: AutoDJ plays this stream.</param>
+internal sealed record LiveOutputResponse(AudioFormat Format, int Listeners, double? BitrateKbps, DateTimeOffset? LiveSince,
+    bool AutoDj);
 
 /// <summary>A station's live status, at most one collector interval (15 s) old.</summary>
-/// <param name="Live">Some source is connected; null when the node's state is not known (see <see cref="Stale"/>).</param>
-/// <param name="Listeners">Listeners on all formats.</param>
-/// <param name="Outputs">Live streams.</param>
+/// <param name="Live">A live source is connected (AutoDJ alone is not live); null when the node's state is not known (see <see cref="Stale"/>).</param>
+/// <param name="Listeners">Listeners on all formats, live or AutoDJ.</param>
+/// <param name="Outputs">Streams with a source, live or AutoDJ.</param>
 /// <param name="UpdatedAt">When the streaming node was sampled.</param>
 /// <param name="Stale">No recent sample: the node or the collector is down.</param>
 internal sealed record StationStatusResponse(bool? Live, int Listeners, IReadOnlyList<LiveOutputResponse> Outputs, DateTimeOffset? UpdatedAt,

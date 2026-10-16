@@ -64,7 +64,9 @@ internal sealed class StatsRecorder(AppDbContext db)
         {
             return; // Unknown, not offline.
         }
-        var live = current.Mounts.Select(m => (m.PublicId, m.Format)).ToHashSet();
+        // Sessions are live broadcasts: AutoDJ's fallback mounts open none.
+        var mounts = current.Mounts.Where(m => !m.AutoDj).ToList();
+        var live = mounts.Select(m => (m.PublicId, m.Format)).ToHashSet();
         var open = await db.LiveSessions.IgnoreQueryFilters([AppDbContext.TenantFilter])
             .Where(l => l.EndedAt == null)
             .Join(db.StreamAssignments.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(a => a.Node == current.Node),
@@ -76,7 +78,7 @@ internal sealed class StatsRecorder(AppDbContext db)
             gone.Session.End(current.At);
         }
         var opened = open.Select(o => (o.PublicId, o.Session.Format)).ToHashSet();
-        var missing = current.Mounts.Where(m => !opened.Contains((m.PublicId, m.Format))).ToList();
+        var missing = mounts.Where(m => !opened.Contains((m.PublicId, m.Format))).ToList();
         if (missing.Count > 0)
         {
             var ids = await StationIdsAsync([.. missing.Select(m => m.PublicId)], cancellationToken);
