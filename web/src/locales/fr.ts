@@ -323,6 +323,28 @@ export const fr: Locale = {
     manageAccount: 'Télécharger mes données ou supprimer mon compte',
     back: 'Retour à Tropicast',
   },
+  workspaceDeletion: {
+    title: 'Supprimer l’espace',
+    hint: 'Supprime cet espace définitivement : ses stations, leur audio et leur historique, l’accès des membres et les invitations. Les comptes des membres restent.',
+    delete: 'Supprimer l’espace',
+    confirmTitle: 'Supprimer « {{name}} » ?',
+    goes: 'Cela supprime {{stations}} station(s), {{tracks}} piste(s) envoyée(s) et {{playlists}} playlist(s), et retire {{members}} membre(s). Les adresses d’écoute cessent de fonctionner aussitôt. Action irréversible.',
+    orphans_one: '1 membre n’a plus aucun espace (son compte reste).',
+    orphans_other: '{{count}} membres n’ont plus aucun espace (leurs comptes restent).',
+    listed_one: '1 station est référencée sur RadioBrowser : la fiche y reste et passe hors ligne.',
+    listed_other:
+      '{{count}} stations sont référencées sur RadioBrowser : les fiches y restent et passent hors ligne.',
+    stays:
+      'Les factures restent chez Stripe, comme l’exige la loi comptable. Les sauvegardes en gardent une copie 30 jours au plus.',
+    typeSlug: 'Saisissez {{slug}} pour confirmer',
+    blockers: {
+      Subscription: 'Résiliez d’abord l’abonnement (Offre et facturation).',
+      Live: 'Une station est en direct. Arrêtez d’abord la diffusion.',
+    },
+    doneTitle: 'Espace supprimé',
+    done: '{{stations}} station(s), {{tracks}} piste(s) et {{members}} accès membre(s) ont été supprimés. Les propriétaires reçoivent un e-mail de confirmation.',
+    continue: 'Continuer',
+  },
   account: {
     title: 'Compte',
     yourData: 'Vos données',

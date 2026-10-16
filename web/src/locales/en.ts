@@ -315,6 +315,28 @@ export const en = {
     manageAccount: 'Download my data or delete my account',
     back: 'Back to Tropicast',
   },
+  workspaceDeletion: {
+    title: 'Delete workspace',
+    hint: 'Deletes this workspace for good: its stations, their audio and history, members’ access and invitations. Member accounts stay.',
+    delete: 'Delete workspace',
+    confirmTitle: 'Delete “{{name}}”?',
+    goes: 'This deletes {{stations}} station(s), {{tracks}} uploaded track(s) and {{playlists}} playlist(s), and removes {{members}} member(s). Listener URLs stop working at once. This cannot be undone.',
+    orphans_one: '1 member is left without any workspace (their account stays).',
+    orphans_other: '{{count}} members are left without any workspace (their accounts stay).',
+    listed_one: '1 station is listed on RadioBrowser: the entry stays there and goes offline.',
+    listed_other:
+      '{{count}} stations are listed on RadioBrowser: the entries stay there and go offline.',
+    stays:
+      'Invoices stay in Stripe, as accounting law requires. Backups keep a copy for up to 30 days.',
+    typeSlug: 'Type {{slug}} to confirm',
+    blockers: {
+      Subscription: 'Cancel the subscription first (Plan and billing).',
+      Live: 'A station is live. Stop the broadcast first.',
+    },
+    doneTitle: 'Workspace deleted',
+    done: '{{stations}} station(s), {{tracks}} track(s) and {{members}} member access(es) were deleted. The owners get a confirmation email.',
+    continue: 'Continue',
+  },
   account: {
     title: 'Account',
     yourData: 'Your data',

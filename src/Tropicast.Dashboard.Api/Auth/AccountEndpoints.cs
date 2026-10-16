@@ -131,12 +131,13 @@ internal static class AccountEndpoints
             }
             if (await others.AnyAsync(cancellationToken))
             {
-                return Conflict($"You are the last Owner of \"{tenant.Name}\". Invite another Owner or remove the other members first.");
+                return Conflict($"You are the last Owner of \"{tenant.Name}\". Invite another Owner, remove the other members, or delete "
+                    + "the workspace (Account, Delete workspace) first.");
             }
             if (await db.Stations.IgnoreQueryFilters([AppDbContext.TenantFilter, AppDbContext.DeletedFilter])
                     .AnyAsync(s => s.TenantId == tenant.Id && s.DeletedAt == null, cancellationToken))
             {
-                return Conflict($"Delete the stations of \"{tenant.Name}\" first.");
+                return Conflict($"Delete the stations of \"{tenant.Name}\", or the whole workspace (Account, Delete workspace), first.");
             }
             if (await db.Subscriptions.IgnoreQueryFilters([AppDbContext.TenantFilter]).AnyAsync(s => s.TenantId == tenant.Id
                     && s.Status != SubscriptionStatus.Canceled, cancellationToken))

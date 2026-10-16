@@ -11,6 +11,7 @@ export function ConfirmDialog({
   title,
   confirmLabel,
   busy = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
   children,
@@ -18,6 +19,8 @@ export function ConfirmDialog({
   title: string;
   confirmLabel: string;
   busy?: boolean;
+  /** Keeps the confirm button disabled, e.g. until the user typed what the dialog asks for. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   children: ReactNode;
@@ -50,6 +53,7 @@ export function ConfirmDialog({
                 size="lg"
                 isLoading={busy}
                 showTextWhileLoading
+                isDisabled={confirmDisabled}
                 onPress={onConfirm}
               >
                 {confirmLabel}

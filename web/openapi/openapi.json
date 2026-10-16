@@ -1240,6 +1240,74 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "Deletes the current workspace and everything in it; member accounts stay. Needs its slug. Refused (409) while it has a subscription Stripe may charge for, or a live station.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteWorkspaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceDeletedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/current/deletion": {
+      "get": {
+        "tags": [
+          "Tenants"
+        ],
+        "summary": "What deleting the current workspace would delete, and what blocks it. Changes nothing.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceDeletionResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/tenants/current/members": {
@@ -3319,6 +3387,172 @@
             "type": "string"
           }
         }
+      },
+      "DeleteWorkspaceRequest": {
+        "required": [
+          "confirmSlug"
+        ],
+        "type": "object",
+        "properties": {
+          "confirmSlug": {
+            "maxLength": 64,
+            "type": "string",
+            "description": "The workspace's slug, typed by the user."
+          }
+        },
+        "description": "Confirms deleting the current workspace."
+      },
+      "DeletionBlocker": {
+        "enum": [
+          "Subscription",
+          "Live"
+        ],
+        "description": "Why a workspace cannot be deleted now."
+      },
+      "DeletionCountsResponse": {
+        "required": [
+          "stations",
+          "credentials",
+          "liveSessions",
+          "statsRollups",
+          "tracks",
+          "playlists",
+          "members",
+          "invitations",
+          "auditEntries"
+        ],
+        "type": "object",
+        "properties": {
+          "stations": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "credentials": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "liveSessions": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "statsRollups": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "tracks": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "playlists": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "members": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "invitations": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "auditEntries": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "Rows deleted with the workspace, per kind."
+      },
+      "DeletionMemberResponse": {
+        "required": [
+          "email",
+          "role",
+          "leftWithoutWorkspace"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Member's email."
+          },
+          "role": {
+            "description": "Role in this workspace.",
+            "$ref": "#/components/schemas/MembershipRole"
+          },
+          "leftWithoutWorkspace": {
+            "type": "boolean",
+            "description": "The account stays, with no workspace left."
+          }
+        },
+        "description": "A member of the workspace and what deleting it leaves them."
+      },
+      "DeletionStationResponse": {
+        "required": [
+          "publicId",
+          "name",
+          "deleted",
+          "live",
+          "listedOnRadioBrowser"
+        ],
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string",
+            "description": "Public ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Already deleted (its history stayed until now)."
+          },
+          "live": {
+            "type": "boolean",
+            "description": "A DJ is live now: blocks the deletion."
+          },
+          "listedOnRadioBrowser": {
+            "type": "boolean",
+            "description": "Its RadioBrowser entry stays there and goes offline."
+          }
+        },
+        "description": "A station of the workspace."
       },
       "DeviceCodeRequest": {
         "required": [
@@ -5718,6 +5952,95 @@
           }
         },
         "description": "API version information."
+      },
+      "WorkspaceDeletedResponse": {
+        "required": [
+          "counts"
+        ],
+        "type": "object",
+        "properties": {
+          "counts": {
+            "description": "What was deleted, per kind.",
+            "$ref": "#/components/schemas/DeletionCountsResponse"
+          }
+        },
+        "description": "The workspace is gone."
+      },
+      "WorkspaceDeletionResponse": {
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "planId",
+          "createdAt",
+          "subscriptionStatus",
+          "members",
+          "stations",
+          "counts",
+          "blockers"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Workspace ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "Slug: type it to confirm the deletion."
+          },
+          "planId": {
+            "type": "string",
+            "description": "Current plan."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was created.",
+            "format": "date-time"
+          },
+          "subscriptionStatus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The subscription's status, or null when there is none.",
+                "$ref": "#/components/schemas/SubscriptionStatus"
+              }
+            ]
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeletionMemberResponse"
+            },
+            "description": "Members; their accounts stay."
+          },
+          "stations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeletionStationResponse"
+            },
+            "description": "Stations, deleted ones too."
+          },
+          "counts": {
+            "description": "What goes.",
+            "$ref": "#/components/schemas/DeletionCountsResponse"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeletionBlocker"
+            },
+            "description": "Why it cannot be deleted now; empty when it can."
+          }
+        },
+        "description": "What deleting the current workspace would do (nothing changes)."
       }
     }
   },

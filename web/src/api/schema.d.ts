@@ -1574,7 +1574,49 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        /** Deletes the current workspace and everything in it; member accounts stay. Needs its slug. Refused (409) while it has a subscription Stripe may charge for, or a live station. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeleteWorkspaceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceDeletedResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unprocessable Entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         /** Renames the current tenant. Needs If-Match. */
@@ -1643,6 +1685,42 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/v1/tenants/current/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What deleting the current workspace would delete, and what blocks it. Changes nothing. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceDeletionResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/tenants/current/members": {
@@ -3411,6 +3489,59 @@ export interface components {
         DeleteAccountRequest: {
             password: string;
         };
+        /** @description Confirms deleting the current workspace. */
+        DeleteWorkspaceRequest: {
+            /** @description The workspace's slug, typed by the user. */
+            confirmSlug: string;
+        };
+        /**
+         * @description Why a workspace cannot be deleted now.
+         * @enum {unknown}
+         */
+        DeletionBlocker: "Subscription" | "Live";
+        /** @description Rows deleted with the workspace, per kind. */
+        DeletionCountsResponse: {
+            /** Format: int32 */
+            stations: number | string;
+            /** Format: int32 */
+            credentials: number | string;
+            /** Format: int32 */
+            liveSessions: number | string;
+            /** Format: int32 */
+            statsRollups: number | string;
+            /** Format: int32 */
+            tracks: number | string;
+            /** Format: int32 */
+            playlists: number | string;
+            /** Format: int32 */
+            members: number | string;
+            /** Format: int32 */
+            invitations: number | string;
+            /** Format: int32 */
+            auditEntries: number | string;
+        };
+        /** @description A member of the workspace and what deleting it leaves them. */
+        DeletionMemberResponse: {
+            /** @description Member's email. */
+            email: string;
+            /** @description Role in this workspace. */
+            role: components["schemas"]["MembershipRole"];
+            /** @description The account stays, with no workspace left. */
+            leftWithoutWorkspace: boolean;
+        };
+        /** @description A station of the workspace. */
+        DeletionStationResponse: {
+            /** @description Public ID. */
+            publicId: string;
+            /** @description Name. */
+            name: string;
+            /** @description Already deleted (its history stayed until now). */
+            deleted: boolean;
+            /** @description A DJ is live now: blocks the deletion. */
+            live: boolean;
+            /** @description Its RadioBrowser entry stays there and goes offline. */
+            listedOnRadioBrowser: boolean;
+        };
         DeviceCodeRequest: {
             deviceName: string;
         };
@@ -4443,6 +4574,39 @@ export interface components {
         VersionInfo: {
             /** @description Semantic version of the API build. */
             version: string;
+        };
+        /** @description The workspace is gone. */
+        WorkspaceDeletedResponse: {
+            /** @description What was deleted, per kind. */
+            counts: components["schemas"]["DeletionCountsResponse"];
+        };
+        /** @description What deleting the current workspace would do (nothing changes). */
+        WorkspaceDeletionResponse: {
+            /**
+             * Format: uuid
+             * @description Workspace ID.
+             */
+            id: string;
+            /** @description Name. */
+            name: string;
+            /** @description Slug: type it to confirm the deletion. */
+            slug: string;
+            /** @description Current plan. */
+            planId: string;
+            /**
+             * Format: date-time
+             * @description When it was created.
+             */
+            createdAt: string;
+            subscriptionStatus: null | components["schemas"]["SubscriptionStatus"];
+            /** @description Members; their accounts stay. */
+            members: components["schemas"]["DeletionMemberResponse"][];
+            /** @description Stations, deleted ones too. */
+            stations: components["schemas"]["DeletionStationResponse"][];
+            /** @description What goes. */
+            counts: components["schemas"]["DeletionCountsResponse"];
+            /** @description Why it cannot be deleted now; empty when it can. */
+            blockers: components["schemas"]["DeletionBlocker"][];
         };
     };
     responses: never;
