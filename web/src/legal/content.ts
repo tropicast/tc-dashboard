@@ -81,7 +81,7 @@ const en: LegalTexts = {
     {
       heading: 'Your rights',
       paragraphs: [
-        'You can access, correct, export and delete your data, object to processing based on legitimate interest, and restrict processing. On the Account page you can download all your data (Download my data) and delete your account (Delete account). For anything else, write to us at the contact address above. You can also complain to your data protection authority; in France, the CNIL (www.cnil.fr).',
+        'You can access, correct, export and delete your data, object to processing based on legitimate interest, and restrict processing. On the Account page you can download all your data (Download my data) and delete your account (Delete account). A workspace Owner can also delete the whole workspace, with its stations, uploaded audio and history (Delete workspace). For anything else, write to us at the contact address above. You can also complain to your data protection authority; in France, the CNIL (www.cnil.fr).',
       ],
     },
     {
@@ -215,7 +215,7 @@ const fr: LegalTexts = {
     {
       heading: 'Vos droits',
       paragraphs: [
-        'Vous pouvez accéder à vos données, les rectifier, les exporter et les effacer, vous opposer aux traitements fondés sur l’intérêt légitime et en demander la limitation. Sur la page Compte, vous pouvez télécharger toutes vos données (Télécharger mes données) et supprimer votre compte (Supprimer le compte). Pour toute autre demande, écrivez-nous à l’adresse ci-dessus. Vous pouvez aussi saisir l’autorité de protection des données ; en France, la CNIL (www.cnil.fr).',
+        'Vous pouvez accéder à vos données, les rectifier, les exporter et les effacer, vous opposer aux traitements fondés sur l’intérêt légitime et en demander la limitation. Sur la page Compte, vous pouvez télécharger toutes vos données (Télécharger mes données) et supprimer votre compte (Supprimer le compte). Le propriétaire d’un espace peut aussi supprimer l’espace entier, avec ses stations, son audio envoyé et son historique (Supprimer l’espace). Pour toute autre demande, écrivez-nous à l’adresse ci-dessus. Vous pouvez aussi saisir l’autorité de protection des données ; en France, la CNIL (www.cnil.fr).',
       ],
     },
     {

@@ -13,3 +13,5 @@ export type TrackUpload = components['schemas']['TrackUploadResponse'];
 export type AutoDj = components['schemas']['AutoDjResponse'];
 export type PlaylistSummary = components['schemas']['PlaylistSummaryResponse'];
 export type Playlist = components['schemas']['PlaylistResponse'];
+export type WorkspaceDeletion = components['schemas']['WorkspaceDeletionResponse'];
+export type WorkspaceDeleted = components['schemas']['WorkspaceDeletedResponse'];

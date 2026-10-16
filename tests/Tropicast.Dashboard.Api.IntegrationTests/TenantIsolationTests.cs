@@ -102,7 +102,8 @@ public sealed partial class TenantIsolationTests(DashboardFactory factory) : ICl
     private static async Task CheckAsync(Browser attacker, string method, string path, string label, List<string> failures, Victim victim,
         bool expectForbidden = false, bool successAllowed = false)
     {
-        using var response = await attacker.SendAsync(new HttpMethod(method), path, method is "GET" or "DELETE" ? null : new { });
+        // DELETE sends a JSON body too: an endpoint that takes one (DELETE /tenants/current) is only routed with it.
+        using var response = await attacker.SendAsync(new HttpMethod(method), path, method is "GET" ? null : new { });
         var status = (int)response.StatusCode;
         var body = await response.Content.ReadAsStringAsync(Token);
         if (status >= 500 || (status < 400 && !successAllowed))

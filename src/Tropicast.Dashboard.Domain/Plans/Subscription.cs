@@ -41,6 +41,12 @@ public sealed class Subscription : ITenantOwned
     public DateTimeOffset? LastEventAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>
+    /// Stripe may still charge for a subscription in this status (<c>Incomplete</c> too: a checkout or 3-D Secure step
+    /// may still complete). Deleting an account or a workspace waits until it is <c>Canceled</c>.
+    /// </summary>
+    public static bool MayCharge(SubscriptionStatus status) => status != SubscriptionStatus.Canceled;
+
     public static Subscription Create(Guid tenantId, string planId, SubscriptionStatus status, DateTimeOffset now) => new()
     {
         Id = Guid.CreateVersion7(now),

@@ -14,11 +14,13 @@ import { Card } from '../../molecules/Card';
 import { PageHeader } from '../../molecules/PageHeader';
 import { Notice } from '../../atoms/Notice';
 import { BillingPanel } from './BillingPanel';
+import { DeleteWorkspacePanel } from './DeleteWorkspacePanel';
 import { YourDataPanel } from './YourDataPanel';
 import { formatDateTime, formatStorage } from '../../../lib/i18n';
 import { data } from '../../../lib/request';
 import type { Tenant } from '../../../lib/types';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { useTenantRole } from '@/hooks/use-me';
 
 export function Account() {
   const { t } = useTranslation();
@@ -28,6 +30,7 @@ export function Account() {
       quota: formatStorage(Number(value.plan.storageQuotaBytes)),
     });
   useDocumentTitle(t('account.title'));
+  const role = useTenantRole();
   const tenantId = localStorage.getItem('tenant-id');
   const tenant = useQuery({
     queryKey: ['tenant', tenantId],
@@ -187,6 +190,8 @@ export function Account() {
         </Table>
       </Card>
       <YourDataPanel />
+      {/* DELETE /tenants/current needs an Owner: others do not see it. */}
+      {role === 'Owner' && <DeleteWorkspacePanel />}
     </section>
   );
 }

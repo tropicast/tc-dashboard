@@ -1507,6 +1507,32 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.ToTable("security_events", (string)null);
                 });
 
+            modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Media.OrphanedUpload", b =>
+                {
+                    b.Property<string>("ObjectKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("object_key");
+
+                    b.Property<DateTimeOffset>("DeleteAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delete_after");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("ObjectKey")
+                        .HasName("pk_orphaned_uploads");
+
+                    b.HasIndex("DeleteAfter")
+                        .HasDatabaseName("ix_orphaned_uploads_delete_after");
+
+                    b.ToTable("orphaned_uploads", (string)null);
+                });
+
             modelBuilder.Entity("Tropicast.Dashboard.Infrastructure.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")

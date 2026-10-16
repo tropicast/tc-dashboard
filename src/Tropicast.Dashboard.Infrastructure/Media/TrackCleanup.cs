@@ -39,21 +39,14 @@ internal sealed class StationTracksCleanup(IServiceScopeFactory scopes, TimeProv
             .Where(c => c.StationId == deleted.StationId && c.Purpose == CredentialPurpose.AutoDj && c.RevokedAt == null)
             .ExecuteUpdateAsync(set => set.SetProperty(c => c.RevokedAt, message.OccurredAt).SetProperty(c => c.ProtectedSecret, (string?)null),
                 cancellationToken);
-        await db.EncodingProfiles.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(e => e.StationId == deleted.StationId)
-            .ExecuteDeleteAsync(cancellationToken);
-        await db.AutoDjSettings.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(a => a.StationId == deleted.StationId)
-            .ExecuteDeleteAsync(cancellationToken);
-        // Playlist entries cascade with their playlist and their track.
-        await db.Playlists.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(p => p.StationId == deleted.StationId)
-            .ExecuteDeleteAsync(cancellationToken);
-        var now = time.GetUtcNow();
-        await db.Tracks.IgnoreQueryFilters([AppDbContext.TenantFilter])
-            .Where(t => t.StationId == deleted.StationId && (t.Status == TrackStatus.Ready || t.UploadExpiresAt < now))
-            .ExecuteDeleteAsync(cancellationToken);
+        await StationMedia.DeleteAsync(db, [deleted.StationId], time.GetUtcNow(), orphanPending: false, cancellationToken);
     }
 }
 
-/// <summary>Uploads started but never confirmed: their object (if the browser sent one) and row go once expired.</summary>
+/// <summary>
+/// Uploads started but never confirmed: their object (if the browser sent one) and row go once expired. So do the
+/// <see cref="OrphanedUpload"/>s of deleted workspaces.
+/// </summary>
 internal sealed partial class PendingUploadCleanup(IServiceScopeFactory scopes, TimeProvider time,
     ILogger<PendingUploadCleanup> logger) : BackgroundService
 {
@@ -93,7 +86,18 @@ internal sealed partial class PendingUploadCleanup(IServiceScopeFactory scopes, 
             await db.Tracks.IgnoreQueryFilters([AppDbContext.TenantFilter]).Where(t => t.Id == track.Id)
                 .ExecuteDeleteAsync(cancellationToken);
         }
-        return expired.Count;
+        // Uploads whose station went with its workspace: the URL has expired, so the object (if any) is final.
+        var orphans = await db.OrphanedUploads.Where(o => o.DeleteAfter < now).Take(500).ToListAsync(cancellationToken);
+        foreach (var orphan in orphans)
+        {
+            if (storage.IsConfigured)
+            {
+                await storage.DeleteAsync(orphan.ObjectKey, cancellationToken);
+            }
+            db.OrphanedUploads.Remove(orphan);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return expired.Count + orphans.Count;
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Pending upload cleanup failed ({ErrorType})")]
