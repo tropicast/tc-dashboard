@@ -78,6 +78,19 @@ public sealed class StatsTests
     }
 
     [Fact]
+    public void A_labeled_icecast_series_of_an_AutoDj_mount_is_not_counted_as_live()
+    {
+        const string labeled = """
+            icecast_mount_up{mount="/stations/k3m9x2p7qa/autodj.mp3",station="k3m9x2p7qa",format="mp3"} 1
+            icecast_mount_listeners{mount="/stations/k3m9x2p7qa/autodj.mp3",station="k3m9x2p7qa",format="mp3"} 3
+            """;
+        var sample = ExporterMetrics.Parse("tc-stream-1", AutoDjTakesOver + "\n" + labeled, Now);
+
+        var mount = Assert.Single(sample.Mounts);
+        Assert.Equal((3, true), (mount.Listeners, mount.AutoDj));
+    }
+
+    [Fact]
     public void Icecast_down_means_mounts_unknown()
     {
         var sample = ExporterMetrics.Parse("tc-stream-1", "icecast_up 0\nhetzner_up 0\n", Now);

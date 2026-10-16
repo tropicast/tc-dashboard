@@ -13,10 +13,13 @@ import { data } from '../../../lib/request';
 import type { AutoDj, PlaylistSummary } from '../../../lib/types';
 
 /**
- * The station's AutoDJ (#109): on or off, its playlist, and what is on air now. `live` is null while the station's
- * status is unknown (loading, failed or stale).
+ * The station's AutoDJ (#109): on or off, its playlist, and what is on air now, as the streaming node reports it.
+ * `onAir` is null while the station's status is unknown (loading, failed or stale).
  */
-export function AutoDjPanel({ stationId, live }: { stationId: string; live: boolean | null }) {
+/** What a station plays now: a live DJ, AutoDJ, or nothing. */
+export type OnAir = 'live' | 'autoDj' | 'none';
+
+export function AutoDjPanel({ stationId, onAir }: { stationId: string; onAir: OnAir | null }) {
   const { t } = useTranslation();
   const tenantId = localStorage.getItem('tenant-id');
   const queryClient = useQueryClient();
@@ -43,7 +46,11 @@ export function AutoDjPanel({ stationId, live }: { stationId: string; live: bool
       data<AutoDj>(
         api.PUT('/api/v1/stations/{stationId}/autodj', { params: { path: { stationId } }, body }),
       ),
-    onSuccess: (result) => queryClient.setQueryData(['autodj', tenantId, stationId], result),
+    onSuccess: async (result) => {
+      queryClient.setQueryData(['autodj', tenantId, stationId], result);
+      // What is on air comes from the streaming node: ask it again rather than wait for the next poll.
+      await queryClient.invalidateQueries({ queryKey: ['status', tenantId, stationId] });
+    },
   });
   if (!autoDj.data) return <Notice error={autoDj.error} />;
   const settings =
@@ -66,11 +73,11 @@ export function AutoDjPanel({ stationId, live }: { stationId: string; live: bool
     );
   }
   const source =
-    live === null
+    onAir === null
       ? { color: 'gray' as const, label: t('autodj.sourceUnknown') }
-      : live
+      : onAir === 'live'
         ? { color: 'success' as const, label: t('autodj.sourceLive') }
-        : autoDj.data.active
+        : onAir === 'autoDj'
           ? { color: 'brand' as const, label: t('autodj.sourceAutoDj') }
           : { color: 'gray' as const, label: t('autodj.sourceNone') };
   const playable = (playlists.data ?? []).filter((playlist) => Number(playlist.trackCount) > 0);

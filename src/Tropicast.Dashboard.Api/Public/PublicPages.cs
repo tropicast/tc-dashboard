@@ -93,8 +93,8 @@ internal static class PublicPages
         const s=d.streams.find(x=>a.canPlayType(x.format==='Opus'?'audio/ogg; codecs="opus"':x.contentType))||d.streams[d.streams.length-1];
         let want=false,delay=1000,timer=0,since=0,tick=0;
         const say=(t,busy)=>{note.textContent=t;note.toggleAttribute('data-busy',!!busy);};
-        const ui=()=>{label.textContent=want?d.t.stop:d.t.play;card.classList.toggle('on',want);b.disabled=!want&&d.live===false;};
-        const live=v=>{d.live=v;badge.textContent=v===true?d.t.live:v===false?d.t.offline:'';badge.hidden=v==null;badge.classList.toggle('live',!!v);ui();};
+        const ui=()=>{label.textContent=want?d.t.stop:d.t.play;card.classList.toggle('on',want);b.disabled=!want&&d.live===false&&!d.autoDj;};
+        const live=(v,auto)=>{d.live=v;d.autoDj=!!auto;badge.textContent=v===true?d.t.live:auto?d.t.autoDj:v===false?d.t.offline:'';badge.hidden=v==null;badge.classList.toggle('live',!!v||!!auto);ui();};
         const two=n=>String(n).padStart(2,'0');
         const count=()=>{const n=Math.floor((Date.now()-since)/1000),h=Math.floor(n/3600),m=Math.floor(n/60)%60;
         clock.textContent=(h?h+':'+two(m):m)+':'+two(n%60);};
@@ -113,8 +113,8 @@ internal static class PublicPages
         shared.textContent=d.t.copied;share.classList.add('done');setTimeout(()=>{shared.textContent='';share.classList.remove('done');},3000);});
         const menu=document.querySelector('details');menu&&menu.addEventListener('keydown',e=>{if(e.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary').focus();}});
         document.addEventListener('click',e=>{if(menu&&menu.open&&!menu.contains(e.target))menu.open=false;});
-        const poll=async()=>{try{const r=await fetch(d.statusUrl);if(r.ok)live((await r.json()).live);}catch{}setTimeout(poll,30000);};
-        live(d.live);sound();setTimeout(poll,30000);})();
+        const poll=async()=>{try{const r=await fetch(d.statusUrl);if(r.ok){const j=await r.json();live(j.live,j.autoDj);}}catch{}setTimeout(poll,30000);};
+        live(d.live,d.autoDj);sound();setTimeout(poll,30000);})();
         """;
 
     /// <summary>Inline icons (Untitled UI line style, 24 px, stroke 2), so the page loads no image for its controls.</summary>
@@ -141,7 +141,7 @@ internal static class PublicPages
 
     private static readonly Dictionary<string, string> English = new()
     {
-        ["play"] = "Play", ["stop"] = "Stop", ["live"] = "Live", ["offline"] = "Offline", ["reconnecting"] = "Reconnecting…",
+        ["play"] = "Play", ["stop"] = "Stop", ["live"] = "Live", ["autoDj"] = "AutoDJ", ["offline"] = "Offline", ["reconnecting"] = "Reconnecting…",
         ["listen"] = "Listen live", ["website"] = "Website", ["mute"] = "Mute", ["unmute"] = "Unmute", ["volume"] = "Volume",
         ["share"] = "Share", ["copied"] = "Link copied", ["copy"] = "Copy this link", ["more"] = "More options", ["stream"] = "Open the {0} stream",
         ["privacy"] = "Privacy", ["terms"] = "Terms",
@@ -149,7 +149,7 @@ internal static class PublicPages
 
     private static readonly Dictionary<string, string> French = new()
     {
-        ["play"] = "Écouter", ["stop"] = "Arrêter", ["live"] = "En direct", ["offline"] = "Hors antenne", ["reconnecting"] = "Reconnexion…",
+        ["play"] = "Écouter", ["stop"] = "Arrêter", ["live"] = "En direct", ["autoDj"] = "AutoDJ", ["offline"] = "Hors antenne", ["reconnecting"] = "Reconnexion…",
         ["listen"] = "Écouter en direct", ["website"] = "Site web", ["mute"] = "Couper le son", ["unmute"] = "Rétablir le son",
         ["volume"] = "Volume", ["share"] = "Partager", ["copied"] = "Lien copié", ["copy"] = "Copiez ce lien", ["more"] = "Plus d’options",
         ["stream"] = "Ouvrir le flux {0}", ["privacy"] = "Confidentialité", ["terms"] = "Conditions",
@@ -164,7 +164,7 @@ internal static class PublicPages
         var description = Html.Encode(summary.Length > 300 ? summary[..300] : summary);
         var meta = string.Join(" · ", new[] { station.Genre, station.Country ?? "" }.Where(v => v.Length > 0));
         var pageUrl = station.PageUrl.AbsoluteUri;
-        var data = JsonSerializer.Serialize(new { name = station.Name, pageUrl, streams = station.Streams, live = station.Live, statusUrl, t }, Json);
+        var data = JsonSerializer.Serialize(new { name = station.Name, pageUrl, streams = station.Streams, live = station.Live, autoDj = station.AutoDj, statusUrl, t }, Json);
         var logo = station.LogoUrl is { } url
             ? $"""<img class="logo" src="{Html.Encode(url.AbsoluteUri)}" alt="" width="64" height="64" decoding="async">"""
             : "";

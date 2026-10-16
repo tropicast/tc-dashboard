@@ -4442,6 +4442,7 @@
           "logoUrl",
           "website",
           "live",
+          "autoDj",
           "streams",
           "pageUrl",
           "embedUrl"
@@ -4495,7 +4496,11 @@
               "null",
               "boolean"
             ],
-            "description": "On air now; null when not known."
+            "description": "A DJ is live now; null when not known."
+          },
+          "autoDj": {
+            "type": "boolean",
+            "description": "No DJ is live and AutoDJ plays: the stream is on air all the same."
           },
           "streams": {
             "type": "array",

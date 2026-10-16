@@ -104,7 +104,18 @@ function fakeApi(
           live: options.live ?? false,
           stale: options.stale ?? false,
           listeners: 0,
-          outputs: [],
+          // The node runs AutoDJ's fallback mount while AutoDJ is on.
+          outputs: autodj.active
+            ? [
+                {
+                  format: 'Mp3',
+                  listeners: 0,
+                  bitrateKbps: null,
+                  liveSince: null,
+                  autoDj: !options.live,
+                },
+              ]
+            : [],
         });
       if (path === '/api/v1/stations/s1/autodj' && request.method === 'GET')
         return Response.json(autodj);

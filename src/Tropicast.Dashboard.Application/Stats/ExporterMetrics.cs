@@ -35,9 +35,10 @@ public static class ExporterMetrics
                     break;
                 default:
                     // Live mounts are icecast_mount_* with station and format labels; AutoDJ mounts are repeated as
-                    // tc_autodj_mount_* (up, listeners, sent bytes), keyed the same way (tc-streaming#66).
+                    // tc_autodj_mount_* (up, listeners, sent bytes), keyed the same way (tc-streaming#66). An
+                    // icecast_mount_* series of an AutoDJ mount is skipped even when labeled, or it would count twice.
                     var autoDj = name.StartsWith(AutoDjPrefix, StringComparison.Ordinal);
-                    if ((autoDj || name.StartsWith(LivePrefix, StringComparison.Ordinal))
+                    if ((autoDj || (name.StartsWith(LivePrefix, StringComparison.Ordinal) && !IsAutoDjMount(labels)))
                         && labels.TryGetValue("station", out var station)
                         && labels.TryGetValue("format", out var format) && Format(format) is { } audio)
                     {
@@ -58,6 +59,10 @@ public static class ExporterMetrics
     }
 
     private const string LivePrefix = "icecast_mount_";
+
+    private static bool IsAutoDjMount(Dictionary<string, string> labels)
+        => labels.TryGetValue("mount", out var mount) && mount.Contains("/autodj.", StringComparison.Ordinal);
+
     private const string AutoDjPrefix = "tc_autodj_mount_";
 
     private sealed record MountFields(bool Up = false, double Listeners = 0, double Bitrate = 0, double SentBytes = 0, double Start = 0);

@@ -3886,8 +3886,10 @@ export interface components {
              * @description The station's website.
              */
             website: null | string;
-            /** @description On air now; null when not known. */
+            /** @description A DJ is live now; null when not known. */
             live: null | boolean;
+            /** @description No DJ is live and AutoDJ plays: the stream is on air all the same. */
+            autoDj: boolean;
             /** @description Streams, Opus first (less data) when the plan includes it, then MP3 (plays everywhere). */
             streams: components["schemas"]["PublicStreamResponse"][];
             /**
