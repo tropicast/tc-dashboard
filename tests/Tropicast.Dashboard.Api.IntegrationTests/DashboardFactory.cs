@@ -16,7 +16,10 @@ namespace Tropicast.Dashboard.Api.IntegrationTests;
 /// <summary>One PostgreSQL 17 container per test run; each factory gets its own database.</summary>
 public sealed class PostgresContainer : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("mirror.gcr.io/library/postgres:17-alpine").Build();
+    // Every test class runs its own API with its own connection pool against this one server: the default of 100
+    // connections runs out on CI ("53300: sorry, too many clients already").
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("mirror.gcr.io/library/postgres:17-alpine")
+        .WithCommand("-c", "max_connections=500").Build();
     private int _databases;
 
     public async ValueTask InitializeAsync() => await _container.StartAsync();
