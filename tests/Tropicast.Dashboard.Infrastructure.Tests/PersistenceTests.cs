@@ -24,6 +24,35 @@ public sealed class PersistenceTests(PostgresFixture db)
             plans.Select(p => (p.Id, p.MaxListeners, p.MaxBitrateKbps, p.Formats)));
     }
 
+    /// <summary>
+    /// Deleting a workspace is one DELETE of its tenant row (#132): every row below a station or a tenant must cascade,
+    /// or a new table breaks workspace deletion (and ops/delete-workspace.sql) with a foreign key violation.
+    /// </summary>
+    [Fact]
+    public async Task Every_row_below_a_station_or_its_workspace_cascades()
+    {
+        await using var context = db.CreateContext(null);
+        var restricted = context.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys())
+            .Where(fk => fk.PrincipalEntityType.ClrType == typeof(Station) || fk.PrincipalEntityType.ClrType == typeof(Tenant))
+            .Where(fk => fk.DeleteBehavior != DeleteBehavior.Cascade)
+            .Select(fk => $"{fk.DeclaringEntityType.ClrType.Name} -> {fk.PrincipalEntityType.ClrType.Name} ({fk.DeleteBehavior})")
+            .ToList();
+        Assert.True(restricted.Count == 0, "Make these cascade: " + string.Join(", ", restricted));
+
+        // And the database does it: a workspace with a station and its rows goes in one statement.
+        var (tenant, station) = await CreateTenantWithStationAsync();
+        await using (var setup = db.CreateContext(tenant.Id))
+        {
+            setup.BroadcastCredentials.Add(BroadcastCredential.Create(station.Id, "Studio PC", new string('c', 64), Now));
+            setup.LiveSessions.Add(LiveSession.Start(station.Id, AudioFormat.Mp3, Now));
+            await setup.SaveChangesAsync(Token);
+        }
+        await context.Tenants.IgnoreQueryFilters().Where(t => t.Id == tenant.Id).ExecuteDeleteAsync(Token);
+        Assert.False(await context.Stations.IgnoreQueryFilters().AnyAsync(s => s.Id == station.Id, Token));
+        Assert.False(await context.LiveSessions.IgnoreQueryFilters().AnyAsync(l => l.StationId == station.Id, Token));
+        Assert.False(await context.BroadcastCredentials.IgnoreQueryFilters().AnyAsync(c => c.StationId == station.Id, Token));
+    }
+
     [Fact]
     public async Task Tenant_A_cannot_load_tenant_B_station_or_its_data_through_the_default_query_path()
     {

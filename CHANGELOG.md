@@ -9,6 +9,10 @@ auto-generated list of merged pull requests. See [Releasing](docs/runbook.md#rel
 
 ## [Unreleased]
 
+### Changed
+
+- Rows below a station, and stations below their workspace, cascade on delete (#132): deleting a workspace is one `DELETE` of its row, and a new table cannot break it. Stations are still soft-deleted one by one.
+
 ### Added
 
 - Workspace deletion by its Owner (#125): Account, Delete workspace shows what goes and what blocks it, and asks for the workspace slug. `GET /api/v1/tenants/current/deletion` and `DELETE /api/v1/tenants/current` follow `ops/delete-workspace.sh`: refused while a subscription Stripe may charge for exists or a station is live, then everything goes in one transaction (uploaded audio and mounts after the commit); member accounts stay and the owners get a confirmation email.

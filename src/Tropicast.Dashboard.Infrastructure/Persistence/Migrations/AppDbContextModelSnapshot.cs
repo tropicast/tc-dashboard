@@ -1689,7 +1689,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_auto_dj_settings_stations_station_id");
 
@@ -1701,7 +1701,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", null)
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_encoding_profiles_stations_station_id");
                 });
@@ -1711,7 +1711,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_playlists_stations_station_id");
 
@@ -1742,7 +1742,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tracks_stations_station_id");
 
@@ -1777,7 +1777,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_broadcast_credentials_stations_station_id");
 
@@ -1789,7 +1789,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_live_sessions_stations_station_id");
 
@@ -1801,7 +1801,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_stations_tenants_tenant_id");
                 });
@@ -1811,7 +1811,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_station_stats_rollups_stations_station_id");
 
@@ -1823,7 +1823,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_stream_assignments_stations_station_id");
 
@@ -1878,7 +1878,7 @@ namespace Tropicast.Dashboard.Infrastructure.Persistence.Migrations
                     b.HasOne("Tropicast.Dashboard.Domain.Stations.Station", null)
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_directory_listings_stations_station_id");
                 });
